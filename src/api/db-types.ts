@@ -49,6 +49,9 @@ export interface DBCycleEntry {
   prediction_confidence: number;
   ramadan_day: number | null;
   fasting_status: 'obligatory' | 'lifted' | 'qadha' | null;
+  symptoms?: Record<string, number>;
+  mood?: number;
+  feeling?: string;
   notes: string | null;
   created_at: string;
 }

@@ -49,9 +49,6 @@ function cn(...inputs: ClassValue[]) {
 }
 
 interface ProfileProps {
-  onOpenGhusl: () => void;
-  onOpenJourneys: () => void;
-  onOpenAdah: () => void;
 }
 
 // --- CITY SEARCH COMPONENT ---
@@ -290,7 +287,7 @@ const CitySearch = ({
   );
 };
 
-export const Profile = ({ onOpenGhusl, onOpenJourneys, onOpenAdah }: ProfileProps) => {
+export const Profile = ({ }: ProfileProps) => {
   const { 
     user: contextUser, 
     refresh, 
@@ -390,28 +387,28 @@ export const Profile = ({ onOpenGhusl, onOpenJourneys, onOpenAdah }: ProfileProp
     if (!user) return;
     setIsGeneratingFiqhPDF(true);
     try {
-      const { pdf } = await import('@react-pdf/renderer');
-      const { FiqhReport } = await import('./Reports');
+      const { generateFiqhPDF } = await import('./Reports');
       const safeUser = {
-        ...user,
         id: user?.id ?? user?.uid ?? 'anonymous',
         display_name: user?.display_name ?? 'أخت',
         madhhab: user?.madhhab ?? 'HANBALI',
         anonymous_mode: user?.anonymous_mode ?? false,
+        language: user?.language ?? 'ar',
+        birth_year: user?.birth_year ?? null,
       };
-      const safeLedger = ledger ?? [];
-      const blob = await pdf(
-        <FiqhReport user={safeUser} ledger={safeLedger} fiqhState={fiqhState} t={t} />
-      ).toBlob();
+      const blob = await generateFiqhPDF(safeUser, ledger ?? [], fiqhState ?? 'TAHARA');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
+      a.style.display = 'none';
       a.href = url;
       a.download = `niswah-fiqh-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err: any) {
-      console.error('Fiqh PDF error:', err?.message, err?.stack);
-      alert(`خطأ في تقرير الفقه: ${err?.message}`);
+      console.error('Fiqh PDF error:', err?.message);
+      alert(`خطأ: ${err?.message}`);
     } finally {
       setIsGeneratingFiqhPDF(false);
     }
@@ -421,89 +418,79 @@ export const Profile = ({ onOpenGhusl, onOpenJourneys, onOpenAdah }: ProfileProp
     if (!user) return;
     setIsGeneratingDoctorPDF(true);
     try {
-      const { pdf } = await import('@react-pdf/renderer');
-      const { DoctorReport } = await import('./Reports');
-      
+      const { generateDoctorPDF } = await import('./Reports');
       const safeUser = {
-        ...user,
         id: user?.id ?? user?.uid ?? 'anonymous',
         display_name: user?.display_name ?? 'أخت',
         madhhab: user?.madhhab ?? 'HANBALI',
         anonymous_mode: user?.anonymous_mode ?? false,
+        language: user?.language ?? 'ar',
+        birth_year: user?.birth_year ?? null,
       };
-      const safeLedger = ledger ?? [];
-      
-      // Calculate stats from ledger
       const stats = {
-        avgCycleLength: safeLedger.length > 0 ? (safeLedger.reduce((acc, curr) => acc + (curr.tuhr_duration_days || 0) + ((curr.haid_duration_hours || 0) / 24), 0) / safeLedger.length).toFixed(1) : '28',
-        avgHaidDuration: safeLedger.length > 0 ? (safeLedger.reduce((acc, curr) => acc + (curr.haid_duration_hours || 0), 0) / safeLedger.length / 24).toFixed(1) : '6',
-        regularityScore: safeLedger.length > 1 ? 'High' : 'Medium',
-        shortestCycle: safeLedger.length > 0 ? Math.min(...safeLedger.map(l => (l.tuhr_duration_days || 0) + ((l.haid_duration_hours || 0) / 24))).toFixed(1) : '...',
-        longestCycle: safeLedger.length > 0 ? Math.max(...safeLedger.map(l => (l.tuhr_duration_days || 0) + ((l.haid_duration_hours || 0) / 24))).toFixed(1) : '...'
+        avgCycleLength: (ledger ?? []).length > 0
+          ? ((ledger ?? []).reduce((a: number, c: any) => a + (c?.tuhr_duration_days || 0) + ((c?.haid_duration_hours || 0) / 24), 0) / (ledger ?? []).length).toFixed(1)
+          : '28',
+        avgHaidDuration: (ledger ?? []).length > 0
+          ? ((ledger ?? []).reduce((a: number, c: any) => a + (c?.haid_duration_hours || 0), 0) / (ledger ?? []).length / 24).toFixed(1)
+          : '7',
+        shortestCycle: (ledger ?? []).length > 0
+          ? Math.min(...(ledger ?? []).map((l: any) => (l?.tuhr_duration_days || 0) + ((l?.haid_duration_hours || 0) / 24))).toFixed(1)
+          : '28',
+        longestCycle: (ledger ?? []).length > 0
+          ? Math.max(...(ledger ?? []).map((l: any) => (l?.tuhr_duration_days || 0) + ((l?.haid_duration_hours || 0) / 24))).toFixed(1)
+          : '28',
       };
-
-      const blob = await pdf(<DoctorReport user={safeUser} stats={stats} ledger={safeLedger} t={t} />).toBlob();
+      const blob = await generateDoctorPDF(safeUser, ledger ?? [], stats);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
+      a.style.display = 'none';
       a.href = url;
-      a.download = `niswah-doctor-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      a.download = `niswah-doctor-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err: any) {
-      console.error('Doctor PDF error:', err?.message, err?.stack);
-      alert(`خطأ في تقرير الطبيب: ${err?.message}`);
+      console.error('Doctor PDF error:', err?.message);
+      alert(`خطأ: ${err?.message}`);
     } finally {
       setIsGeneratingDoctorPDF(false);
     }
   };
 
   const handleDownloadHusbandReport = async () => {
-    if (!user) {
-      alert('لا توجد بيانات مستخدم');
-      return;
-    }
+    if (!user) return;
     setIsGeneratingHusbandPDF(true);
     try {
-      const { pdf } = await import('@react-pdf/renderer');
-      const { HusbandReport } = await import('./Reports');
-      
+      const { generateHusbandPDF } = await import('./Reports');
       const safeUser = {
         id: user?.id ?? user?.uid ?? 'anonymous',
         display_name: user?.display_name ?? 'أخت',
         madhhab: user?.madhhab ?? 'HANBALI',
         anonymous_mode: user?.anonymous_mode ?? false,
+        language: user?.language ?? 'ar',
         trying_to_conceive: user?.trying_to_conceive ?? false,
-        language: user?.language ?? 'ar'
       };
-
-      // ADD THIS — logs exact values before crash
-      console.log('DEBUG safeUser:', JSON.stringify(safeUser));
-      console.log('DEBUG currentDay:', currentDay);
-      console.log('DEBUG fiqhState:', fiqhState);
-      console.log('DEBUG prediction:', JSON.stringify(prediction));
-      console.log('DEBUG ovulation:', JSON.stringify(ovulation));
-
-      const blob = await pdf(
-        <HusbandReport
-          user={safeUser}
-          currentDay={currentDay ?? 1}
-          fiqhState={fiqhState ?? 'TAHARA'}
-          nextPeriodDate={prediction?.predictedStartDate ? new Date(prediction.predictedStartDate) : null}
-          fertilityStart={ovulation?.fertileWindowStart ? new Date(ovulation.fertileWindowStart) : null}
-          fertilityEnd={ovulation?.fertileWindowEnd ? new Date(ovulation.fertileWindowEnd) : null}
-          t={t}
-        />
-      ).toBlob();
-
+      const blob = await generateHusbandPDF(
+        safeUser,
+        currentDay ?? 1,
+        fiqhState ?? 'TAHARA',
+        prediction?.predictedStartDate ? new Date(prediction.predictedStartDate) : null,
+        ovulation?.fertileWindowStart ? new Date(ovulation.fertileWindowStart) : null,
+        ovulation?.fertileWindowEnd ? new Date(ovulation.fertileWindowEnd) : null,
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
+      a.style.display = 'none';
       a.href = url;
       a.download = `niswah-husband-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err: any) {
-      console.error('FULL ERROR:', err);
-      console.error('STACK:', err?.stack);
+      console.error('Husband PDF error:', err?.message);
       alert(`خطأ: ${err?.message}`);
     } finally {
       setIsGeneratingHusbandPDF(false);
@@ -595,17 +582,6 @@ export const Profile = ({ onOpenGhusl, onOpenJourneys, onOpenAdah }: ProfileProp
           </div>
         </section>
 
-        {/* Essential Tools */}
-        <section className="space-y-3">
-          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('essential_tools')}</h3>
-          <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
-            <LinkRow icon={Calendar} label={t('adah_ledger')} onClick={onOpenAdah} />
-            <LinkRow icon={BookOpen} label={t('ghusl_guide')} onClick={onOpenGhusl} />
-            <LinkRow icon={Sparkles} label={t('journeys')} onClick={onOpenJourneys} />
-            <LinkRow icon={Share2} label={t('invite_friends' as any)} onClick={() => {}} />
-            <LinkRow icon={Heart} label={t('rate_app' as any)} onClick={() => {}} />
-          </div>
-        </section>
 
         {/* Health Profile */}
         <section className="space-y-4">

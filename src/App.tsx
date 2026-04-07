@@ -204,16 +204,12 @@ function AppContent() {
       case 'calendar':
         return <Calendar />;
       case 'insights':
-        return <Insights />;
+        return <Insights onNavigateToToday={() => setActiveTab('today')} />;
       case 'community':
         return <Community />;
       case 'profile':
         return (
-          <Profile 
-            onOpenGhusl={() => setIsGhuslOpen(true)}
-            onOpenJourneys={() => setIsJourneysOpen(true)}
-            onOpenAdah={() => setActiveTab('insights')}
-          />
+          <Profile />
         );
       default:
         return (

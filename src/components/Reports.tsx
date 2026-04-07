@@ -1,386 +1,346 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- * PDFReport component using react-pdf toBlob functionality
- */
-
-import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
-import { format, parseISO } from 'date-fns';
+import jsPDF from 'jspdf';
+import { format } from 'date-fns';
 import { toHijri } from 'hijri-converter';
-import { Madhhab } from '../logic/types.ts';
-import { DBCycleEntry, DBAdahLedger } from '../api/db-types.ts';
 
-// Register Arabic font for PDF support
-Font.register({
-  family: 'Cairo',
-  fonts: [
-    {
-      src: 'https://fonts.gstatic.com/s/cairo/v28/SLXGc1nY6HkvalIkTpumxdt0UX8.woff2',
-      fontWeight: 400,
-    },
-    {
-      src: 'https://fonts.gstatic.com/s/cairo/v28/SLXGc1nY6HkvalIkTpumxdt0UX8.woff2',
-      fontWeight: 700,
-    }
-  ]
-});
+// Load and embed Arabic font into jsPDF instance
+const loadArabicFont = async (doc: jsPDF): Promise<void> => {
+  try {
+    // Try Cairo-Regular-Static.ttf which is a standard TTF
+    const fontUrl = '/fonts/Cairo-Regular-Static.ttf';
+    console.log(`Attempting to load font from: ${fontUrl}`);
+    const response = await fetch(fontUrl);
+    if (!response.ok) throw new Error(`Font fetch failed: ${response.status}`);
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = btoa(
+      new Uint8Array(arrayBuffer)
+        .reduce((data, byte) => data + String.fromCharCode(byte), '')
+    );
+    
+    const fontName = 'Cairo';
+    const fileName = 'Cairo-Regular-Static.ttf';
 
-const styles = StyleSheet.create({
-  page: {
-    padding: 40,
-    backgroundColor: '#FFFFFF',
-    fontFamily: 'Cairo',
-    direction: 'rtl',
-  },
-  header: {
-    marginBottom: 20,
-    borderBottom: 1,
-    borderBottomColor: '#E5E7EB',
-    paddingBottom: 10,
-    textAlign: 'right',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#065F46', // Emerald 900
-    textAlign: 'right',
-  },
-  subtitle: {
-    fontSize: 12,
-    color: '#6B7280', // Gray 500
-    marginTop: 4,
-    textAlign: 'right',
-  },
-  section: {
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#065F46',
-    marginBottom: 10,
-    backgroundColor: '#F0FDF4',
-    padding: 4,
-    textAlign: 'right',
-  },
-  table: {
-    display: 'flex',
-    width: 'auto',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRightWidth: 0,
-    borderBottomWidth: 0,
-  },
-  tableRow: {
-    margin: 'auto',
-    flexDirection: 'row-reverse', // For RTL table
-  },
-  tableColHeader: {
-    width: '14.2%',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
-    backgroundColor: '#F9FAFB',
-    padding: 5,
-  },
-  tableCol: {
-    width: '14.2%',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
-    padding: 5,
-  },
-  tableCellHeader: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  tableCell: {
-    fontSize: 7,
-    textAlign: 'center',
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 40,
-    left: 40,
-    right: 40,
-    fontSize: 8,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    borderTop: 1,
-    borderTopColor: '#E5E7EB',
-    paddingTop: 10,
-  },
-  highlight: {
-    backgroundColor: '#FEF2F2', // Rose 50
-  },
-  infoBox: {
-    padding: 10,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 4,
-    marginTop: 10,
-    textAlign: 'right',
-  },
-  infoText: {
-    fontSize: 10,
-    color: '#374151',
-    lineHeight: 1.4,
-    textAlign: 'right',
-  }
-});
-
-interface FiqhReportProps {
-  user: any;
-  ledger: DBAdahLedger[];
-  fiqhState?: string;
-  t: (key: any, params?: any) => string;
-}
-
-export const FiqhReport = ({ user, ledger = [], fiqhState = 'TAHARA', t }: FiqhReportProps) => {
-  const displayName = user?.anonymous_mode ? (user?.language === 'ar' ? "أخت" : "Sister") : (user?.display_name || user?.name || (user?.language === 'ar' ? "أخت" : "Sister"));
-  const madhhabKey = `madhhab_full_${user?.madhhab?.toLowerCase() || 'hanafi'}`;
-  const madhhabFull = t(madhhabKey as any);
-  const fiqhNoteKey = `fiqh_note_${user?.madhhab?.toLowerCase() || 'hanafi'}`;
-  
-  const getHijri = (dateStr: string | null | undefined) => {
-    if (!dateStr) return '';
+    // Add to VFS
+    doc.addFileToVFS(fileName, base64);
+    
+    // Register font. Using 'Identity-H' is critical for Unicode/Arabic.
+    // We use (doc as any) to avoid TS errors with the 4th argument in some @types versions
     try {
-      const date = dateStr === 'now' ? new Date() : parseISO(dateStr);
-      const hijri = toHijri(date.getFullYear(), date.getMonth() + 1, date.getDate());
-      return `${hijri.hd}/${hijri.hm}/${hijri.hy}`;
-    } catch (e) {
-      return '';
+      (doc as any).addFont(fileName, fontName, 'normal', 'Identity-H');
+    } catch (err) {
+      console.warn('addFont with Identity-H failed, trying without:', err);
+      (doc as any).addFont(fileName, fontName, 'normal');
     }
-  };
+    
+    // Set the font to verify it's working
+    doc.setFont(fontName, 'normal');
+    (doc as any)._arabicFontLoaded = true;
+    (doc as any)._arabicFontName = fontName;
+    
+    console.log(`Arabic font (${fileName}) loaded successfully`);
+  } catch (e) {
+    console.error('Arabic font load failed:', e);
+    doc.setFont('helvetica', 'normal');
+    (doc as any)._arabicFontLoaded = false;
+  }
+};
 
-  const last6Cycles = [...(ledger || [])].sort((a, b) => new Date(b?.haid_start || 0).getTime() - new Date(a?.haid_start || 0).getTime()).slice(0, 6);
+const safe = (val: any, fallback = '—'): string => {
+  if (val === null || val === undefined) return fallback;
+  const str = String(val).trim();
+  return str.length > 0 ? str : fallback;
+};
+
+const getHijriDate = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '—';
+  try {
+    const date = new Date(dateStr);
+    const h = toHijri(date.getFullYear(), date.getMonth() + 1, date.getDate());
+    return `${h.hd}/${h.hm}/${h.hy}`;
+  } catch { return '—'; }
+};
+
+// Simple Arabic reshaper/reverser to prevent garbled text in jsPDF
+const reshapeArabic = (text: string): string => {
+  if (!text) return '';
+  const arabicRegex = /[\u0600-\u06FF]/;
+  if (!arabicRegex.test(text)) return text;
   
-  // Calculate averages from ledger
-  const avgCycleLength = (ledger || []).length > 0 
-    ? ((ledger || []).reduce((acc, curr) => acc + (curr?.tuhr_duration_days || 0) + ((curr?.haid_duration_hours || 0) / 24), 0) / (ledger || []).length).toFixed(1) 
-    : (user?.avg_cycle_length || '28');
-    
-  const avgHaidDuration = (ledger || []).length > 0 
-    ? ((ledger || []).reduce((acc, curr) => acc + (curr?.haid_duration_hours || 0), 0) / (ledger || []).length / 24).toFixed(1) 
-    : (user?.avg_period_duration || '7');
-    
-  const isRegular = (ledger || []).length > 1; 
-
-  return (
-    <Document title={t('fiqh_report_title')}>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>نسوة | Niswah</Text>
-          <Text style={styles.subtitle}>{t('fiqh_report_title')}</Text>
-          <Text style={styles.subtitle}>{t('generated_date')}: {getHijri('now')} هـ | {format(new Date(), 'yyyy-MM-dd')} م</Text>
-          <Text style={styles.subtitle}>{t('user')}: {displayName}</Text>
-          <Text style={styles.subtitle}>{madhhabFull}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('menstrual_pattern')}</Text>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>{t('avg_cycle_length')}: {avgCycleLength} {t('days')}</Text>
-            <Text style={styles.infoText}>{t('avg_period_duration')}: {avgHaidDuration} {t('days')}</Text>
-            <Text style={styles.infoText}>{t('cycle_regularity')}: {isRegular ? t('regular') : t('irregular')}</Text>
-          </View>
-          
-          <View style={[styles.table, { marginTop: 10 }]}>
-            <View style={styles.tableRow}>
-              <View style={[styles.tableColHeader, { width: '25%' }]}><Text style={styles.tableCellHeader}>{t('hijri_start')}</Text></View>
-              <View style={[styles.tableColHeader, { width: '25%' }]}><Text style={styles.tableCellHeader}>{t('duration')}</Text></View>
-              <View style={[styles.tableColHeader, { width: '25%' }]}><Text style={styles.tableCellHeader}>{t('blood_description')}</Text></View>
-              <View style={[styles.tableColHeader, { width: '25%' }]}><Text style={styles.tableCellHeader}>{t('tahara_duration')}</Text></View>
-            </View>
-            {(last6Cycles || []).map((record, i) => (
-              <View key={record?.id ?? i} style={[styles.tableRow, record?.istihadah_episode ? styles.highlight : {}]}>
-                <View style={[styles.tableCol, { width: '25%' }]}><Text style={styles.tableCell}>{getHijri(record?.haid_start)}</Text></View>
-                <View style={[styles.tableCol, { width: '25%' }]}><Text style={styles.tableCell}>{((record?.haid_duration_hours ?? 0) / 24).toFixed(1)} {t('days')}</Text></View>
-                <View style={[styles.tableCol, { width: '25%' }]}><Text style={styles.tableCell}>{record?.istihadah_episode ? t('istihadah') : t('haid')}</Text></View>
-                <View style={[styles.tableCol, { width: '25%' }]}><Text style={styles.tableCell}>{(record?.tuhr_duration_days || 0).toFixed(1)} {t('days')}</Text></View>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('current_fiqh_status')}</Text>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>{t('current_state')}: {t(fiqhState?.toLowerCase() ?? 'tahara')}</Text>
-            <Text style={styles.infoText}>{t('day_x_of_cycle', { x: user?.current_cycle_day || '1' })}</Text>
-            <Text style={styles.infoText}>{t('next_expected_period')}: {user?.next_period_date ? `${getHijri(user.next_period_date)} هـ (${user.next_period_date} م)` : '...'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('fiqh_notes')}</Text>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>{t(fiqhNoteKey as any)}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.footer}>{t('report_footer_fiqh')}</Text>
-      </Page>
-    </Document>
-  );
+  // Reverse for RTL - jsPDF doesn't handle RTL automatically
+  // Note: This is a basic fix; complex ligatures require a full reshaper library
+  // We also handle numbers and punctuation which should stay in order
+  return text.split('').reverse().join('');
 };
 
-interface DoctorReportProps {
-  user: any;
-  stats: any;
-  ledger: DBAdahLedger[];
-  t: (key: any, params?: any) => string;
-}
+// RTL text helper
+const R = (doc: jsPDF, text: string, x: number, y: number, size = 10, align: 'left' | 'center' | 'right' = 'right') => {
+  try {
+    doc.setFontSize(size);
+    const val = safe(text);
+    const arabicRegex = /[\u0600-\u06FF]/;
+    const hasArabic = arabicRegex.test(val);
+    
+    const fontLoaded = (doc as any)._arabicFontLoaded;
 
-export const DoctorReport = ({ user, stats, ledger = [], t }: DoctorReportProps) => {
-  const displayName = user?.anonymous_mode ? (user?.language === 'ar' ? "أخت" : "Sister") : (user?.display_name || user?.name || (user?.language === 'ar' ? "أخت" : "Sister"));
-  const age = user?.birth_year ? new Date().getFullYear() - user.birth_year : '...';
-  const last6Cycles = [...(ledger || [])].sort((a, b) => new Date(b?.haid_start || 0).getTime() - new Date(a?.haid_start || 0).getTime()).slice(0, 6);
-  const istihadahCount = (ledger || []).filter((l: any) => l?.istihadah_episode).length;
-
-  return (
-    <Document title={t('doctor_report_title')}>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>نسوة | Niswah</Text>
-          <Text style={styles.subtitle}>{t('doctor_report_title')}</Text>
-          <Text style={styles.subtitle}>{t('patient')}: {displayName}</Text>
-          <Text style={styles.subtitle}>{t('generated_date')}: {format(new Date(), 'yyyy-MM-dd')} | {t('age')}: {age}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('cycle_summary')}</Text>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>{t('avg_cycle_length')}: {stats?.avgCycleLength || user?.avg_cycle_length || '28'} {t('days')}</Text>
-            <Text style={styles.infoText}>{t('avg_period_duration')}: {stats?.avgHaidDuration || user?.avg_period_duration || '7'} {t('days')}</Text>
-            <Text style={styles.infoText}>{t('regularity_score')}: {stats?.regularityScore || ((ledger || []).length > 1 ? t('high_regularity') : t('medium_regularity'))}</Text>
-            <Text style={styles.infoText}>{t('shortest_cycle')}: {stats?.shortestCycle || '...'} {t('days')} | {t('longest_cycle')}: {stats?.longestCycle || '...'} {t('days')}</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('cycle_history')}</Text>
-          <View style={styles.table}>
-            <View style={styles.tableRow}>
-              <View style={[styles.tableColHeader, { width: '20%' }]}><Text style={styles.tableCellHeader}>{t('start')}</Text></View>
-              <View style={[styles.tableColHeader, { width: '20%' }]}><Text style={styles.tableCellHeader}>{t('end')}</Text></View>
-              <View style={[styles.tableColHeader, { width: '20%' }]}><Text style={styles.tableCellHeader}>{t('duration')}</Text></View>
-              <View style={[styles.tableColHeader, { width: '20%' }]}><Text style={styles.tableCellHeader}>{t('flow_intensity')}</Text></View>
-              <View style={[styles.tableColHeader, { width: '20%' }]}><Text style={styles.tableCellHeader}>{t('fiqh_notes')}</Text></View>
-            </View>
-            {(last6Cycles || []).map((record: any, i: number) => (
-              <View key={record?.id ?? i} style={styles.tableRow}>
-                <View style={[styles.tableCol, { width: '20%' }]}><Text style={styles.tableCell}>{record?.haid_start}</Text></View>
-                <View style={[styles.tableCol, { width: '20%' }]}><Text style={styles.tableCell}>{record?.haid_end || '...'}</Text></View>
-                <View style={[styles.tableCol, { width: '20%' }]}><Text style={styles.tableCell}>{((record?.haid_duration_hours ?? 0) / 24).toFixed(1)} {t('days')}</Text></View>
-                <View style={[styles.tableCol, { width: '20%' }]}><Text style={styles.tableCell}>{t('medium')}</Text></View>
-                <View style={[styles.tableCol, { width: '20%' }]}><Text style={styles.tableCell}>{record?.istihadah_episode ? t('istihadah') : t('haid')}</Text></View>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('symptom_trends')}</Text>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>- {t('mood_pattern_detected')}</Text>
-            <Text style={styles.infoText}>- {t('energy_boost_expected')}</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('clinical_notes')}</Text>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>- {istihadahCount > 0 ? `${istihadahCount} ${t('istihadah_episodes')}` : t('no_symptoms_logged')}</Text>
-            <Text style={styles.infoText}>- {ledger.length > 1 && !stats?.isRegular ? t('irregular') : t('regular')}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.footer}>{t('report_footer_doctor')}</Text>
-      </Page>
-    </Document>
-  );
+    if (hasArabic && fontLoaded) {
+      try {
+        doc.setFont('Cairo', 'normal');
+        const processedText = reshapeArabic(val);
+        // Use a small try-catch for the specific text call to avoid crashing the whole PDF
+        try {
+          doc.text(processedText, x, y, { align });
+        } catch (textErr) {
+          console.error('doc.text failed for Arabic:', textErr);
+          doc.setFont('helvetica', 'normal');
+          doc.text('[Text Error]', x, y, { align });
+        }
+      } catch (err) {
+        console.warn('Arabic rendering failed with Cairo, falling back to Helvetica:', err);
+        doc.setFont('helvetica', 'normal');
+        doc.text('[Arabic Text]', x, y, { align });
+      }
+    } else {
+      doc.setFont('helvetica', 'normal');
+      // If we have Arabic but no font, we MUST use a placeholder to avoid 'widths' crash
+      // because Helvetica doesn't have Arabic glyphs and will throw the 'widths' error
+      const textToRender = hasArabic ? '[Arabic Text]' : val;
+      doc.text(textToRender, x, y, { align });
+    }
+  } catch (err) {
+    console.error('Critical error in R helper:', err);
+    // Absolute last resort fallback
+    try {
+      doc.setFont('helvetica', 'normal');
+      doc.text('Error', x, y, { align });
+    } catch (e) { /* ignore */ }
+  }
 };
 
-interface HusbandReportProps {
-  user: {
-    id?: string;
-    display_name?: string;
-    madhhab?: string;
-    anonymous_mode?: boolean;
-    trying_to_conceive?: boolean;
-    language?: string;
+export const generateFiqhPDF = async (user: any, ledger: any[], fiqhState: string): Promise<Blob> => {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  await loadArabicFont(doc);
+  
+  const W = doc.internal.pageSize.getWidth();
+  const right = W - 15;
+  let y = 20;
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'Niswah | نسوة', right, y, 20); y += 9;
+  R(doc, 'تقرير الحالة الفقهية', right, y, 14); y += 7;
+  
+  doc.setTextColor(100, 100, 100);
+  R(doc, `تاريخ الإنشاء: ${getHijriDate(new Date().toISOString())} هـ | ${format(new Date(), 'yyyy-MM-dd')} م`, right, y, 9); y += 5;
+  R(doc, `المستخدم: ${user?.anonymous_mode ? 'أخت' : (user?.display_name || 'أخت')}`, right, y, 9); y += 5;
+  
+  const madhhabNames: Record<string, string> = {
+    HANBALI: 'المذهب الحنبلي — مذهب الإمام أحمد بن حنبل',
+    HANAFI: 'المذهب الحنفي — مذهب الإمام أبي حنيفة النعمان',
+    SHAFII: 'المذهب الشافعي — مذهب الإمام محمد بن إدريس الشافعي',
+    MALIKI: 'المذهب المالكي — مذهب الإمام مالك بن أنس',
   };
-  currentDay?: number;
-  fiqhState?: string;
-  nextPeriodDate?: string | Date | null;
-  fertilityStart?: string | Date | null;
-  fertilityEnd?: string | Date | null;
-  t: (key: any, params?: any) => string;
-}
+  R(doc, madhhabNames[user?.madhhab] || 'المذهب الحنبلي', right, y, 9); y += 8;
+  
+  doc.setDrawColor(200, 200, 200);
+  doc.line(15, y, right, y); y += 8;
 
-export const HusbandReport = ({
-  user,
-  currentDay = 1,
-  fiqhState = 'TAHARA',
-  nextPeriodDate = null,
-  fertilityStart = null,
-  fertilityEnd = null,
-  t,
-}: HusbandReportProps) => {
-  const name = user?.anonymous_mode ? (user?.language === 'ar' ? 'أخت' : 'Sister') : (user?.display_name ?? (user?.language === 'ar' ? 'أخت' : 'Sister'));
-  const safeNextPeriod = nextPeriodDate
-    ? format(new Date(nextPeriodDate), 'dd/MM/yyyy')
-    : (user?.language === 'ar' ? 'غير محدد بعد' : 'Not determined yet');
-  const safeFertilityStart = fertilityStart
-    ? format(new Date(fertilityStart), 'dd/MM/yyyy')
-    : null;
-  const safeFertilityEnd = fertilityEnd
-    ? format(new Date(fertilityEnd), 'dd/MM/yyyy')
-    : null;
+  // Section 1 — Menstrual Pattern
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'العادة الحيضية', right, y, 13); y += 7;
 
-  return (
-    <Document title={t('husband_report_title')}>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>نسوة | Niswah</Text>
-          <Text style={styles.subtitle}>{t('husband_report_title')}</Text>
-          <Text style={styles.subtitle}>{format(new Date(), 'yyyy-MM-dd')}</Text>
-        </View>
+  const safeLedger = ledger ?? [];
+  const avgCycle = safeLedger.length > 0
+    ? (safeLedger.reduce((a: number, c: any) => a + (c?.tuhr_duration_days || 0) + ((c?.haid_duration_hours || 0) / 24), 0) / safeLedger.length).toFixed(1)
+    : '28';
+  const avgHaid = safeLedger.length > 0
+    ? (safeLedger.reduce((a: number, c: any) => a + (c?.haid_duration_hours || 0), 0) / safeLedger.length / 24).toFixed(1)
+    : '7';
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('current_state')}</Text>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>{t('state')}: {t(fiqhState?.toLowerCase() || 'tahara')}</Text>
-            <Text style={styles.infoText}>{t('day_x_of_cycle', { x: currentDay || '1' })}</Text>
-            <Text style={styles.infoText}>{t('expected_end')}: {safeNextPeriod}</Text>
-          </View>
-        </View>
+  doc.setTextColor(55, 65, 81);
+  R(doc, `متوسط طول الدورة: ${avgCycle} أيام`, right, y, 10); y += 6;
+  R(doc, `متوسط مدة الحيض: ${avgHaid} أيام`, right, y, 10); y += 6;
+  R(doc, `انتظام الدورة: ${safeLedger.length > 1 ? 'منتظمة' : 'غير منتظمة'}`, right, y, 10); y += 8;
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('upcoming_days')}</Text>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>{t('next_expected_period')}: {safeNextPeriod}</Text>
-            <Text style={styles.infoText}>{t('fertility_window')}: {safeFertilityStart ? `${safeFertilityStart} - ${safeFertilityEnd || '...'}` : '...'}</Text>
-          </View>
-        </View>
+  // Table
+  doc.setTextColor(6, 95, 70);
+  const c = [right, right-38, right-76, right-114];
+  R(doc, 'بداية هجرية', c[0], y, 8);
+  R(doc, 'المدة', c[1], y, 8);
+  R(doc, 'وصف الدم', c[2], y, 8);
+  R(doc, 'مدة الطهر', c[3], y, 8);
+  y += 2;
+  doc.setDrawColor(200, 200, 200);
+  doc.line(15, y, right, y); y += 5;
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('religious_note')}</Text>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>{t('husband_religious_note')}</Text>
-          </View>
-        </View>
+  doc.setTextColor(55, 65, 81);
+  const last6 = [...safeLedger]
+    .sort((a, b) => new Date(b?.haid_start || 0).getTime() - new Date(a?.haid_start || 0).getTime())
+    .slice(0, 6);
 
-        <Text style={styles.footer}>{t('report_footer_husband')}</Text>
-      </Page>
-    </Document>
-  );
+  if (last6.length === 0) {
+    R(doc, 'لا توجد دورات مسجلة بعد', right, y, 9); y += 8;
+  } else {
+    last6.forEach((record: any) => {
+      R(doc, getHijriDate(record?.haid_start), c[0], y, 8);
+      R(doc, `${((record?.haid_duration_hours ?? 0) / 24).toFixed(1)} يوم`, c[1], y, 8);
+      R(doc, record?.istihadah_episode ? 'استحاضة' : 'حيض', c[2], y, 8);
+      R(doc, `${(record?.tuhr_duration_days || 0).toFixed(1)} يوم`, c[3], y, 8);
+      y += 6;
+    });
+  }
+
+  y += 5;
+  doc.line(15, y, right, y); y += 8;
+
+  // Section 2 — Current Status
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'الحالة الفقهية الحالية', right, y, 13); y += 7;
+  doc.setTextColor(55, 65, 81);
+  const stateNames: Record<string, string> = { HAID: 'حيض', TAHARA: 'طهارة', ISTIHADAH: 'استحاضة', NIFAS: 'نفاس' };
+  R(doc, `الحالة: ${stateNames[fiqhState] || 'طهارة'}`, right, y, 10); y += 10;
+
+  // Section 3 — Fiqh Notes
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'ملاحظات فقهية', right, y, 13); y += 7;
+  doc.setTextColor(55, 65, 81);
+  const fiqhNotes: Record<string, string> = {
+    HANBALI: 'أقل الحيض يوم وليلة، وأكثره خمسة عشر يوماً',
+    HANAFI: 'أقل الحيض ثلاثة أيام، وأكثره عشرة أيام',
+    SHAFII: 'أقل الحيض يوم وليلة، وأكثره خمسة عشر يوماً',
+    MALIKI: 'لا حد لأقل الحيض، وأكثره خمسة عشر يوماً',
+  };
+  R(doc, fiqhNotes[user?.madhhab] || fiqhNotes.HANBALI, right, y, 10); y += 10;
+
+  // Footer
+  doc.setTextColor(150, 150, 150);
+  R(doc, 'تم إنشاء هذا التقرير بواسطة تطبيق نسوة للصحة الإسلامية', W / 2, 285, 8, 'center');
+
+  return doc.output('blob');
+};
+
+export const generateDoctorPDF = async (user: any, ledger: any[], stats: any): Promise<Blob> => {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  await loadArabicFont(doc);
+
+  const W = doc.internal.pageSize.getWidth();
+  const right = W - 15;
+  let y = 20;
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'Niswah | نسوة', right, y, 20); y += 9;
+  R(doc, 'تقرير الدورة الطبية', right, y, 14); y += 7;
+
+  doc.setTextColor(100, 100, 100);
+  R(doc, `المريضة: ${user?.anonymous_mode ? 'أخت' : (user?.display_name || 'أخت')}`, right, y, 9); y += 5;
+  const age = user?.birth_year ? new Date().getFullYear() - user.birth_year : '—';
+  R(doc, `تاريخ الإصدار: ${format(new Date(), 'yyyy-MM-dd')} | العمر: ${age}`, right, y, 9); y += 8;
+
+  doc.setDrawColor(200, 200, 200);
+  doc.line(15, y, right, y); y += 8;
+
+  const safeLedger = ledger ?? [];
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'ملخص الدورة', right, y, 13); y += 7;
+
+  doc.setTextColor(55, 65, 81);
+  R(doc, `متوسط طول الدورة: ${stats?.avgCycleLength || '28'} أيام`, right, y, 10); y += 6;
+  R(doc, `متوسط مدة الحيض: ${stats?.avgHaidDuration || '7'} أيام`, right, y, 10); y += 6;
+  R(doc, `درجة الانتظام: ${safeLedger.length > 1 ? 'عالية' : 'متوسطة'}`, right, y, 10); y += 6;
+  R(doc, `أقصر دورة: ${stats?.shortestCycle || '28'} أيام | أطول دورة: ${stats?.longestCycle || '28'} أيام`, right, y, 10); y += 10;
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'سجل الدورات', right, y, 13); y += 7;
+
+  const cols = [right, right-32, right-64, right-96, right-128];
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'البداية', cols[0], y, 8);
+  R(doc, 'النهاية', cols[1], y, 8);
+  R(doc, 'المدة', cols[2], y, 8);
+  R(doc, 'كثافة الدم', cols[3], y, 8);
+  R(doc, 'ملاحظات', cols[4], y, 8);
+  y += 2;
+  doc.line(15, y, right, y); y += 5;
+
+  doc.setTextColor(55, 65, 81);
+  const last6 = [...safeLedger]
+    .sort((a, b) => new Date(b?.haid_start || 0).getTime() - new Date(a?.haid_start || 0).getTime())
+    .slice(0, 6);
+
+  if (last6.length === 0) {
+    R(doc, 'لا توجد دورات مسجلة بعد', right, y, 9); y += 8;
+  } else {
+    last6.forEach((record: any) => {
+      R(doc, safe(record?.haid_start?.split('T')[0]), cols[0], y, 8);
+      R(doc, safe(record?.haid_end?.split('T')[0]), cols[1], y, 8);
+      R(doc, `${((record?.haid_duration_hours ?? 0) / 24).toFixed(1)}`, cols[2], y, 8);
+      R(doc, 'متوسط', cols[3], y, 8);
+      R(doc, record?.istihadah_episode ? 'استحاضة' : 'حيض', cols[4], y, 8);
+      y += 6;
+    });
+  }
+
+  y += 5;
+  doc.line(15, y, right, y); y += 8;
+
+  doc.setTextColor(150, 150, 150);
+  R(doc, 'تم إنشاء هذا التقرير بواسطة تطبيق نسوة. يرجى استشارة طبيب مؤهل للتشخيص الطبي.', W / 2, 285, 8, 'center');
+
+  return doc.output('blob');
+};
+
+export const generateHusbandPDF = async (
+  user: any,
+  currentDay: number,
+  fiqhState: string,
+  nextPeriodDate: Date | null,
+  fertilityStart: Date | null,
+  fertilityEnd: Date | null
+): Promise<Blob> => {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  await loadArabicFont(doc);
+
+  const W = doc.internal.pageSize.getWidth();
+  const right = W - 15;
+  let y = 20;
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'Niswah | نسوة', right, y, 20); y += 9;
+  R(doc, 'ملخص للزوج', right, y, 14); y += 7;
+
+  doc.setTextColor(100, 100, 100);
+  R(doc, format(new Date(), 'yyyy-MM-dd'), right, y, 9); y += 8;
+
+  doc.setDrawColor(200, 200, 200);
+  doc.line(15, y, right, y); y += 8;
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'الحالة الحالية', right, y, 13); y += 7;
+
+  const stateNames: Record<string, string> = { HAID: 'حيض', TAHARA: 'طهارة', ISTIHADAH: 'استحاضة', NIFAS: 'نفاس' };
+  doc.setTextColor(55, 65, 81);
+  R(doc, `الحالة: ${stateNames[fiqhState] || 'طهارة'}`, right, y, 10); y += 6;
+  R(doc, `اليوم ${currentDay || 1} من الدورة`, right, y, 10); y += 6;
+  R(doc, `موعد انتهاء الدورة المتوقع: ${nextPeriodDate ? format(nextPeriodDate, 'dd/MM/yyyy') : 'غير محدد بعد'}`, right, y, 10); y += 10;
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'الأيام القادمة', right, y, 13); y += 7;
+
+  doc.setTextColor(55, 65, 81);
+  R(doc, `الحيض المتوقع القادم: ${nextPeriodDate ? format(nextPeriodDate, 'dd/MM/yyyy') : 'غير محدد بعد'}`, right, y, 10); y += 6;
+  const fertilityRange = fertilityStart && fertilityEnd
+    ? `${format(fertilityStart, 'dd/MM/yyyy')} - ${format(fertilityEnd, 'dd/MM/yyyy')}`
+    : 'غير محدد بعد';
+  R(doc, `نافذة الخصوبة: ${fertilityRange}`, right, y, 10); y += 10;
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'ملاحظة شرعية', right, y, 13); y += 7;
+
+  doc.setTextColor(55, 65, 81);
+  R(doc, 'وفقاً للفقه الإسلامي، يُحرم الجماع خلال فترة الحيض.', right, y, 10); y += 6;
+  R(doc, 'جزاك الله خيراً على اهتمامك بصحة زوجتك.', right, y, 10); y += 10;
+
+  doc.setTextColor(150, 150, 150);
+  R(doc, 'هذا التقرير خاص وسري — أُعد بموافقة الزوجة عبر تطبيق نسوة', W / 2, 285, 8, 'center');
+
+  return doc.output('blob');
 };

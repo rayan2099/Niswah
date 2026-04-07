@@ -46,6 +46,7 @@ import { useCycleData } from '../contexts/CycleContext.tsx';
 import { PregnancyTracker } from './PregnancyTracker.tsx';
 import { IstihadahMode } from './IstihadahMode.tsx';
 import { PCOSProtocol, EndoProtocol } from './ConditionProtocols.tsx';
+import { HealthDoctor } from './HealthDoctor.tsx';
 
 import { translations } from '../i18n/translations.ts';
 type TranslationKey = keyof typeof translations.en;
@@ -126,13 +127,22 @@ const CycleRing = ({
   const tahara1Duration = Math.max(0, fertileStart - avgPeriodLength - 1);
   const tahara2Duration = Math.max(0, (cycleLength - prePeriodDuration - expectedDuration) - fertileEnd);
   
+  const isActualHaid = fiqhState === 'HAID';
+  const isActualNifas = fiqhState === 'NIFAS';
+
   const segments = [
-    { id: 'haid', label: t('haid'), duration: avgPeriodLength, color: '#BE123C' },
-    { id: 'tahara_1', label: t('tahara'), duration: tahara1Duration, color: '#0D9488' },
-    { id: 'fertile', label: t('fertile_window'), duration: fertileDuration, color: '#D97706' },
-    { id: 'tahara_2', label: t('tahara'), duration: tahara2Duration, color: '#0D9488' },
-    { id: 'pre_period', label: t('pre_period'), duration: prePeriodDuration, color: '#4F46E5' },
-    { id: 'expected', label: t('expected_period'), duration: expectedDuration, color: '#FB7185', dashed: true },
+    { 
+      id: 'haid', 
+      label: isRTL ? (isActualHaid ? 'حيض' : 'حيض متوقع') : (isActualHaid ? t('haid') : t('expected_period')), 
+      duration: avgPeriodLength, 
+      color: isActualHaid ? STATE_COLORS.HAID : '#FB7185',
+      dashed: !isActualHaid
+    },
+    { id: 'tahara_1', label: isRTL ? 'طهارة' : t('tahara'), duration: tahara1Duration, color: STATE_COLORS.TAHARA },
+    { id: 'fertile', label: isRTL ? 'خصوبة' : t('fertile_window'), duration: fertileDuration, color: '#D97706' },
+    { id: 'tahara_2', label: isRTL ? 'طهارة' : t('tahara'), duration: tahara2Duration, color: STATE_COLORS.TAHARA },
+    { id: 'pre_period', label: isRTL ? 'ما قبل الحيض' : t('pre_period'), duration: prePeriodDuration, color: '#4F46E5' },
+    { id: 'expected', label: isRTL ? 'حيض متوقع' : t('expected_period'), duration: expectedDuration, color: '#FB7185', dashed: true },
   ].filter(s => s.duration > 0);
 
   // Find current phase
@@ -290,6 +300,15 @@ const CycleRing = ({
             >
               {currentPhase.label}
             </span>
+            {currentPhase.id === 'expected' && (
+              <motion.span 
+                animate={{ opacity: [1, 0.4, 1] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+                className="text-[14px] font-bold text-rose-400 mb-2"
+              >
+                ← هل بدأ؟
+              </motion.span>
+            )}
             <div className="h-[1px] w-8 bg-gray-200 mb-3" />
             <span className="text-[11px] font-medium text-gray-400 flex items-center space-x-1 rtl:space-x-reverse">
               <span className="opacity-50">←</span>
@@ -303,74 +322,168 @@ const CycleRing = ({
 
       {/* Phase Timeline Strip */}
       <PhaseTimeline 
-        segments={segments} 
+        segments={segments.map((s, idx) => ({ ...s, isActive: idx === currentPhaseIndex }))} 
         currentPhaseIndex={currentPhaseIndex} 
-        currentDay={currentDay}
+        totalDays={cycleLength}
+        isRTL={isRTL}
       />
     </div>
   );
 };
 
-const PhaseTimeline = ({ 
-  segments, 
-  currentPhaseIndex,
-  currentDay
-}: { 
-  segments: any[]; 
-  currentPhaseIndex: number; 
-  currentDay: number;
+const PhaseTimeline = ({ segments, currentPhaseIndex, totalDays, isRTL }: {
+  segments: any[];
+  currentPhaseIndex: number;
+  totalDays: number;
+  isRTL: boolean;
 }) => {
-  const { t, isRTL } = useTranslation();
-  const totalDuration = segments.reduce((acc, s) => acc + s.duration, 0);
-  
   return (
-    <div className="w-full max-w-[320px] space-y-4">
-      <div className="relative">
-        {/* Triangle Pointer */}
-        {(() => {
-          const progress = (currentDay / totalDuration) * 100;
-          return (
-            <div 
-              className="absolute top-[-20px] transform -translate-x-1/2 flex flex-col items-center z-10"
-              style={{ [isRTL ? 'right' : 'left']: `${progress}%` }}
-            >
-              <span className="text-[9px] font-black text-rose-500 mb-0.5 whitespace-nowrap bg-white px-1 rounded shadow-sm border border-rose-100">
-                {isRTL ? 'أنتِ هنا' : 'You are here'}
-              </span>
-              <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px] border-t-rose-500" />
-            </div>
-          );
-        })()}
-
-        <div className="h-2 flex rounded-full overflow-hidden bg-gray-100 shadow-inner">
-          {segments.map((segment, idx) => (
-            <div 
-              key={idx}
-              style={{ 
-                width: `${(segment.duration / totalDuration) * 100}%`,
-                backgroundColor: segment.color,
-                opacity: idx === currentPhaseIndex ? 1 : 0.3
-              }}
-              className="h-full transition-opacity duration-500"
-            />
-          ))}
-        </div>
-      </div>
-      
-      <div className="flex justify-between px-1">
-        {segments.map((segment, idx) => (
-          <div 
-            key={idx} 
-            className="flex flex-col items-center"
-            style={{ width: `${(segment.duration / totalDuration) * 100}%` }}
-          >
-            <span className={cn(
-              "text-[8px] font-bold truncate w-full text-center",
-              idx === currentPhaseIndex ? "text-gray-900" : "text-gray-400"
-            )}>
-              {segment.label}
-            </span>
+    <div style={{
+      width: '100%',
+      padding: '0 8px',
+      direction: 'rtl',
+    }}>
+      {/* أنتِ هنا label above current phase */}
+      <div style={{
+        display: 'flex',
+        width: '100%',
+        marginBottom: '4px',
+      }}>
+        {segments.map((seg, i) => (
+          <div key={i} style={{
+            flex: 1,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+            {i === currentPhaseIndex ? (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '2px',
+              }}>
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  color: seg.color,
+                  whiteSpace: 'nowrap',
+                }}>
+                  أنتِ هنا
+                </span>
+                <svg width="8" height="6" viewBox="0 0 8 6">
+                  <path d="M4 6L0 0h8L4 6z" fill={seg.color}/>
+                </svg>
+              </div>
+            ) : null}
           </div>
+        ))}
+      </div>
+
+      {/* Stepper row */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        width: '100%',
+      }}>
+        {segments.map((seg, i) => (
+          <React.Fragment key={i}>
+            {/* Circle */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '5px',
+              flex: '0 0 auto',
+            }}>
+              <div style={{
+                width: i === currentPhaseIndex ? '42px' : '32px',
+                height: i === currentPhaseIndex ? '42px' : '32px',
+                borderRadius: '50%',
+                background: i === currentPhaseIndex ? seg.color + '20' : '#F3F4F6',
+                border: i === currentPhaseIndex
+                  ? `2.5px solid ${seg.color}`
+                  : '1.5px solid #E5E7EB',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  lineHeight: 1,
+                }}>
+                  <span style={{
+                    fontSize: i === currentPhaseIndex ? '13px' : '11px',
+                    fontWeight: i === currentPhaseIndex ? 600 : 400,
+                    color: i === currentPhaseIndex ? seg.color : '#9CA3AF',
+                  }}>
+                    {seg.duration}
+                  </span>
+                  <span style={{
+                    fontSize: '7px',
+                    color: i === currentPhaseIndex ? seg.color : '#C4C4C4',
+                    marginTop: '1px',
+                  }}>
+                    أيام
+                  </span>
+                </div>
+                {/* Active indicator dot */}
+                {i === currentPhaseIndex && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '-2px',
+                    right: '-2px',
+                    width: '14px',
+                    height: '14px',
+                    borderRadius: '50%',
+                    background: seg.color,
+                    border: '2px solid white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <div style={{
+                      width: '5px',
+                      height: '5px',
+                      borderRadius: '50%',
+                      background: 'white',
+                    }}/>
+                  </div>
+                )}
+              </div>
+              {/* Label below circle */}
+              <span style={{
+                fontSize: '9px',
+                fontWeight: i === currentPhaseIndex ? 600 : 400,
+                color: i === currentPhaseIndex ? seg.color : '#9CA3AF',
+                whiteSpace: 'nowrap',
+                maxWidth: '52px',
+                textAlign: 'center',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: 'block',
+              }}>
+                {seg.label}
+              </span>
+            </div>
+
+            {/* Connector line between circles */}
+            {i < segments.length - 1 && (
+              <div style={{
+                flex: 1,
+                minWidth: '8px',
+                height: '2px',
+                background: i < currentPhaseIndex ? segments[i].color : '#E5E7EB',
+                borderRadius: '1px',
+                marginBottom: '18px',
+                opacity: i < currentPhaseIndex ? 0.5 : 1,
+              }}/>
+            )}
+          </React.Fragment>
         ))}
       </div>
     </div>
@@ -453,16 +566,34 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
   const [thickness, setThickness] = useState('normal');
   const [kursuf, setKursuf] = useState(false);
   const [internal, setInternal] = useState(false);
-  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+  const [symptoms, setSymptoms] = useState<Record<string, number>>({});
   const [mood, setMood] = useState(2);
   const [feeling, setFeeling] = useState('');
   const [notes, setNotes] = useState('');
 
-  const symptoms = [
-    t('cramps'), t('bloating'), t('headache'), t('backache'),
-    t('mood_changes'), t('fatigue'), t('tender_breasts'),
-    t('acne'), t('nausea'), t('insomnia'), t('spotting'), t('clots')
+  const symptomList = [
+    { key: 'cramps', labelAr: 'تشنجات' },
+    { key: 'headache', labelAr: 'صداع' },
+    { key: 'backache', labelAr: 'ألم الظهر' },
+    { key: 'bloating', labelAr: 'انتفاخ' },
+    { key: 'nausea', labelAr: 'غثيان' },
+    { key: 'fatigue', labelAr: 'تعب' },
+    { key: 'acne', labelAr: 'حب الشباب' },
+    { key: 'breastpain', labelAr: 'آلام الثدي' },
+    { key: 'spotting', labelAr: 'تبقيع' },
+    { key: 'clots', labelAr: 'تجلطات' },
   ];
+
+  const cycleSymptom = (key: string) => {
+    setSymptoms(prev => ({
+      ...prev,
+      [key]: ((prev[key] || 0) + 1) % 4  // 0=none, 1=خفيف, 2=متوسط, 3=شديد
+    }));
+  };
+
+  const levelColors = ['transparent', '#FBEAF0', '#F4C0D1', '#D4537E'];
+  const levelLabels = ['', 'خفيف', 'متوسط', 'شديد'];
+  const levelTextColors = ['#9CA3AF', '#D4537E', '#993556', '#ffffff'];
 
   const feelingTags = [
     t('feeling_anxious'), t('feeling_peaceful'), t('feeling_energetic'),
@@ -485,7 +616,7 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
       thickness,
       kursuf,
       internal,
-      symptoms: selectedSymptoms,
+      symptoms: symptoms,
       mood,
       feeling,
       notes,
@@ -582,9 +713,12 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
                   </div>
                   <button 
                     onClick={() => setKursuf(!kursuf)}
-                    className={cn("w-12 h-6 rounded-full relative transition-all", kursuf ? "bg-rose-400" : "bg-rose-100")}
+                    className={cn("w-12 h-6 rounded-full relative transition-all shrink-0", kursuf ? "bg-rose-400" : "bg-rose-100")}
                   >
-                    <motion.div animate={{ x: kursuf ? 24 : 4 }} className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm" />
+                    <motion.div 
+                      animate={{ x: isRTL ? (kursuf ? -24 : -4) : (kursuf ? 24 : 4) }} 
+                      className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm" 
+                    />
                   </button>
                 </div>
                 <AnimatePresence>
@@ -619,18 +753,32 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
             {/* Symptoms */}
             <section className="space-y-4">
               <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('symptoms')}</h4>
-              <div className="grid grid-cols-3 gap-2">
-                {symptoms.map(s => (
+              <div className="flex flex-wrap gap-2">
+                {symptomList.map(symptom => (
                   <motion.button
-                    key={s}
+                    key={symptom.key}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => setSelectedSymptoms(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
-                    className={cn(
-                      "py-3 px-2 rounded-xl border-2 text-[10px] font-bold transition-all",
-                      selectedSymptoms.includes(s) ? "border-rose-300 bg-rose-400 text-white shadow-md" : "border-black/5 text-gray-500"
-                    )}
+                    onClick={() => cycleSymptom(symptom.key)}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '20px',
+                      border: `1px solid ${symptoms[symptom.key] ? '#D4537E' : '#E5E7EB'}`,
+                      background: levelColors[symptoms[symptom.key] || 0],
+                      color: levelTextColors[symptoms[symptom.key] || 0],
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.2s',
+                    }}
                   >
-                    {s}
+                    {symptom.labelAr}
+                    {symptoms[symptom.key] > 0 && (
+                      <span style={{ fontSize: '10px', opacity: 0.8 }}>
+                        · {levelLabels[symptoms[symptom.key]]}
+                      </span>
+                    )}
                   </motion.button>
                 ))}
               </div>
@@ -664,21 +812,6 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
               {/* Expressive Feeling Input */}
               <div className="space-y-4 pt-2">
                 <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('feeling')}</h4>
-                <div className="flex flex-wrap gap-2">
-                  {feelingTags.map(tag => (
-                    <motion.button
-                      key={tag}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setFeeling(prev => prev.includes(tag) ? prev.replace(tag, '').trim() : `${prev} ${tag}`.trim())}
-                      className={cn(
-                        "px-4 py-2 rounded-full border text-[10px] font-bold transition-all",
-                        feeling.includes(tag) ? "border-rose-300 bg-rose-400 text-white shadow-md" : "border-black/5 text-gray-500 bg-white"
-                      )}
-                    >
-                      {tag}
-                    </motion.button>
-                  ))}
-                </div>
                 <input 
                   type="text"
                   value={feeling}
@@ -783,8 +916,9 @@ const PrayerStatusWidget = ({ state, onOpenSettings }: { state: State; onOpenSet
       
       if (isPrayed) {
         status = 'prayed';
-      } else if (state === 'HAID' && latestHaidStart) {
-        if (pt.adhanTime < latestHaidStart) {
+      } else if (isHaidOrNifas) {
+        // If we are in HAID or NIFAS, prayers are either lifted or qadha required
+        if (latestHaidStart && pt.adhanTime < latestHaidStart) {
           status = 'qadha_required';
         } else {
           status = 'lifted';
@@ -851,24 +985,41 @@ const PrayerStatusWidget = ({ state, onOpenSettings }: { state: State; onOpenSet
   }
 
   if (isHaidOrNifas) {
+    const stateColor = STATE_COLORS[state];
     return (
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full p-6 rounded-[32px] bg-white shadow-xl shadow-black/5 border border-black/5 flex flex-col items-center text-center space-y-4"
       >
-        <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center text-rose-500">
-          <Moon className="w-6 h-6" />
+        <div 
+          className="w-16 h-16 rounded-full flex items-center justify-center"
+          style={{ backgroundColor: `${stateColor}1A` }}
+        >
+          <Moon className="w-8 h-8" style={{ color: stateColor }} />
         </div>
         <div className="space-y-1">
-          <h3 className="text-lg font-serif font-bold text-emerald-900">{t('salah_lifted')}</h3>
-          <p className="text-xs text-gray-500 leading-relaxed px-4">
-            {t('salah_lifted_desc' as any)}
+          <h3 className="text-lg font-serif font-bold" style={{ color: stateColor }}>{t('salah_lifted')}</h3>
+          <p className="text-xs leading-relaxed max-w-[200px]" style={{ color: `${stateColor}99` }}>
+            {t('prayer_times_reason')}
           </p>
         </div>
-        <div className="flex items-center space-x-2 text-[10px] font-bold text-rose-400 uppercase tracking-widest">
-          <Sparkles className="w-3 h-3" />
-          <span>{t('focus_on_zikr' as any)}</span>
+        
+        <div className="w-full pt-2 grid grid-cols-5 gap-2">
+          {prayers.map((p) => (
+            <div key={p.id} className="flex flex-col items-center space-y-1">
+              <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
+                <p.icon className="w-4 h-4 text-gray-300" />
+              </div>
+              <span className="text-[8px] font-bold text-gray-400 uppercase">{p.name}</span>
+              <div 
+                className="px-1.5 py-0.5 rounded-full text-[6px] font-black tracking-widest uppercase"
+                style={{ backgroundColor: `${stateColor}1A`, color: stateColor }}
+              >
+                {t('lifted_status')}
+              </div>
+            </div>
+          ))}
         </div>
       </motion.div>
     );
@@ -935,85 +1086,6 @@ const PrayerStatusWidget = ({ state, onOpenSettings }: { state: State; onOpenSet
   );
 };
 
-// --- WORSHIP WITHOUT SALAH WIDGET ---
-
-const WorshipWithoutSalah = () => {
-  const { t } = useTranslation();
-  const [counts, setCounts] = useState({ Zikir: 0, Dua: 0, Salawat: 0, Istighfar: 0 });
-  const [ripples, setRipples] = useState<{ id: number, key: string }[]>([]);
-
-  const increment = (key: keyof typeof counts) => {
-    const newVal = counts[key] + 1;
-    setCounts(prev => ({ ...prev, [key]: newVal }));
-    setRipples(prev => [...prev, { id: Date.now(), key }]);
-    
-    if (newVal === 33) {
-      // Ripple logic handled by state
-    }
-    if (newVal === 99) {
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-    }
-  };
-
-  const suggestions = [
-    { text: t('read_surah_maryam'), icon: BookOpen },
-    { text: t('dua_ease_pain'), icon: Heart },
-    { text: t('try_gentle_stretching'), icon: Zap },
-    { text: t('listen_to_podcast'), icon: BookOpen },
-    { text: t('istighfar'), icon: Sparkles },
-    { text: t('drink_ginger_tea'), icon: Sun },
-    { text: t('salawat'), icon: Moon }
-  ];
-
-  return (
-    <motion.div 
-      layout
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className="w-full space-y-6"
-    >
-      <div className="grid grid-cols-4 gap-2">
-        {Object.entries(counts).map(([label, val]) => (
-          <motion.button
-            key={label}
-            whileTap={{ scale: 0.92 }}
-            onClick={() => increment(label as any)}
-            className="bg-white rounded-2xl p-4 shadow-lg shadow-black/5 border border-black/5 flex flex-col items-center space-y-1 relative overflow-hidden"
-          >
-            <AnimatePresence>
-              {ripples.filter(r => r.key === label).map(r => (
-                <Ripple key={r.id} color="#F43F5E22" />
-              ))}
-            </AnimatePresence>
-            <motion.span 
-              key={val}
-              initial={{ scale: 1.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className={cn("text-xl font-serif font-bold", (val as number) >= 99 ? "text-amber-500" : "text-rose-400")}
-            >
-              {val}
-            </motion.span>
-            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{t(label.toLowerCase() as TranslationKey)}</span>
-          </motion.button>
-        ))}
-      </div>
-
-      <div className="flex overflow-x-auto space-x-3 pb-2 no-scrollbar">
-        {suggestions.map((s, i) => (
-          <motion.div 
-            key={i} 
-            whileTap={{ scale: 0.98 }}
-            className="flex-shrink-0 bg-rose-50 p-4 rounded-2xl border border-rose-100 max-w-[180px] flex flex-col space-y-2 cursor-pointer"
-          >
-            <s.icon className="w-4 h-4 text-rose-400" />
-            <p className="text-[10px] font-medium text-rose-800 leading-relaxed">{s.text}</p>
-          </motion.div>
-        ))}
-      </div>
-    </motion.div>
-  );
-};
 
 // --- DAILY INSIGHTS ---
 
@@ -1066,6 +1138,7 @@ export const Today = ({
     }
   }, [contextState, localFiqhState]);
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const [isHealthDoctorOpen, setIsHealthDoctorOpen] = useState(false);
   const [defaultIntensity, setDefaultIntensity] = useState('none');
   const [showBloom, setShowBloom] = useState(false);
   const [bloomMessage, setBloomMessage] = useState('');
@@ -1085,6 +1158,8 @@ export const Today = ({
     return Math.round(logic.getAverageHaidDuration(user));
   }, [user]);
 
+  const isPredictedPeriod = state === 'TAHARA' && (currentDay <= haidDuration || currentDay > cycleLength);
+
   const handleSaveLog = async (logData: any) => {
     try {
       const newState = (logData.intensity === 'none' ? 'TAHARA' : 'HAID') as State;
@@ -1098,6 +1173,9 @@ export const Today = ({
         blood_thickness: logData.thickness as any,
         kursuf_used: logData.kursuf,
         discharge_internal: logData.internal,
+        symptoms: logData.symptoms,
+        mood: logData.mood,
+        feeling: logData.feeling,
         notes: logData.notes,
         is_predicted: false
       };
@@ -1209,6 +1287,21 @@ export const Today = ({
                   }}
                 />
                 
+                {isPredictedPeriod && (
+                  <motion.div
+                    animate={{ opacity: [1, 0.6, 1] }}
+                    transition={{ repeat: Infinity, duration: 2 }}
+                    className="w-full bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 text-center mb-4"
+                  >
+                    <p className="text-rose-600 text-sm font-bold">
+                      {t('period_expected_today')}
+                    </p>
+                    <p className="text-rose-400 text-xs mt-1">
+                      {t('tap_start_haid_to_log')}
+                    </p>
+                  </motion.div>
+                )}
+
                 {/* Quick Action Buttons right below the cycle */}
                 <div className="flex w-full max-w-sm gap-3 px-2">
                   <motion.button
@@ -1219,7 +1312,8 @@ export const Today = ({
                     }}
                     className={cn(
                       "flex-1 py-4 rounded-2xl font-bold flex items-center justify-center space-x-2 shadow-sm transition-all",
-                      state !== 'HAID' ? "bg-rose-600 text-white shadow-rose-200" : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      state !== 'HAID' ? "bg-rose-600 text-white shadow-rose-200" : "bg-gray-100 text-gray-400 cursor-not-allowed",
+                      isPredictedPeriod && "shadow-lg shadow-rose-300 ring-2 ring-rose-400 ring-offset-2"
                     )}
                   >
                     <Droplets className="w-4 h-4" />
@@ -1239,6 +1333,23 @@ export const Today = ({
                     <CheckCircle2 className="w-4 h-4" />
                     <span className="text-xs">{t('period_end')}</span>
                   </motion.button>
+                </div>
+
+                {/* Health Doctor Card */}
+                <div
+                  onClick={() => setIsHealthDoctorOpen(true)}
+                  className="w-full max-w-sm p-4 bg-white border border-rose-100 rounded-2xl flex items-center justify-between cursor-pointer active:scale-95 transition-transform"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-rose-50 border-2 border-rose-300 flex items-center justify-center font-bold text-rose-500">
+                      د
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-gray-800">الطبيبة نسوة</div>
+                      <div className="text-xs text-gray-400">اسألي عن أعراضك — اقتراحات مبنية على بياناتك</div>
+                    </div>
+                  </div>
+                  <ChevronRight className={cn("w-4 h-4 text-rose-400", isRTL && "rotate-180")} />
                 </div>
               </>
             )}
@@ -1308,11 +1419,6 @@ export const Today = ({
         <div className="space-y-4">
           <PrayerStatusWidget state={state} onOpenSettings={onOpenSettings} />
           
-          <AnimatePresence mode="wait">
-            {(state === 'HAID' || state === 'NIFAS') && (
-              <WorshipWithoutSalah key="worship" />
-            )}
-          </AnimatePresence>
         </div>
 
         {/* Dream Interpreter */}
@@ -1359,6 +1465,9 @@ export const Today = ({
         currentState={state}
         defaultIntensity={defaultIntensity}
       />
+
+      {/* Health Doctor Modal */}
+      <HealthDoctor isOpen={isHealthDoctorOpen} onClose={() => setIsHealthDoctorOpen(false)} />
     </div>
   );
 };

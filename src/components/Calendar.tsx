@@ -58,17 +58,27 @@ export const Calendar = () => {
   const { t, isRTL } = useTranslation();
   const { user, entries, cycleStats, prediction, ovulation, loading: dataLoading } = useCycleData();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [calendarType, setCalendarType] = useState<'gregorian' | 'hijri'>('gregorian');
 
   const cycleLength = cycleStats.avgCycleLength;
 
   const monthEntries = useMemo(() => {
-    const month = currentDate.getMonth();
-    const year = currentDate.getFullYear();
-    return entries.filter(e => {
-      const d = parseISO(e.date);
-      return d.getMonth() === month && d.getFullYear() === year;
-    });
-  }, [entries, currentDate]);
+    if (calendarType === 'gregorian') {
+      const month = currentDate.getMonth();
+      const year = currentDate.getFullYear();
+      return entries.filter(e => {
+        const d = parseISO(e.date);
+        return d.getMonth() === month && d.getFullYear() === year;
+      });
+    } else {
+      const hCurrent = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
+      return entries.filter(e => {
+        const d = parseISO(e.date);
+        const h = toHijri(d.getFullYear(), d.getMonth() + 1, d.getDate());
+        return h.hm === hCurrent.hm && h.hy === hCurrent.hy;
+      });
+    }
+  }, [entries, currentDate, calendarType]);
 
   const haidDays = useMemo(() => monthEntries.filter(e => e.fiqh_state === 'HAID').length, [monthEntries]);
   const taharaDays = useMemo(() => monthEntries.filter(e => e.fiqh_state === 'TAHARA').length, [monthEntries]);
@@ -97,18 +107,69 @@ export const Calendar = () => {
     });
   }, [cycleLength]);
 
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(monthEnd);
+  const { calendarDays, displayTitle, monthStart } = useMemo(() => {
+    if (calendarType === 'gregorian') {
+      const mStart = startOfMonth(currentDate);
+      const mEnd = endOfMonth(mStart);
+      const sDate = startOfWeek(mStart);
+      const eDate = endOfWeek(mEnd);
+      return {
+        calendarDays: eachDayOfInterval({ start: sDate, end: eDate }),
+        displayTitle: format(currentDate, 'MMMM yyyy'),
+        monthStart: mStart
+      };
+    } else {
+      const h = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
+      const mStart = new Date(currentDate);
+      mStart.setDate(currentDate.getDate() - (h.hd - 1));
+      
+      const mEnd = new Date(mStart);
+      mEnd.setDate(mEnd.getDate() + 28);
+      let hEnd = toHijri(mEnd.getFullYear(), mEnd.getMonth() + 1, mEnd.getDate());
+      while (hEnd.hm === h.hm) {
+        mEnd.setDate(mEnd.getDate() + 1);
+        hEnd = toHijri(mEnd.getFullYear(), mEnd.getMonth() + 1, mEnd.getDate());
+      }
+      mEnd.setDate(mEnd.getDate() - 1);
+      
+      const sDate = startOfWeek(mStart);
+      const eDate = endOfWeek(mEnd);
+      
+      const hijriMonthName = isRTL ? hijriMonthNamesAr[h.hm - 1] : hijriMonthNames[h.hm - 1];
+      
+      return {
+        calendarDays: eachDayOfInterval({ start: sDate, end: eDate }),
+        displayTitle: `${hijriMonthName} ${h.hy}`,
+        monthStart: mStart
+      };
+    }
+  }, [currentDate, calendarType, isRTL]);
 
-  const calendarDays = eachDayOfInterval({
-    start: startDate,
-    end: endDate,
-  });
+  const nextMonth = () => {
+    if (calendarType === 'gregorian') {
+      setCurrentDate(addMonths(currentDate, 1));
+    } else {
+      const h = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() + (32 - h.hd));
+      const h2 = toHijri(d.getFullYear(), d.getMonth() + 1, d.getDate());
+      d.setDate(d.getDate() - (h2.hd - 1));
+      setCurrentDate(d);
+    }
+  };
 
-  const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
-  const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
+  const prevMonth = () => {
+    if (calendarType === 'gregorian') {
+      setCurrentDate(subMonths(currentDate, 1));
+    } else {
+      const h = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() - (h.hd + 15));
+      const h2 = toHijri(d.getFullYear(), d.getMonth() + 1, d.getDate());
+      d.setDate(d.getDate() - (h2.hd - 1));
+      setCurrentDate(d);
+    }
+  };
 
   const getDayState = (day: Date): { state: State | null; isExpected?: boolean; isFertile?: boolean; isOvulation?: boolean } => {
     const dayString = format(day, 'yyyy-MM-dd');
@@ -145,21 +206,21 @@ export const Calendar = () => {
       {/* Header */}
       <header className="p-6 flex items-center justify-between sticky top-0 bg-[#FDFCFB]/80 backdrop-blur-md z-50">
         <h1 className="text-xl font-serif font-bold text-emerald-900">{t('calendar')}</h1>
-        <div className="flex items-center space-x-2 bg-white rounded-2xl p-1 shadow-sm border border-black/5">
+        <div className="flex items-center space-x-1 bg-white rounded-2xl p-1 shadow-sm border border-black/5">
           <button 
             onClick={prevMonth}
             className="p-2 hover:bg-gray-50 rounded-xl transition-colors"
           >
-            <ChevronLeft className={cn("w-5 h-5 text-emerald-900", isRTL && "rotate-180")} />
+            <ChevronLeft className={cn("w-4 h-4 text-emerald-900", isRTL && "rotate-180")} />
           </button>
-          <span className="px-4 text-sm font-bold text-emerald-900 min-w-[120px] text-center">
-            {format(currentDate, 'MMMM yyyy')}
+          <span className="px-2 text-sm font-bold text-emerald-900 min-w-[100px] text-center">
+            {displayTitle}
           </span>
           <button 
             onClick={nextMonth}
             className="p-2 hover:bg-gray-50 rounded-xl transition-colors"
           >
-            <ChevronRight className={cn("w-5 h-5 text-emerald-900", isRTL && "rotate-180")} />
+            <ChevronRight className={cn("w-4 h-4 text-emerald-900", isRTL && "rotate-180")} />
           </button>
         </div>
       </header>
@@ -167,6 +228,30 @@ export const Calendar = () => {
       <main className="px-6 space-y-8">
         {/* Calendar Grid */}
         <div className="bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 border border-black/5">
+          {/* Calendar Type Toggle - Now inside the white frame */}
+          <div className="flex justify-center mb-6">
+            <div className="flex bg-emerald-50 p-1 rounded-xl border border-emerald-100">
+              <button 
+                onClick={() => setCalendarType('gregorian')}
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all",
+                  calendarType === 'gregorian' ? "bg-white text-emerald-900 shadow-sm" : "text-emerald-600/60"
+                )}
+              >
+                {isRTL ? 'ميلادي' : 'Gregorian'}
+              </button>
+              <button 
+                onClick={() => setCalendarType('hijri')}
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all",
+                  calendarType === 'hijri' ? "bg-white text-emerald-900 shadow-sm" : "text-emerald-600/60"
+                )}
+              >
+                {isRTL ? 'هجري' : 'Hijri'}
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-7 mb-4">
             {weekDays.map((day) => (
               <div key={day} className="text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest py-2">
@@ -178,11 +263,15 @@ export const Calendar = () => {
           <div className="grid grid-cols-7 gap-y-4">
             {calendarDays.map((day, i) => {
               const { state, isExpected, isFertile, isOvulation } = getDayState(day);
-              const isCurrentMonth = isSameMonth(day, monthStart);
+              const hijri = toHijri(day.getFullYear(), day.getMonth() + 1, day.getDate());
+              const currentHijri = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
+              
+              const isCurrentMonth = calendarType === 'gregorian' 
+                ? isSameMonth(day, monthStart)
+                : (hijri.hm === currentHijri.hm && hijri.hy === currentHijri.hy);
+              
               const isTodayDay = isToday(day);
               
-              // Calculate Hijri date
-              const hijri = toHijri(day.getFullYear(), day.getMonth() + 1, day.getDate());
               const hijriMonthName = isRTL ? hijriMonthNamesAr[hijri.hm - 1] : hijriMonthNames[hijri.hm - 1];
               const hijriDisplay = `${hijri.hd} ${hijriMonthName}`;
 
@@ -233,13 +322,7 @@ export const Calendar = () => {
                     state === 'HAID' && !isExpected && "text-white",
                     isFertile && "text-[#D97706]"
                   )}>
-                    {format(day, 'd')}
-                  </span>
-                  <span className={cn(
-                    "relative z-10 text-[8px] opacity-40 mt-0.5 whitespace-nowrap",
-                    state === 'HAID' && !isExpected && "text-white opacity-60"
-                  )}>
-                    {hijriDisplay}
+                    {calendarType === 'gregorian' ? format(day, 'd') : hijri.hd}
                   </span>
                 </motion.div>
               );
@@ -343,7 +426,7 @@ export const Calendar = () => {
               </div>
               <div>
                 <h4 className="text-lg font-serif font-bold text-emerald-900">{t('month_summary')}</h4>
-                <p className="text-[10px] text-emerald-700/60 font-bold uppercase tracking-widest">{format(currentDate, 'MMMM yyyy')}</p>
+                <p className="text-[10px] text-emerald-700/60 font-bold uppercase tracking-widest">{displayTitle}</p>
               </div>
             </div>
             <div className="flex flex-col items-end">

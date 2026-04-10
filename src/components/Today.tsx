@@ -9,20 +9,17 @@ import {
   Bell, 
   User as UserIcon, 
   Plus, 
-  CheckCircle2, 
-  AlertCircle, 
+  CheckCircle2,
+  AlertCircle,
   Moon, 
   Sun, 
   Sparkles, 
   MessageSquare,
   X,
   Heart,
-  Globe,
   MapPin,
   Settings,
-  AlertTriangle,
   Calendar as CalendarIcon,
-  BookOpen,
   Zap,
   ChevronRight,
   Smile,
@@ -31,7 +28,6 @@ import {
   Laugh,
   Angry,
   Clock,
-  Info,
   Droplets
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -1143,10 +1139,6 @@ export const Today = ({
   const [showBloom, setShowBloom] = useState(false);
   const [bloomMessage, setBloomMessage] = useState('');
   const [isIstihadahMode, setIsIstihadahMode] = useState(false);
-
-  useEffect(() => {
-    // Sync local state if needed
-  }, [state, currentDay]);
 
   const cycleLength = useMemo(() => {
     if (!user) return 28;

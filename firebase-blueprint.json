@@ -9,7 +9,7 @@
         "email_hash": { "type": "string" },
         "display_name": { "type": "string" },
         "birth_year": { "type": "integer" },
-        "madhhab": { "type": "string", "enum": ["HANAFI", "SHAFI", "MALIKI", "HANBALI"] },
+        "madhhab": { "type": "string", "enum": ["HANAFI", "SHAFII", "MALIKI", "HANBALI"] },
         "language": { "type": "string", "enum": ["en", "ar"] },
         "avg_cycle_length": { "type": "integer" },
         "avg_haid_duration": { "type": "integer" },
@@ -25,7 +25,8 @@
         "location_name": { "type": "string" },
         "manual_prayer_offsets": { "type": "object" },
         "created_at": { "type": "string", "format": "date-time" },
-        "updated_at": { "type": "string", "format": "date-time" }
+        "updated_at": { "type": "string", "format": "date-time" },
+        "role": { "type": "string", "enum": ["user", "admin"] }
       },
       "required": ["id", "madhhab", "language"]
     },
@@ -73,6 +74,21 @@
         "status": { "type": "string", "enum": ["prayed", "missed", "qadha"] },
         "timestamp": { "type": "string", "format": "date-time" }
       }
+    },
+    "CommunityPost": {
+      "title": "CommunityPost",
+      "description": "A post in the community forum",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "author_id": { "type": "string" },
+        "author_name": { "type": "string" },
+        "content": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "likes_count": { "type": "integer" },
+        "comments_count": { "type": "integer" }
+      },
+      "required": ["author_id", "content"]
     }
   },
   "firestore": {
@@ -91,6 +107,10 @@
     "/users/{userId}/prayer_log/{logId}": {
       "schema": "PrayerLog",
       "description": "Log of prayers performed or missed"
+    },
+    "/community_posts/{postId}": {
+      "schema": "CommunityPost",
+      "description": "Public community forum posts"
     }
   }
 }

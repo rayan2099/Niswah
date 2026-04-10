@@ -11,7 +11,6 @@ import {
   Home, 
   Calendar as CalendarIcon, 
   BarChart2, 
-  Compass, 
   User as UserIcon,
   Sparkles,
   Users,
@@ -84,8 +83,6 @@ const Discover = lazy(() => import('./components/Discover.tsx').then(m => ({ def
 const Profile = lazy(() => import('./components/Profile.tsx').then(m => ({ default: m.Profile })));
 const Insights = lazy(() => import('./components/Insights.tsx').then(m => ({ default: m.Insights })));
 const NiswahAI = lazy(() => import('./components/NiswahAI.tsx').then(m => ({ default: m.NiswahAI })));
-const GhuslGuide = lazy(() => import('./components/GhuslGuide.tsx').then(m => ({ default: m.GhuslGuide })));
-const GuidedJourneys = lazy(() => import('./components/GuidedJourneys.tsx').then(m => ({ default: m.GuidedJourneys })));
 const DreamInterpreter = lazy(() => import('./components/DreamInterpreter.tsx').then(m => ({ default: m.DreamInterpreter })));
 const Community = lazy(() => import('./components/Community.tsx').then(m => ({ default: m.Community })));
 
@@ -104,19 +101,32 @@ const LoadingSpinner = () => {
   );
 };
 
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './firebase';
+import { AuthScreen } from './components/Auth';
 import { notificationService } from './services/NotificationService.ts';
 
 function AppContent() {
   const { fiqhState, currentDay: cycleDay, user: contextUser, refresh } = useCycleData();
   const [showOnboarding, setShowOnboarding] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [authUser, setAuthUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('today');
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
-  const [isGhuslOpen, setIsGhuslOpen] = useState(false);
-  const [isJourneysOpen, setIsJourneysOpen] = useState(false);
   const [isDreamInterpreterOpen, setIsDreamInterpreterOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const { t, isRTL } = useTranslation();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthUser(user);
+      setAuthLoading(false);
+      if (user) {
+        refresh();
+      }
+    });
+    return () => unsubscribe();
+  }, [refresh]);
 
   useEffect(() => {
     if (contextUser) {
@@ -124,45 +134,8 @@ function AppContent() {
       if (contextUser.madhhab) {
         setShowOnboarding(false);
       }
-      setLoading(false);
     }
   }, [contextUser]);
-
-  useEffect(() => {
-    async function checkUser() {
-      try {
-        let { data: userData, error } = await api.getUser();
-        
-        if (error === 'Not authenticated') {
-          const { data: authData, error: authError } = await api.signInAnonymously();
-          
-          if (authError) {
-            console.error("Anonymous login failed", authError);
-            alert(t('error_auth_failed') || "Authentication failed. Please check your internet connection.");
-            // Allow proceeding in demo mode for UI exploration
-            setLoading(false);
-            return;
-          }
-          
-          const { data: newUserData, error: newUserError } = await api.getUser();
-          if (newUserError && newUserError !== 'Not authenticated') {
-            console.error("Failed to get user after auth", newUserError);
-          }
-          userData = newUserData;
-        }
-
-        if (userData && userData.madhhab) {
-          setUser(userData);
-          setShowOnboarding(false);
-        }
-      } catch (err) {
-        console.error("Auth check failed", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    checkUser();
-  }, []);
 
   useEffect(() => {
     (window as any).openDreamInterpreter = () => setIsDreamInterpreterOpen(true);
@@ -171,7 +144,7 @@ function AppContent() {
     };
   }, []);
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="fixed inset-0 bg-[#FDFCFB] flex items-center justify-center">
         <motion.div 
@@ -181,6 +154,10 @@ function AppContent() {
         />
       </div>
     );
+  }
+
+  if (!authUser) {
+    return <AuthScreen onSuccess={() => refresh()} />;
   }
 
   if (showOnboarding) {
@@ -300,31 +277,6 @@ function AppContent() {
             ramadan_active: false,
             pregnant: user?.pregnant || false
           }}
-        />
-      </Suspense>
-
-      {/* Ghusl Guide */}
-      <Suspense fallback={null}>
-        <GhuslGuide 
-          isOpen={isGhuslOpen} 
-          onClose={() => setIsGhuslOpen(false)} 
-          onComplete={() => {
-            setIsGhuslOpen(false);
-            if (contextUser) {
-              notificationService.scheduleGhuslReminder(contextUser);
-            }
-            refresh();
-          }}
-          madhhab={user?.madhhab || 'HANAFI'}
-        />
-      </Suspense>
-
-      {/* Guided Journeys */}
-      <Suspense fallback={null}>
-        <GuidedJourneys 
-          isOpen={isJourneysOpen} 
-          onClose={() => setIsJourneysOpen(false)} 
-          isPremium={true} // Freemium
         />
       </Suspense>
 

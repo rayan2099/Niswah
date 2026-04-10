@@ -12,8 +12,6 @@ import {
   ChevronRight, 
   ChevronLeft, 
   Calendar, 
-  Info, 
-  CheckCircle2,
   Stethoscope,
   Utensils,
   Moon

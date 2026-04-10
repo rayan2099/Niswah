@@ -12,7 +12,6 @@ import {
   Sparkles, 
   ChevronDown, 
   ChevronUp, 
-  User, 
   Info,
   Zap,
   MessageSquare,

@@ -36,6 +36,8 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { format } from 'date-fns';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebase';
 import * as api from '../api/index.ts';
 import { Madhhab } from '../logic/types.ts';
 import { popularCities } from '../logic/constants.ts';
@@ -805,7 +807,16 @@ export const Profile = ({ }: ProfileProps) => {
           </div>
         </section>
 
-        <div className="pt-8 pb-12 text-center">
+        <div className="pt-8 pb-4 text-center">
+          <button 
+            onClick={() => signOut(auth)}
+            className="px-8 py-3 bg-rose-50 text-rose-500 rounded-2xl font-bold text-sm border border-rose-100 active:scale-95 transition-transform"
+          >
+            {t('sign_out')}
+          </button>
+        </div>
+
+        <div className="pt-4 pb-12 text-center">
           <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Niswah v1.0.0</p>
         </div>
       </div>

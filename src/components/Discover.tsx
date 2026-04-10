@@ -16,13 +16,9 @@ import {
   Star, 
   Calendar as CalendarIcon,
   Lock,
-  MessageSquare,
   ChevronRight,
   Heart,
   ShieldCheck,
-  Volume2,
-  Pause,
-  X,
   Moon,
   Sparkles
 } from 'lucide-react';

@@ -27,6 +27,7 @@ service cloud.firestore {
     //   - location_lng: number
     //   - created_at: string (ISO 8601)
     //   - updated_at: string (ISO 8601)
+    //   - role: string (enum: 'user', 'admin')
     //
     // Collection: /users/{userId}/cycle_entries/{entryId}
     // Document ID: entryId
@@ -48,10 +49,6 @@ service cloud.firestore {
     //
     // ===============================================================
 
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-    
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -62,31 +59,36 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "helpooclassmate@gmail.com" && request.auth.token.email_verified == true));
+        (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin') ||
+          (request.auth.token.email == "helpooclassmate@gmail.com" && request.auth.token.email_verified == true)
+        );
     }
 
     function isValidUser(data) {
       return data.keys().hasAll(['madhhab', 'language']) &&
-             data.madhhab in ['HANAFI', 'SHAFI', 'MALIKI', 'HANBALI'] &&
+             data.madhhab in ['HANAFI', 'SHAFII', 'MALIKI', 'HANBALI'] &&
              data.language in ['en', 'ar'];
     }
 
     function isValidCycleEntry(data) {
       return data.keys().hasAll(['user_id', 'date', 'fiqh_state']) &&
-             data.fiqh_state in ['HAID', 'TUHR', 'ISTIHADAH', 'NIFAS'];
+             data.fiqh_state in ['HAID', 'TUHR', 'ISTIHADAH', 'NIFAS'] &&
+             data.user_id == request.auth.uid;
     }
-
-    // ===============================================================
-    // Rules
-    // ===============================================================
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                    (!('role' in request.resource.data) || request.resource.data.role == 'user' || isAdmin());
+      
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
+                    (!('role' in request.resource.data) || request.resource.data.role == resource.data.role || isAdmin());
+      
       allow delete: if isAdmin();
-
+      
       match /cycle_entries/{entryId} {
         allow read, delete: if isOwner(userId) || isAdmin();
         allow create, update: if isOwner(userId) && isValidCycleEntry(request.resource.data);
@@ -115,6 +117,17 @@ service cloud.firestore {
       match /secret_vault/{entryId} {
         allow read, write: if isOwner(userId) || isAdmin();
       }
+    }
+
+    match /community_posts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                    request.resource.data.author_id == request.auth.uid &&
+                    request.resource.data.content.size() < 5000;
+      allow update: if isAuthenticated() && 
+                    (resource.data.author_id == request.auth.uid || isAdmin()) &&
+                    request.resource.data.author_id == resource.data.author_id;
+      allow delete: if isAuthenticated() && (resource.data.author_id == request.auth.uid || isAdmin());
     }
 
     match /test/{docId} {

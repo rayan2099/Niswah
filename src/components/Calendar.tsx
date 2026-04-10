@@ -8,11 +8,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronLeft, 
   ChevronRight, 
-  Calendar as CalendarIcon,
-  Info,
   Droplets,
   Sparkles,
-  Heart
+  Heart,
+  Info
 } from 'lucide-react';
 import { 
   format, 

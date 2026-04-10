@@ -41,8 +41,6 @@ import { useCycleData } from '../contexts/CycleContext.tsx';
 import { cn } from '../utils/cn.ts';
 import { generateSmartAlerts } from '../logic/healthEngine.ts';
 
-const SYMPTOM_DATA = []; // Removed hardcoded data
-
 export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void }) => {
   const { t, isRTL } = useTranslation();
   const { user, ledger, cycleStats, entries, loading } = useCycleData();

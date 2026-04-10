@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useCycleData } from '../contexts/CycleContext';
 import { useTranslation } from '../i18n/LanguageContext';
-import { analyzeSymptoms, generateSmartAlerts, CONDITIONS } from '../logic/healthEngine';
+import { analyzeSymptoms } from '../logic/healthEngine';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, X, Search, Send, ChevronRight } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { GoogleGenAI } from "@google/genai";

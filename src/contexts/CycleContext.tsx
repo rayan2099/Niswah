@@ -42,6 +42,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
   const [prayerTimesLoading, setPrayerTimesLoading] = useState(false);
   const [prayerTimesError, setPrayerTimesError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [firebaseUser, setFirebaseUser] = useState<any>(null);
 
   // Derived states using useMemo to avoid stale data and satisfy Scenario 5
   const user = useMemo(() => {
@@ -112,54 +113,66 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      setFirebaseUser(user);
       // Always load initial data (handles guest fallback)
       await loadInitialData();
-
-      if (firebaseUser) {
-        // Set up real-time listeners
-        const entriesQuery = query(collection(db, `users/${firebaseUser.uid}/cycle_entries`));
-        const ledgerQuery = query(collection(db, `users/${firebaseUser.uid}/adah_ledger`));
-        const prayersQuery = query(collection(db, `users/${firebaseUser.uid}/prayer_log`));
-        const userDoc = doc(db, `users/${firebaseUser.uid}`);
-
-        const unsubEntries = onSnapshot(entriesQuery, (snapshot) => {
-          const data = snapshot.docs.map(doc => doc.data() as DBCycleEntry);
-          data.sort((a, b) => b.date.localeCompare(a.date) || (b.time_logged || '').localeCompare(a.time_logged || ''));
-          setEntries(data);
-        });
-
-        const unsubLedger = onSnapshot(ledgerQuery, (snapshot) => {
-          const data = snapshot.docs.map(doc => doc.data() as DBAdahLedger);
-          data.sort((a, b) => b.cycle_number - a.cycle_number);
-          setLedger(data);
-        });
-
-        const unsubPrayers = onSnapshot(prayersQuery, (snapshot) => {
-          const data = snapshot.docs.map(doc => doc.data() as DBPrayerLog);
-          setPrayers(data);
-        });
-
-        const unsubUser = onSnapshot(userDoc, (snapshot) => {
-          if (snapshot.exists()) {
-            const userData = snapshot.data() as DBUser;
-            setDbUser(userData);
-          }
-        });
-
-        return () => {
-          unsubEntries();
-          unsubLedger();
-          unsubPrayers();
-          unsubUser();
-        };
-      } else {
-        setLoading(false);
-      }
     });
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!firebaseUser) {
+      setLoading(false);
+      return;
+    }
+
+    // Set up real-time listeners
+    const entriesQuery = query(collection(db, `users/${firebaseUser.uid}/cycle_entries`));
+    const ledgerQuery = query(collection(db, `users/${firebaseUser.uid}/adah_ledger`));
+    const prayersQuery = query(collection(db, `users/${firebaseUser.uid}/prayer_log`));
+    const userDoc = doc(db, `users/${firebaseUser.uid}`);
+
+    const unsubEntries = onSnapshot(entriesQuery, (snapshot) => {
+      const data = snapshot.docs.map(doc => doc.data() as DBCycleEntry);
+      data.sort((a, b) => b.date.localeCompare(a.date) || (b.time_logged || '').localeCompare(a.time_logged || ''));
+      setEntries(data);
+    }, (error) => {
+      console.error("Entries snapshot error", error);
+    });
+
+    const unsubLedger = onSnapshot(ledgerQuery, (snapshot) => {
+      const data = snapshot.docs.map(doc => doc.data() as DBAdahLedger);
+      data.sort((a, b) => b.cycle_number - a.cycle_number);
+      setLedger(data);
+    }, (error) => {
+      console.error("Ledger snapshot error", error);
+    });
+
+    const unsubPrayers = onSnapshot(prayersQuery, (snapshot) => {
+      const data = snapshot.docs.map(doc => doc.data() as DBPrayerLog);
+      setPrayers(data);
+    }, (error) => {
+      console.error("Prayers snapshot error", error);
+    });
+
+    const unsubUser = onSnapshot(userDoc, (snapshot) => {
+      if (snapshot.exists()) {
+        const userData = snapshot.data() as DBUser;
+        setDbUser(userData);
+      }
+    }, (error) => {
+      console.error("User snapshot error", error);
+    });
+
+    return () => {
+      unsubEntries();
+      unsubLedger();
+      unsubPrayers();
+      unsubUser();
+    };
+  }, [firebaseUser]);
 
   // Update logic user and state when raw data changes
   // Derived states are now handled by useMemo above

@@ -26,6 +26,21 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
+  const [dbStatus, setDbStatus] = useState<'checking' | 'ok' | 'error'>('checking');
+
+  React.useEffect(() => {
+    const checkDb = async () => {
+      try {
+        const { getDocFromServer, doc } = await import('firebase/firestore');
+        await getDocFromServer(doc(auth.app.getFirestore ? auth.app.getFirestore() : (await import('../firebase')).db, 'test', 'connection'));
+        setDbStatus('ok');
+      } catch (e) {
+        setDbStatus('error');
+      }
+    };
+    checkDb();
+  }, []);
+
   // Loading timeout to prevent getting stuck
   React.useEffect(() => {
     let timeout: NodeJS.Timeout;
@@ -69,6 +84,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
       'auth/invalid-credential': 'بيانات الاعتماد غير صالحة. تأكدي من البريد وكلمة المرور',
       'auth/user-disabled': 'تم تعطيل هذا الحساب',
       'auth/operation-not-allowed': 'تسجيل الدخول بهذا الأسلوب غير مفعل حالياً',
+      'auth/unauthorized-domain': 'هذا النطاق (Domain) غير مصرح به في إعدادات Firebase. يرجى إضافة النطاق الحالي للقائمة البيضاء.',
     };
     return errors[code] || `حدث خطأ (${code}). حاولي مرة أخرى`;
   };
@@ -414,7 +430,8 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
       )}
       {/* Debug Info (Only for troubleshooting) */}
       <div className="fixed bottom-4 left-4 right-4 p-2 bg-black/5 rounded text-[10px] font-mono text-gray-400 pointer-events-none opacity-50">
-        Auth Status: {auth.currentUser ? `Logged in (${auth.currentUser.uid})` : 'Not logged in'} | 
+        Auth: {auth.currentUser ? `Logged in (${auth.currentUser.uid.slice(0,5)})` : 'Not logged in'} | 
+        DB: {dbStatus} |
         Mode: {mode} | 
         Loading: {loading ? 'YES' : 'NO'}
       </div>

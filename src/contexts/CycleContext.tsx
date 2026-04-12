@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { onSnapshot, collection, query, where, orderBy, doc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase.ts';
 import * as api from '../api/index.ts';
 import * as logic from '../logic/index.ts';
@@ -113,7 +114,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
       // Always load initial data (handles guest fallback)
       await loadInitialData();

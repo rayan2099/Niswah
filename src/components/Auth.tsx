@@ -34,8 +34,11 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
       'auth/too-many-requests': 'تم تجاوز عدد المحاولات. حاولي لاحقاً',
       'auth/network-request-failed': 'تحققي من الاتصال بالإنترنت',
       'auth/popup-closed-by-user': 'تم إغلاق نافذة تسجيل الدخول',
+      'auth/invalid-credential': 'بيانات الاعتماد غير صالحة. تأكدي من البريد وكلمة المرور',
+      'auth/user-disabled': 'تم تعطيل هذا الحساب',
+      'auth/operation-not-allowed': 'تسجيل الدخول بهذا الأسلوب غير مفعل حالياً',
     };
-    return errors[code] || 'حدث خطأ. حاولي مرة أخرى';
+    return errors[code] || `حدث خطأ (${code}). حاولي مرة أخرى`;
   };
 
   const handleEmailAuth = async () => {
@@ -53,8 +56,9 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
-      onSuccess();
+      await onSuccess();
     } catch (err: any) {
+      console.error("Auth Error:", err);
       setError(getErrorMessage(err.code));
     } finally {
       setLoading(false);

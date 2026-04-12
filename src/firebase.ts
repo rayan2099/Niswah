@@ -31,4 +31,4 @@ if (typeof window !== 'undefined') {
   });
 }
 
-export const auth = getAuth();
+export const auth = getAuth(app);

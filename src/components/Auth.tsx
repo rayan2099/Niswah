@@ -206,8 +206,8 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         >
           {/* Logo area */}
           <div className="flex-1 flex flex-col items-center justify-center gap-6">
-            <div className="w-24 h-24 rounded-full bg-rose-100 border-4 border-rose-300 flex items-center justify-center">
-              <span className="text-4xl font-serif text-rose-600">ن</span>
+            <div className="w-28 h-28 rounded-3xl bg-white border border-rose-100 flex items-center justify-center overflow-hidden shadow-sm">
+              <img src="/logo.svg" alt="Niswah Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
             <div className="text-center">
               <h1 className="text-3xl font-bold text-rose-600 mb-1">نسوة</h1>

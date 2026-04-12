@@ -49,8 +49,8 @@ export const PWAInstallBanner = () => {
         </button>
 
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-12 h-12 rounded-xl bg-rose-50 border-2 border-rose-200 flex items-center justify-center flex-shrink-0">
-            <span className="text-2xl font-serif text-rose-500">ن</span>
+          <div className="w-12 h-12 rounded-xl bg-white border border-rose-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <img src="/logo.svg" alt="Niswah Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
           </div>
           <div>
             <p className="font-bold text-gray-800 text-sm">أضيفي نسوة لشاشتك الرئيسية</p>

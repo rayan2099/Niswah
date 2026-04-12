@@ -79,8 +79,8 @@ const Ripple = ({ color }: { color: string }) => (
 
 const FirstTimeWelcome = ({ onStart }: { onStart: () => void }) => (
   <div className="mx-4 mb-6 p-6 bg-white border border-rose-100 rounded-3xl" dir="rtl">
-    <div className="w-20 h-20 rounded-full bg-rose-50 border-2 border-rose-200 flex items-center justify-center mx-auto mb-4">
-      <span className="text-3xl font-serif text-rose-500">ن</span>
+    <div className="w-20 h-20 rounded-full bg-white border border-rose-100 flex items-center justify-center mx-auto mb-4 overflow-hidden">
+      <img src="/logo.svg" alt="Niswah Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
     </div>
     <h2 className="text-lg font-bold text-gray-800 text-center mb-1">أهلاً بكِ في نسوة</h2>
     <p className="text-sm text-gray-400 text-center mb-5 leading-relaxed">

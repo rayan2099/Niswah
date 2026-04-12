@@ -122,14 +122,14 @@ const Screen1Splash = ({ onNext }: { onNext: () => void }) => {
   return (
     <div className="flex flex-col items-center justify-center space-y-8">
       <div className="flex flex-col items-center justify-center space-y-4">
-        <motion.h1 
+        <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
-          className="text-5xl font-serif font-bold text-rose-800"
+          className="w-32 h-32 rounded-3xl bg-white border border-rose-100 flex items-center justify-center overflow-hidden shadow-sm"
         >
-          Niswah
-        </motion.h1>
+          <img src="/logo.svg" alt="Niswah Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+        </motion.div>
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

@@ -182,14 +182,34 @@ export const PWAInstallButton = ({ showLabel = false }: { showLabel?: boolean })
                 لإضافة التطبيق إلى شاشتك الرئيسية، اتبعي الخطوات التالية:
               </p>
               
-              <div className="space-y-4 mb-8">
-                <div className="flex items-center gap-4 text-right">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 font-bold text-gray-500">1</div>
-                  <p className="text-sm text-gray-700">اضغطي على أيقونة <b>"مشاركة"</b> (المربع مع سهم للأعلى) في أسفل المتصفح</p>
+              <div className="space-y-6 mb-8">
+                <div className="flex items-start gap-4 text-right">
+                  <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0 font-bold text-rose-500">1</div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      اضغطي على أيقونة <b>"مشاركة"</b> في أسفل المتصفح
+                    </p>
+                    <div className="mt-2 w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-100 shadow-sm">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                        <polyline points="16 6 12 2 8 6" />
+                        <line x1="12" y1="2" x2="12" y2="15" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4 text-right">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 font-bold text-gray-500">2</div>
-                  <p className="text-sm text-gray-700">اسحبي القائمة للأعلى واختاري <span className="font-bold text-rose-600">"إضافة إلى الشاشة الرئيسية"</span></p>
+                <div className="flex items-start gap-4 text-right">
+                  <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0 font-bold text-rose-500">2</div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      اسحبي القائمة للأعلى واختاري <span className="font-bold text-rose-600">"إضافة إلى الشاشة الرئيسية"</span>
+                    </p>
+                    <div className="mt-2 w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-100 shadow-sm">
+                      <div className="w-6 h-6 border-2 border-gray-400 rounded-md flex items-center justify-center">
+                        <span className="text-lg font-bold text-gray-400">+</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 

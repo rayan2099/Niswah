@@ -133,7 +133,7 @@ export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpre
       }));
 
       const responseStream = await ai.models.generateContentStream({
-        model: "gemini-3.1-pro-preview",
+        model: "gemini-1.5-flash",
         contents: [
           { role: 'user', parts: [{ text: systemPrompt }] },
           ...chatHistory,

@@ -42,6 +42,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   };
 
   const handleEmailAuth = async () => {
+    console.log("Auth: handleEmailAuth started", { mode, email: email ? 'provided' : 'missing' });
     if (!email || !password) {
       setError('يرجى إدخال البريد الإلكتروني وكلمة المرور');
       return;
@@ -50,15 +51,20 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     setError('');
     try {
       if (mode === 'register') {
+        console.log("Auth: Attempting registration...");
         if (!name.trim()) { setError('يرجى إدخال اسمك'); setLoading(false); return; }
         const cred = await createUserWithEmailAndPassword(auth, email, password);
+        console.log("Auth: Registration success, updating profile...");
         await updateProfile(cred.user, { displayName: name });
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        console.log("Auth: Attempting login...");
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        console.log("Auth: Login success", cred.user.uid);
       }
+      console.log("Auth: Calling onSuccess callback...");
       await onSuccess();
     } catch (err: any) {
-      console.error("Auth Error:", err);
+      console.error("Auth Error (Email):", err);
       setError(getErrorMessage(err.code));
     } finally {
       setLoading(false);
@@ -66,14 +72,18 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   };
 
   const handleGoogle = async () => {
+    console.log("Auth: handleGoogle started");
     setLoading(true);
     setError('');
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithPopup(auth, provider);
-      onSuccess();
+      console.log("Auth: Opening Google Sign-in Popup...");
+      const result = await signInWithPopup(auth, provider);
+      console.log("Auth: Google Sign-in Success:", result.user.uid);
+      await onSuccess();
     } catch (err: any) {
+      console.error("Auth Error (Google):", err);
       setError(getErrorMessage(err.code));
     } finally {
       setLoading(false);
@@ -81,15 +91,19 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   };
 
   const handleApple = async () => {
+    console.log("Auth: handleApple started");
     setLoading(true);
     setError('');
     try {
       const provider = new OAuthProvider('apple.com');
       provider.addScope('email');
       provider.addScope('name');
-      await signInWithPopup(auth, provider);
-      onSuccess();
+      console.log("Auth: Opening Apple Sign-in Popup...");
+      const result = await signInWithPopup(auth, provider);
+      console.log("Auth: Apple Sign-in Success:", result.user.uid);
+      await onSuccess();
     } catch (err: any) {
+      console.error("Auth Error (Apple):", err);
       setError(getErrorMessage(err.code));
     } finally {
       setLoading(false);
@@ -330,6 +344,12 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
           )}
         </motion.div>
       )}
+      {/* Debug Info (Only for troubleshooting) */}
+      <div className="fixed bottom-4 left-4 right-4 p-2 bg-black/5 rounded text-[10px] font-mono text-gray-400 pointer-events-none opacity-50">
+        Auth Status: {auth.currentUser ? `Logged in (${auth.currentUser.uid})` : 'Not logged in'} | 
+        Mode: {mode} | 
+        Loading: {loading ? 'YES' : 'NO'}
+      </div>
     </div>
   );
 };

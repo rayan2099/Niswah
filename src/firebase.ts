@@ -1,9 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { initializeFirestore, enableIndexedDbPersistence, doc, getDocFromServer } from 'firebase/firestore';
 
 // Import the Firebase configuration
 import firebaseConfig from '../firebase-applet-config.json';
+
+console.log("Initializing Firebase with Project ID:", firebaseConfig.projectId);
 
 if (!firebaseConfig || !firebaseConfig.projectId) {
   console.error("Firebase configuration is missing or invalid. Please check firebase-applet-config.json.");
@@ -32,3 +34,18 @@ if (typeof window !== 'undefined') {
 }
 
 export const auth = getAuth(app);
+
+// Connection test
+async function testConnection() {
+  try {
+    console.log("Testing Firestore connection...");
+    await getDocFromServer(doc(db, 'test', 'connection'));
+    console.log("Firestore connection test completed (document may not exist, but connection is alive)");
+  } catch (error) {
+    console.error("Firestore connection test error:", error);
+    if(error instanceof Error && error.message.includes('the client is offline')) {
+      console.error("CRITICAL: Firebase client is offline. Check configuration and network.");
+    }
+  }
+}
+testConnection();

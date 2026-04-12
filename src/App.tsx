@@ -169,7 +169,10 @@ function AppContent() {
   }
 
   if (!authUser) {
-    return <AuthScreen onSuccess={() => refresh()} />;
+    return <AuthScreen onSuccess={async () => {
+      console.log("App: Auth Success Callback triggered");
+      await refresh();
+    }} />;
   }
 
   if (showOnboarding) {

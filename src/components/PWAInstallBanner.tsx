@@ -112,7 +112,7 @@ export const PWAInstallButton = ({ showLabel = false }: { showLabel?: boolean })
   const handleInstall = async () => {
     if (platform.isIOS) {
       setShowIOSHint(true);
-      setTimeout(() => setShowIOSHint(false), 5000);
+      // Don't auto-hide too quickly, let them see it
       return;
     }
     const r = await triggerInstall();
@@ -153,15 +153,63 @@ export const PWAInstallButton = ({ showLabel = false }: { showLabel?: boolean })
 
       <AnimatePresence>
         {showIOSHint && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 10 }}
-            className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 p-3 bg-black/80 backdrop-blur text-white text-[10px] rounded-xl z-50 text-center leading-relaxed"
-          >
-            <div className="mb-1 font-bold">لمستخدمي آيفون:</div>
-            اضغطي على أيقونة "مشاركة" ثم "إضافة إلى الشاشة الرئيسية"
-          </motion.div>
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowIOSHint(false)}
+              className="fixed inset-0 bg-rose-900/20 z-[200] backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed bottom-10 left-4 right-4 p-6 bg-white rounded-3xl z-[201] text-center shadow-2xl border border-rose-100"
+              dir="rtl"
+            >
+              <button 
+                onClick={() => setShowIOSHint(false)}
+                className="absolute top-4 left-4 w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Download className="w-8 h-8 text-rose-500" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">تثبيت نسوة على آيفون</h3>
+              <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+                لإضافة التطبيق إلى شاشتك الرئيسية، اتبعي الخطوات التالية:
+              </p>
+              
+              <div className="space-y-4 mb-8">
+                <div className="flex items-center gap-4 text-right">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 font-bold text-gray-500">1</div>
+                  <p className="text-sm text-gray-700">اضغطي على أيقونة <b>"مشاركة"</b> (المربع مع سهم للأعلى) في أسفل المتصفح</p>
+                </div>
+                <div className="flex items-center gap-4 text-right">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 font-bold text-gray-500">2</div>
+                  <p className="text-sm text-gray-700">اسحبي القائمة للأعلى واختاري <span className="font-bold text-rose-600">"إضافة إلى الشاشة الرئيسية"</span></p>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setShowIOSHint(false)}
+                className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold shadow-lg shadow-rose-200"
+              >
+                فهمت
+              </button>
+
+              {/* Arrow pointing to Safari share button */}
+              <motion.div 
+                animate={{ y: [0, 10, 0] }}
+                transition={{ repeat: Infinity, duration: 1.5 }}
+                className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-white"
+              >
+                <div className="w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[20px] border-t-rose-500"></div>
+              </motion.div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

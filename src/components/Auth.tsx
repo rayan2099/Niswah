@@ -32,7 +32,8 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     const checkDb = async () => {
       try {
         const { getDocFromServer, doc } = await import('firebase/firestore');
-        await getDocFromServer(doc(auth.app.getFirestore ? auth.app.getFirestore() : (await import('../firebase')).db, 'test', 'connection'));
+        const { db } = await import('../firebase');
+        await getDocFromServer(doc(db, 'test', 'connection'));
         setDbStatus('ok');
       } catch (e) {
         setDbStatus('error');

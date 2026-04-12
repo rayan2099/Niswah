@@ -95,7 +95,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
       const { data: entriesData } = await api.getCycleEntries();
       
       if (userData) {
-        console.log("CycleContext: User data loaded", userData.uid);
+        console.log("CycleContext: User data loaded", userData.id);
         setDbUser(userData);
         setLedger(ledgerData || []);
         setEntries(entriesData || []);

@@ -88,29 +88,38 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const loadInitialData = useCallback(async () => {
-    const { data: userData } = await api.getUser();
-    const { data: ledgerData } = await api.getAdahLedger();
-    const { data: entriesData } = await api.getCycleEntries();
-    
-    if (userData) {
-      setDbUser(userData);
-      setLedger(ledgerData || []);
-      setEntries(entriesData || []);
+    try {
+      console.log("CycleContext: Loading initial data...");
+      const { data: userData } = await api.getUser();
+      const { data: ledgerData } = await api.getAdahLedger();
+      const { data: entriesData } = await api.getCycleEntries();
+      
+      if (userData) {
+        console.log("CycleContext: User data loaded", userData.uid);
+        setDbUser(userData);
+        setLedger(ledgerData || []);
+        setEntries(entriesData || []);
 
-      // Fetch prayer times early if city or coordinates are set
-      const logicUser = api.mapDBUserToLogicUser(userData, ledgerData || []);
-      if (logicUser && (logicUser.prayerCity || (logicUser.prayerLat && logicUser.prayerLon))) {
-        logic.getPrayerTimes(logicUser, new Date()).then(({ times }) => {
-          if (times.length > 0) {
-            setPrayerTimes(times);
-          }
-        }).catch(err => {
-          console.error("Initial prayer fetch failed", err);
-          setPrayerTimesError("تعذّر تحميل أوقات الصلاة");
-        });
+        // Fetch prayer times early if city or coordinates are set
+        const logicUser = api.mapDBUserToLogicUser(userData, ledgerData || []);
+        if (logicUser && (logicUser.prayerCity || (logicUser.prayerLat && logicUser.prayerLon))) {
+          logic.getPrayerTimes(logicUser, new Date()).then(({ times }) => {
+            if (times.length > 0) {
+              setPrayerTimes(times);
+            }
+          }).catch(err => {
+            console.error("Initial prayer fetch failed", err);
+            setPrayerTimesError("تعذّر تحميل أوقات الصلاة");
+          });
+        }
+      } else {
+        console.log("CycleContext: No user data found (new user or guest)");
       }
+    } catch (error) {
+      console.error("CycleContext: Failed to load initial data", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {

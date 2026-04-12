@@ -26,6 +26,19 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
+  // Loading timeout to prevent getting stuck
+  React.useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    if (loading) {
+      timeout = setTimeout(() => {
+        console.warn("Auth: Loading state timed out, forcing to false");
+        setLoading(false);
+        setError('استغرق الطلب وقتاً طويلاً. يرجى المحاولة مرة أخرى');
+      }, 15000); // 15 seconds timeout
+    }
+    return () => clearTimeout(timeout);
+  }, [loading]);
+
   React.useEffect(() => {
     const checkRedirect = async () => {
       try {
@@ -104,8 +117,9 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         console.log("Auth: Google Sign-in Popup Success:", result.user.uid);
         await onSuccess();
       } catch (popupErr: any) {
-        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request') {
-          console.warn("Auth: Popup blocked or cancelled, falling back to Redirect...");
+        console.warn("Auth: Google Popup Error:", popupErr.code, popupErr.message);
+        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request' || popupErr.code === 'auth/popup-closed-by-user') {
+          console.warn("Auth: Popup issue, falling back to Redirect...");
           await signInWithRedirect(auth, provider);
         } else {
           throw popupErr;
@@ -134,8 +148,9 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         console.log("Auth: Apple Sign-in Popup Success:", result.user.uid);
         await onSuccess();
       } catch (popupErr: any) {
-        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request') {
-          console.warn("Auth: Popup blocked or cancelled, falling back to Redirect...");
+        console.warn("Auth: Apple Popup Error:", popupErr.code, popupErr.message);
+        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request' || popupErr.code === 'auth/popup-closed-by-user') {
+          console.warn("Auth: Popup issue, falling back to Redirect...");
           await signInWithRedirect(auth, provider);
         } else {
           throw popupErr;

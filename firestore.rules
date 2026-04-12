@@ -116,6 +116,11 @@ service cloud.firestore {
       }
     }
 
+    // Allow public read for connection testing
+    match /test/connection {
+      allow read: if true;
+    }
+
     match /community_posts/{postId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && 

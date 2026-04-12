@@ -54,11 +54,14 @@ async function testConnection() {
   try {
     console.log("Testing Firestore connection...");
     await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log("Firestore connection test completed (document may not exist, but connection is alive)");
-  } catch (error) {
-    console.error("Firestore connection test error:", error);
-    if(error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("CRITICAL: Firebase client is offline. Check configuration and network.");
+    console.log("✅ Firestore connection test SUCCESS: Connection is alive.");
+  } catch (error: any) {
+    if (error.code === 'permission-denied') {
+      console.warn("⚠️ Firestore connection test: Permission denied (this is expected if rules are strict, but connection is alive).");
+    } else if (error.message && error.message.includes('the client is offline')) {
+      console.error("❌ CRITICAL: Firebase client is offline. Check configuration and network.");
+    } else {
+      console.error("❌ Firestore connection test error:", error);
     }
   }
 }

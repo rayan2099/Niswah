@@ -96,7 +96,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
       console.log("Auth: Calling onSuccess callback...");
       await onSuccess();
     } catch (err: any) {
-      console.error("Auth Error (Email):", err);
+      console.error("Auth Error (Email) FULL OBJECT:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
       setError(getErrorMessage(err.code));
     } finally {
       setLoading(false);
@@ -126,7 +126,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         }
       }
     } catch (err: any) {
-      console.error("Auth Error (Google):", err);
+      console.error("Auth Error (Google) FULL OBJECT:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
       setError(getErrorMessage(err.code));
     } finally {
       setLoading(false);
@@ -157,7 +157,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         }
       }
     } catch (err: any) {
-      console.error("Auth Error (Apple):", err);
+      console.error("Auth Error (Apple) FULL OBJECT:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
       setError(getErrorMessage(err.code));
     } finally {
       setLoading(false);

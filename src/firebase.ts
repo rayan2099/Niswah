@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { initializeFirestore, enableIndexedDbPersistence, doc, getDocFromServer } from 'firebase/firestore';
 
 // Import the Firebase configuration
@@ -34,6 +34,20 @@ if (typeof window !== 'undefined') {
 }
 
 export const auth = getAuth(app);
+
+// Set persistence to ensure login "sticks"
+setPersistence(auth, browserSessionPersistence)
+  .then(() => {
+    console.log("Auth persistence set to browserSessionPersistence");
+  })
+  .catch((error) => {
+    console.error("Error setting auth persistence:", error);
+  });
+
+// Diagnostic Mode
+if (typeof window !== 'undefined') {
+  (window as any).firebaseDebug = auth;
+}
 
 // Connection test
 async function testConnection() {

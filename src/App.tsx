@@ -127,8 +127,20 @@ function AppContent() {
         refresh();
       }
     });
-    return () => unsubscribe();
-  }, [refresh]);
+
+    // Timeout fallback for authLoading to prevent permanent hanging
+    const timeout = setTimeout(() => {
+      if (authLoading) {
+        console.warn("App: Auth state check timed out, forcing loading to false");
+        setAuthLoading(false);
+      }
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearTimeout(timeout);
+    };
+  }, [refresh, authLoading]);
 
   useEffect(() => {
     if (user && user.madhhab) {

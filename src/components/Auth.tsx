@@ -4,6 +4,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   OAuthProvider,
   sendPasswordResetEmail,
@@ -23,6 +25,23 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
+
+  React.useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        console.log("Auth: Checking for redirect result...");
+        const result = await getRedirectResult(auth);
+        if (result) {
+          console.log("Auth: Redirect Sign-in Success:", result.user.uid);
+          await onSuccess();
+        }
+      } catch (err: any) {
+        console.error("Auth Error (Redirect):", err);
+        setError(getErrorMessage(err.code));
+      }
+    };
+    checkRedirect();
+  }, [onSuccess]);
 
   const getErrorMessage = (code: string): string => {
     const errors: Record<string, string> = {
@@ -78,10 +97,20 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      console.log("Auth: Opening Google Sign-in Popup...");
-      const result = await signInWithPopup(auth, provider);
-      console.log("Auth: Google Sign-in Success:", result.user.uid);
-      await onSuccess();
+      
+      console.log("Auth: Attempting Google Sign-in Popup...");
+      try {
+        const result = await signInWithPopup(auth, provider);
+        console.log("Auth: Google Sign-in Popup Success:", result.user.uid);
+        await onSuccess();
+      } catch (popupErr: any) {
+        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request') {
+          console.warn("Auth: Popup blocked or cancelled, falling back to Redirect...");
+          await signInWithRedirect(auth, provider);
+        } else {
+          throw popupErr;
+        }
+      }
     } catch (err: any) {
       console.error("Auth Error (Google):", err);
       setError(getErrorMessage(err.code));
@@ -98,10 +127,20 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
       const provider = new OAuthProvider('apple.com');
       provider.addScope('email');
       provider.addScope('name');
-      console.log("Auth: Opening Apple Sign-in Popup...");
-      const result = await signInWithPopup(auth, provider);
-      console.log("Auth: Apple Sign-in Success:", result.user.uid);
-      await onSuccess();
+      
+      console.log("Auth: Attempting Apple Sign-in Popup...");
+      try {
+        const result = await signInWithPopup(auth, provider);
+        console.log("Auth: Apple Sign-in Popup Success:", result.user.uid);
+        await onSuccess();
+      } catch (popupErr: any) {
+        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request') {
+          console.warn("Auth: Popup blocked or cancelled, falling back to Redirect...");
+          await signInWithRedirect(auth, provider);
+        } else {
+          throw popupErr;
+        }
+      }
     } catch (err: any) {
       console.error("Auth Error (Apple):", err);
       setError(getErrorMessage(err.code));
@@ -219,7 +258,13 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
             {mode === 'register' ? 'رحلتك الصحية تبدأ هنا' : 'سجّلي الدخول لمتابعة تتبع دورتك'}
           </p>
 
-          <div className="flex flex-col gap-4">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleEmailAuth();
+            }}
+            className="flex flex-col gap-4"
+          >
             {mode === 'register' && (
               <div>
                 <label className="text-sm text-gray-500 text-right block mb-1">الاسم</label>
@@ -230,6 +275,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
                   placeholder="اسمك أو لقبك"
                   className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-right focus:outline-none focus:border-rose-300"
                   dir="rtl"
+                  required
                 />
               </div>
             )}
@@ -243,6 +289,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
                 placeholder="example@email.com"
                 className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-left focus:outline-none focus:border-rose-300"
                 dir="ltr"
+                required
               />
             </div>
 
@@ -255,6 +302,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
                 placeholder="••••••••"
                 className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-left focus:outline-none focus:border-rose-300"
                 dir="ltr"
+                required
               />
             </div>
 
@@ -265,7 +313,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
             )}
 
             <button
-              onClick={handleEmailAuth}
+              type="submit"
               disabled={loading}
               className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold disabled:opacity-50 active:scale-95 transition-transform mt-2"
             >
@@ -273,13 +321,18 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
             </button>
 
             {mode === 'login' && (
-              <button onClick={() => setMode('reset')} className="text-sm text-rose-400 text-right">
+              <button 
+                type="button"
+                onClick={() => setMode('reset')} 
+                className="text-sm text-rose-400 text-right"
+              >
                 نسيتِ كلمة المرور؟
               </button>
             )}
 
             <div className="flex items-center justify-center gap-2 mt-2">
               <button
+                type="button"
                 onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
                 className="text-rose-500 text-sm font-medium"
               >
@@ -289,7 +342,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
                 {mode === 'login' ? 'ليس لديكِ حساب؟' : 'لديكِ حساب؟'}
               </span>
             </div>
-          </div>
+          </form>
         </motion.div>
       )}
 

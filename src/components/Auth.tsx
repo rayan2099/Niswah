@@ -10,29 +10,22 @@ import {
   OAuthProvider,
   sendPasswordResetEmail,
   updateProfile,
-  signInWithPhoneNumber,
-  RecaptchaVerifier,
-  ConfirmationResult,
 } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useTranslation } from '../i18n/LanguageContext';
 
-type AuthMode = 'welcome' | 'login' | 'register' | 'reset' | 'phone' | 'phone-verify';
+type AuthMode = 'welcome' | 'email' | 'reset';
 
 export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   const { t, isRTL } = useTranslation();
   const [mode, setMode] = useState<AuthMode>('welcome');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [verificationId, setVerificationId] = useState<ConfirmationResult | null>(null);
   const [name, setName] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
-  const recaptchaRef = React.useRef<HTMLDivElement>(null);
-  const verifierRef = React.useRef<RecaptchaVerifier | null>(null);
 
   const [dbStatus, setDbStatus] = useState<'checking' | 'ok' | 'error'>('checking');
 
@@ -92,18 +85,14 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
       'auth/popup-closed-by-user': 'تم إغلاق نافذة تسجيل الدخول',
       'auth/invalid-credential': 'بيانات الاعتماد غير صالحة. تأكدي من البريد وكلمة المرور',
       'auth/user-disabled': 'تم تعطيل هذا الحساب',
-      'auth/operation-not-allowed': 'تسجيل الدخول بهذا الأسلوب غير مفعل حالياً في إعدادات Firebase. يرجى تفعيل (Email/Password) أو (Phone) في لوحة تحكم Firebase.',
+      'auth/operation-not-allowed': 'تسجيل الدخول بهذا الأسلوب غير مفعل حالياً في إعدادات Firebase. يرجى تفعيل (Email/Password) في لوحة تحكم Firebase.',
       'auth/unauthorized-domain': 'هذا النطاق (Domain) غير مصرح به في إعدادات Firebase. يرجى إضافة النطاق الحالي للقائمة البيضاء.',
-      'auth/invalid-phone-number': 'رقم الهاتف غير صحيح. يرجى إدخاله بصيغة دولية (مثلاً: +966500000000)',
-      'auth/missing-phone-number': 'يرجى إدخال رقم الهاتف',
-      'auth/quota-exceeded': 'تم تجاوز حصة الرسائل القصيرة (SMS). يرجى المحاولة لاحقاً',
-      'auth/captcha-check-failed': 'فشل التحقق من الكابتشا. يرجى المحاولة مرة أخرى',
     };
     return errors[code] || `حدث خطأ (${code}). حاولي مرة أخرى`;
   };
 
   const handleEmailAuth = async () => {
-    console.log("Auth: handleEmailAuth started", { mode, email: email ? 'provided' : 'missing' });
+    console.log("Auth: handleEmailAuth started", { isRegistering, email: email ? 'provided' : 'missing' });
     if (!email || !password) {
       setError('يرجى إدخال البريد الإلكتروني وكلمة المرور');
       return;
@@ -111,19 +100,38 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     setLoading(true);
     setError('');
     try {
-      if (mode === 'register') {
+      if (isRegistering) {
         console.log("Auth: Attempting registration...");
-        if (!name.trim()) { setError('يرجى إدخال اسمك'); setLoading(false); return; }
+        if (!name.trim()) { 
+          setError('يرجى إدخال اسمك لإكمال التسجيل'); 
+          setLoading(false); 
+          return; 
+        }
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         console.log("Auth: Registration success, updating profile...");
         await updateProfile(cred.user, { displayName: name });
+        await onSuccess();
       } else {
         console.log("Auth: Attempting login...");
-        const cred = await signInWithEmailAndPassword(auth, email, password);
-        console.log("Auth: Login success", cred.user.uid);
+        try {
+          const cred = await signInWithEmailAndPassword(auth, email, password);
+          console.log("Auth: Login success", cred.user.uid);
+          await onSuccess();
+        } catch (loginErr: any) {
+          if (loginErr.code === 'auth/user-not-found' || loginErr.code === 'auth/invalid-credential') {
+            // If user not found, we check if it's potentially a new user
+            // Firebase v9+ often returns 'invalid-credential' for both wrong password and user not found
+            // but we can try to create the account if they provide a name
+            if (!isRegistering) {
+              setIsRegistering(true);
+              setError('يبدو أنكِ مستخدمة جديدة، يرجى إدخال اسمكِ لإكمال التسجيل');
+              setLoading(false);
+              return;
+            }
+          }
+          throw loginErr;
+        }
       }
-      console.log("Auth: Calling onSuccess callback...");
-      await onSuccess();
     } catch (err: any) {
       console.error("Auth Error (Email) FULL OBJECT:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
       setError(getErrorMessage(err.code));
@@ -156,57 +164,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
       }
     } catch (err: any) {
       console.error("Auth Error (Google) FULL OBJECT:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
-      setError(getErrorMessage(err.code));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePhoneAuth = async () => {
-    if (!phone) { setError('يرجى إدخال رقم الهاتف'); return; }
-    if (!phone.startsWith('+')) { setError('يرجى إدخال رقم الهاتف بالصيغة الدولية (مثلاً: +966...)'); return; }
-    
-    setLoading(true);
-    setError('');
-    
-    try {
-      if (!verifierRef.current && recaptchaRef.current) {
-        verifierRef.current = new RecaptchaVerifier(auth, recaptchaRef.current, {
-          size: 'invisible',
-          callback: () => {
-            console.log('Recaptcha resolved');
-          }
-        });
-      }
-      
-      const confirmation = await signInWithPhoneNumber(auth, phone, verifierRef.current!);
-      setVerificationId(confirmation);
-      setMode('phone-verify');
-    } catch (err: any) {
-      console.error("Auth Error (Phone):", err);
-      setError(getErrorMessage(err.code));
-      if (verifierRef.current) {
-        verifierRef.current.clear();
-        verifierRef.current = null;
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    if (!verificationCode) { setError('يرجى إدخال رمز التحقق'); return; }
-    if (!verificationId) { setError('حدث خطأ. يرجى المحاولة مرة أخرى'); setMode('phone'); return; }
-    
-    setLoading(true);
-    setError('');
-    
-    try {
-      const result = await verificationId.confirm(verificationCode);
-      console.log("Auth: Phone Sign-in Success:", result.user.uid);
-      await onSuccess();
-    } catch (err: any) {
-      console.error("Auth Error (Verify):", err);
       setError(getErrorMessage(err.code));
     } finally {
       setLoading(false);
@@ -319,21 +276,10 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
 
             {/* Email */}
             <button
-              onClick={() => setMode('login')}
+              onClick={() => setMode('email')}
               className="w-full py-4 bg-rose-50 border border-rose-200 rounded-2xl font-medium text-rose-600 active:scale-95 transition-transform"
             >
               المتابعة بالبريد الإلكتروني
-            </button>
-
-            {/* Phone */}
-            <button
-              onClick={() => setMode('phone')}
-              className="w-full py-4 bg-white border border-gray-200 rounded-2xl flex items-center justify-center gap-3 font-medium text-gray-700 active:scale-95 transition-transform"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-              </svg>
-              المتابعة برقم الهاتف
             </button>
 
             <p className="text-xs text-gray-400 text-center mt-2 leading-relaxed">
@@ -346,123 +292,26 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         </motion.div>
       )}
 
-      {/* Phone Login */}
-      {mode === 'phone' && (
+      {/* Email Auth */}
+      {mode === 'email' && (
         <motion.div
           initial={{ x: 50, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           className="flex-1 flex flex-col p-6 pt-12"
         >
-          <button onClick={() => setMode('welcome')} className="text-gray-400 text-right mb-8">
-            → رجوع
-          </button>
-
-          <h2 className="text-2xl font-bold text-right mb-1">تسجيل الدخول بالهاتف</h2>
-          <p className="text-sm text-gray-400 text-right mb-8">
-            أدخلي رقم هاتفك مع رمز الدولة (مثلاً: +966...)
-          </p>
-
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-sm text-gray-500 text-right block mb-1">رقم الهاتف</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="+966 50 000 0000"
-                className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-left focus:outline-none focus:border-rose-300"
-                dir="ltr"
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                <p className="text-sm text-red-600 text-right">{error}</p>
-              </div>
-            )}
-
-            <div ref={recaptchaRef} />
-
-            <button
-              onClick={handlePhoneAuth}
-              disabled={loading}
-              className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold disabled:opacity-50 active:scale-95 transition-transform mt-2"
-            >
-              {loading ? 'جارٍ الإرسال...' : 'إرسال رمز التحقق'}
-            </button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Phone Verification */}
-      {mode === 'phone-verify' && (
-        <motion.div
-          initial={{ x: 50, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          className="flex-1 flex flex-col p-6 pt-12"
-        >
-          <button onClick={() => setMode('phone')} className="text-gray-400 text-right mb-8">
-            → رجوع
-          </button>
-
-          <h2 className="text-2xl font-bold text-right mb-1">رمز التحقق</h2>
-          <p className="text-sm text-gray-400 text-right mb-8">
-            أدخلي الرمز المكون من 6 أرقام المرسل إلى {phone}
-          </p>
-
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-sm text-gray-500 text-right block mb-1">رمز التحقق</label>
-              <input
-                type="text"
-                value={verificationCode}
-                onChange={e => setVerificationCode(e.target.value)}
-                placeholder="000000"
-                className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-center tracking-[0.5em] font-bold text-xl focus:outline-none focus:border-rose-300"
-                maxLength={6}
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                <p className="text-sm text-red-600 text-right">{error}</p>
-              </div>
-            )}
-
-            <button
-              onClick={handleVerifyCode}
-              disabled={loading}
-              className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold disabled:opacity-50 active:scale-95 transition-transform mt-2"
-            >
-              {loading ? 'جارٍ التحقق...' : 'تأكيد الرمز'}
-            </button>
-            
-            <button 
-              onClick={() => setMode('phone')}
-              className="text-sm text-rose-400 text-center mt-2"
-            >
-              تغيير رقم الهاتف
-            </button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Login / Register */}
-      {(mode === 'login' || mode === 'register') && (
-        <motion.div
-          initial={{ x: 50, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          className="flex-1 flex flex-col p-6 pt-12"
-        >
-          <button onClick={() => setMode('welcome')} className="text-gray-400 text-right mb-8">
+          <button onClick={() => {
+            setMode('welcome');
+            setIsRegistering(false);
+            setError('');
+          }} className="text-gray-400 text-right mb-8">
             → رجوع
           </button>
 
           <h2 className="text-2xl font-bold text-right mb-1">
-            {mode === 'register' ? 'إنشاء حساب جديد' : 'مرحباً بعودتك'}
+            {isRegistering ? 'إنشاء حساب جديد' : 'مرحباً بعودتك'}
           </h2>
           <p className="text-sm text-gray-400 text-right mb-8">
-            {mode === 'register' ? 'رحلتك الصحية تبدأ هنا' : 'سجّلي الدخول لمتابعة تتبع دورتك'}
+            {isRegistering ? 'رحلتك الصحية تبدأ هنا' : 'سجّلي الدخول لمتابعة تتبع دورتك'}
           </p>
 
           <form 
@@ -472,20 +321,26 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
             }}
             className="flex flex-col gap-4"
           >
-            {mode === 'register' && (
-              <div>
-                <label className="text-sm text-gray-500 text-right block mb-1">الاسم</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="اسمك أو لقبك"
-                  className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-right focus:outline-none focus:border-rose-300"
-                  dir="rtl"
-                  required
-                />
-              </div>
-            )}
+            <AnimatePresence>
+              {isRegistering && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  className="overflow-hidden"
+                >
+                  <label className="text-sm text-gray-500 text-right block mb-1">الاسم</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="اسمك أو لقبك"
+                    className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-right focus:outline-none focus:border-rose-300"
+                    dir="rtl"
+                    required={isRegistering}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div>
               <label className="text-sm text-gray-500 text-right block mb-1">البريد الإلكتروني</label>
@@ -524,10 +379,10 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               disabled={loading}
               className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold disabled:opacity-50 active:scale-95 transition-transform mt-2"
             >
-              {loading ? 'جارٍ التحميل...' : mode === 'register' ? 'إنشاء الحساب' : 'تسجيل الدخول'}
+              {loading ? 'جارٍ التحميل...' : isRegistering ? 'إكمال التسجيل' : 'تسجيل الدخول'}
             </button>
 
-            {mode === 'login' && (
+            {!isRegistering && (
               <button 
                 type="button"
                 onClick={() => setMode('reset')} 
@@ -540,13 +395,13 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
             <div className="flex items-center justify-center gap-2 mt-2">
               <button
                 type="button"
-                onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+                onClick={() => setIsRegistering(!isRegistering)}
                 className="text-rose-500 text-sm font-medium"
               >
-                {mode === 'login' ? 'إنشاء حساب جديد' : 'لدي حساب بالفعل'}
+                {isRegistering ? 'لدي حساب بالفعل' : 'إنشاء حساب جديد'}
               </button>
               <span className="text-gray-400 text-sm">
-                {mode === 'login' ? 'ليس لديكِ حساب؟' : 'لديكِ حساب؟'}
+                {isRegistering ? 'لديكِ حساب؟' : 'ليس لديكِ حساب؟'}
               </span>
             </div>
           </form>
@@ -560,7 +415,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
           animate={{ x: 0, opacity: 1 }}
           className="flex-1 flex flex-col p-6 pt-12"
         >
-          <button onClick={() => setMode('login')} className="text-gray-400 text-right mb-8">
+          <button onClick={() => setMode('email')} className="text-gray-400 text-right mb-8">
             → رجوع
           </button>
 
@@ -574,7 +429,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               <div className="text-4xl mb-3">✓</div>
               <p className="text-emerald-700 font-bold">تم الإرسال!</p>
               <p className="text-sm text-emerald-600 mt-2">تحققي من بريدك الإلكتروني</p>
-              <button onClick={() => setMode('login')} className="mt-4 text-rose-500 text-sm">
+              <button onClick={() => setMode('email')} className="mt-4 text-rose-500 text-sm">
                 العودة لتسجيل الدخول
               </button>
             </div>

@@ -182,32 +182,39 @@ export const PWAInstallButton = ({ showLabel = false }: { showLabel?: boolean })
                 لإضافة التطبيق إلى شاشتك الرئيسية، اتبعي الخطوات التالية:
               </p>
               
-              <div className="space-y-6 mb-8">
-                <div className="flex items-start gap-4 text-right">
-                  <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0 font-bold text-rose-500">1</div>
+              <div className="space-y-8 mb-10">
+                <div className="flex items-start gap-5 text-right">
+                  <div className="w-10 h-10 rounded-full bg-rose-500 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm">1</div>
                   <div className="flex-1">
-                    <p className="text-sm text-gray-700 leading-relaxed">
-                      اضغطي على أيقونة <b>"مشاركة"</b> في أسفل المتصفح
+                    <p className="text-base text-gray-800 leading-relaxed font-medium">
+                      اضغطي على أيقونة <span className="text-blue-600 font-bold">"مشاركة"</span> في شريط الأدوات بالأسفل
                     </p>
-                    <div className="mt-2 w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-100 shadow-sm">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                        <polyline points="16 6 12 2 8 6" />
-                        <line x1="12" y1="2" x2="12" y2="15" />
-                      </svg>
+                    <div className="mt-4 flex items-center gap-4">
+                      <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center border-2 border-blue-100 shadow-md animate-pulse">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#007AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                          <polyline points="16 6 12 2 8 6" />
+                          <line x1="12" y1="2" x2="12" y2="15" />
+                        </svg>
+                      </div>
+                      <div className="text-xs text-gray-400 font-medium">هذه الأيقونة تجدينها في منتصف الشريط السفلي</div>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-start gap-4 text-right">
-                  <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0 font-bold text-rose-500">2</div>
+                
+                <div className="flex items-start gap-5 text-right">
+                  <div className="w-10 h-10 rounded-full bg-rose-500 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm">2</div>
                   <div className="flex-1">
-                    <p className="text-sm text-gray-700 leading-relaxed">
-                      اسحبي القائمة للأعلى واختاري <span className="font-bold text-rose-600">"إضافة إلى الشاشة الرئيسية"</span>
+                    <p className="text-base text-gray-800 leading-relaxed font-medium">
+                      اسحبي القائمة للأعلى واختاري <span className="text-rose-600 font-bold">"إضافة إلى الشاشة الرئيسية"</span>
                     </p>
-                    <div className="mt-2 w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-100 shadow-sm">
-                      <div className="w-6 h-6 border-2 border-gray-400 rounded-md flex items-center justify-center">
-                        <span className="text-lg font-bold text-gray-400">+</span>
+                    <div className="mt-4 flex items-center gap-4">
+                      <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center border-2 border-rose-100 shadow-md">
+                        <div className="w-8 h-8 border-2 border-gray-400 rounded-lg flex items-center justify-center">
+                          <span className="text-2xl font-bold text-gray-400">+</span>
+                        </div>
                       </div>
+                      <div className="text-xs text-gray-400 font-medium">ستجدينها في القائمة المنسدلة</div>
                     </div>
                   </div>
                 </div>

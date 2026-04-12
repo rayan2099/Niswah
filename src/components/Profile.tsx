@@ -45,6 +45,7 @@ import { useTranslation } from '../i18n/LanguageContext.tsx';
 import { useCycleData } from '../contexts/CycleContext.tsx';
 import { Paywall } from './Paywall.tsx';
 import { NotificationService } from '../services/NotificationService.ts';
+import { PWAInstallButton } from './PWAInstallBanner.tsx';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -313,7 +314,7 @@ export const Profile = ({ }: ProfileProps) => {
   const [isGeneratingFiqhPDF, setIsGeneratingFiqhPDF] = useState(false);
   const [isGeneratingDoctorPDF, setIsGeneratingDoctorPDF] = useState(false);
   const [isGeneratingHusbandPDF, setIsGeneratingHusbandPDF] = useState(false);
-  const { t, language, setLanguage } = useTranslation();
+  const { t, language, setLanguage, isRTL } = useTranslation();
 
   useEffect(() => {
     if (contextUser) {
@@ -685,7 +686,16 @@ export const Profile = ({ }: ProfileProps) => {
                 {isGeneratingHusbandPDF ? t('preparing') : t('download')}
               </button>
             </div>
+          </div>
+        </section>
 
+        {/* App Settings */}
+        <section className="space-y-4">
+          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('app_settings')}</h3>
+          <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
+            <div className="px-6 py-4 flex items-center justify-between border-b border-black/5 hover:bg-gray-50 transition-colors">
+              <PWAInstallButton showLabel={true} />
+            </div>
             <LinkRow icon={Share2} label={t('invite_friends')} onClick={handleInvite} />
             <LinkRow icon={Star} label={t('rate_app')} onClick={handleRate} />
             <LinkRow icon={Trash2} label={t('delete_account')} color="text-rose-500" onClick={() => setShowDeleteConfirm(true)} />

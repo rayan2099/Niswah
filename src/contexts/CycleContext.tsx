@@ -86,7 +86,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
     return logic.predictOvulation(user);
   }, [user]);
 
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     const { data: userData } = await api.getUser();
     const { data: ledgerData } = await api.getAdahLedger();
     const { data: entriesData } = await api.getCycleEntries();
@@ -110,7 +110,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -120,7 +120,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [loadInitialData]);
 
   useEffect(() => {
     if (!firebaseUser) {

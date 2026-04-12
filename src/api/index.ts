@@ -4,7 +4,6 @@
  */
 
 import { 
-  signInAnonymously as firebaseSignInAnonymously,
   onAuthStateChanged,
   User as FirebaseUser,
   getAuth
@@ -99,15 +98,6 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 // API LAYER
-
-export async function signInAnonymously() {
-  try {
-    const { user } = await firebaseSignInAnonymously(auth);
-    return { data: user, error: null };
-  } catch (error) {
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
-}
 
 export async function getUser(): Promise<ApiResponse<DBUser>> {
   const user = auth.currentUser;
@@ -544,31 +534,18 @@ export async function deleteAccount(): Promise<ApiResponse<boolean>> {
   if (!user) return { data: null, error: 'Not authenticated' };
 
   const uid = user.uid;
-  const collections = [
-    'cycle_entries',
-    'adah_ledger',
-    'prayer_log',
-    'symptoms_log',
-    'nifas_records',
-    'ramadan_records',
-    'pregnancy_records',
-    'secret_vault'
-  ];
-
   try {
     // Delete subcollections
-    for (const collName of collections) {
-      const q = query(collection(db, `users/${uid}/${collName}`));
-      const snapshot = await getDocs(q);
-      for (const d of snapshot.docs) {
-        await deleteDoc(d.ref);
-      }
+    const subcollections = ['cycle_entries', 'adah_ledger', 'prayer_log', 'symptoms_log', 'nifas_records', 'ramadan_records', 'pregnancy_records', 'secret_vault'];
+    for (const sub of subcollections) {
+      const snap = await getDocs(collection(db, 'users', uid, sub));
+      await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
     }
 
     // Delete user document
-    await deleteDoc(doc(db, `users/${uid}`));
+    await deleteDoc(doc(db, 'users', uid));
 
-    // Delete auth user (might fail if not recently logged in, we catch and sign out anyway)
+    // Delete auth user
     try {
       await user.delete();
     } catch (e) {

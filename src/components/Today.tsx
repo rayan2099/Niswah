@@ -77,6 +77,49 @@ const Ripple = ({ color }: { color: string }) => (
   />
 );
 
+const FirstTimeWelcome = ({ onStart }: { onStart: () => void }) => (
+  <div className="mx-4 mb-6 p-6 bg-white border border-rose-100 rounded-3xl" dir="rtl">
+    <div className="w-20 h-20 rounded-full bg-rose-50 border-2 border-rose-200 flex items-center justify-center mx-auto mb-4">
+      <span className="text-3xl font-serif text-rose-500">ن</span>
+    </div>
+    <h2 className="text-lg font-bold text-gray-800 text-center mb-1">أهلاً بكِ في نسوة</h2>
+    <p className="text-sm text-gray-400 text-center mb-5 leading-relaxed">
+      ابدئي بتسجيل دورتك الأولى لنبني معكِ فهماً فقهياً وصحياً كاملاً
+    </p>
+    <div className="flex flex-col gap-2 mb-5">
+      {[
+        { n: '١', c: '#D4537E', t: 'سجّلي بدء الحيض', s: 'اضغطي "بدء الحيض" فور رؤية الدم' },
+        { n: '٢', c: '#A09CF7', t: 'تابعي يومياً', s: 'سجّلي الكثافة واللون كل يوم' },
+        { n: '٣', c: '#1D9E75', t: 'سجّلي الانتهاء', s: 'اضغطي "انتهاء الحيض" عند الطهارة' },
+      ].map(step => (
+        <div key={step.n} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={{ background: step.c }}>
+            {step.n}
+          </div>
+          <div>
+            <div className="text-sm font-bold text-gray-700">{step.t}</div>
+            <div className="text-xs text-gray-400 mt-0.5">{step.s}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+    <button onClick={onStart} className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-sm active:scale-95 transition-transform">
+      ابدئي الآن — سجّلي دورتك الأولى
+    </button>
+  </div>
+);
+
+const CycleSkeleton = () => (
+  <div className="animate-pulse px-4 pt-4">
+    <div className="w-64 h-64 rounded-full bg-gray-100 mx-auto mb-6 border-8 border-gray-50" />
+    <div className="h-16 bg-gray-100 rounded-2xl mb-3" />
+    <div className="flex gap-3">
+      <div className="flex-1 h-14 bg-gray-100 rounded-2xl" />
+      <div className="flex-1 h-14 bg-gray-100 rounded-2xl" />
+    </div>
+  </div>
+);
+
 // --- CYCLE RING (SVG Implementation) ---
 
 const CycleRing = ({ 
@@ -1125,6 +1168,8 @@ export const Today = ({
 }) => {
   const { t, isRTL } = useTranslation();
   const { user, fiqhState: contextState, currentDay, cycleStats, prediction, ovulation, entries, loading: dataLoading, refresh } = useCycleData();
+  const isFirstTime = !dataLoading && (!entries || entries.filter(e => !e.is_predicted).length === 0);
+
   const [localFiqhState, setLocalFiqhState] = useState<State | null>(null);
   const state = localFiqhState || contextState;
 
@@ -1203,11 +1248,7 @@ export const Today = ({
   const hasPCOS = user?.conditions?.includes('PCOS');
   const hasEndo = user?.conditions?.includes('Endometriosis');
 
-  if (dataLoading) return (
-    <div className="fixed inset-0 bg-[#FDFCFB] flex items-center justify-center">
-      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full" />
-    </div>
-  );
+  if (dataLoading) return <CycleSkeleton />;
 
   return (
     <div className="min-h-screen bg-[#FDFCFB] pb-32 relative overflow-x-hidden">
@@ -1266,6 +1307,8 @@ export const Today = ({
                   // Handle birth logging logic
                 }} 
               />
+            ) : isFirstTime ? (
+              <FirstTimeWelcome onStart={() => setIsLogOpen(true)} />
             ) : (
               <>
                 <CycleRing 

@@ -106,15 +106,16 @@ import { auth } from './firebase';
 import { AuthScreen } from './components/Auth';
 import { notificationService } from './services/NotificationService.ts';
 
+import { PWAInstallBanner } from './components/PWAInstallBanner';
+
 function AppContent() {
-  const { fiqhState, currentDay: cycleDay, user: contextUser, refresh } = useCycleData();
+  const { fiqhState, currentDay: cycleDay, user, refresh } = useCycleData();
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [authUser, setAuthUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('today');
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [isDreamInterpreterOpen, setIsDreamInterpreterOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const { t, isRTL } = useTranslation();
 
   useEffect(() => {
@@ -129,19 +130,29 @@ function AppContent() {
   }, [refresh]);
 
   useEffect(() => {
-    if (contextUser) {
-      setUser(contextUser);
-      if (contextUser.madhhab) {
-        setShowOnboarding(false);
-      }
+    if (user && user.madhhab) {
+      setShowOnboarding(false);
     }
-  }, [contextUser]);
+  }, [user]);
 
   useEffect(() => {
     (window as any).openDreamInterpreter = () => setIsDreamInterpreterOpen(true);
     return () => {
       delete (window as any).openDreamInterpreter;
     };
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    const tab = params.get('tab') as Tab | null;
+    if (action === 'start-haid') {
+      setActiveTab('today');
+      setTimeout(() => { (window as any).__niswah_open_log = true; }, 600);
+    }
+    if (tab && ['today','calendar','insights','community','profile'].includes(tab)) {
+      setActiveTab(tab);
+    }
   }, []);
 
   if (authLoading) {
@@ -161,8 +172,7 @@ function AppContent() {
   }
 
   if (showOnboarding) {
-    return <Onboarding onFinish={async (userData) => {
-      setUser(userData);
+    return <Onboarding onFinish={async () => {
       await refresh();
       setShowOnboarding(false);
     }} />;
@@ -285,9 +295,11 @@ function AppContent() {
         <DreamInterpreter 
           isOpen={isDreamInterpreterOpen} 
           onClose={() => setIsDreamInterpreterOpen(false)} 
-          userMadhhab={contextUser?.madhhab || 'HANAFI'}
+          userMadhhab={user?.madhhab || 'HANAFI'}
         />
       </Suspense>
+
+      <PWAInstallBanner />
     </div>
   );
 }

@@ -39,7 +39,7 @@
         "user_id": { "type": "string" },
         "date": { "type": "string", "format": "date" },
         "time_logged": { "type": "string", "format": "date-time" },
-        "fiqh_state": { "type": "string", "enum": ["HAID", "TUHR", "ISTIHADAH", "NIFAS"] },
+        "fiqh_state": { "type": "string", "enum": ["HAID", "TAHARA", "ISTIHADAH", "NIFAS"] },
         "flow_intensity": { "type": "string" },
         "blood_color": { "type": "string" },
         "blood_thickness": { "type": "string" },
@@ -89,6 +89,20 @@
         "comments_count": { "type": "integer" }
       },
       "required": ["author_id", "content"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A message in an AI chat",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "chat_type": { "type": "string", "enum": ["dream", "doctor", "niswah"] },
+        "role": { "type": "string", "enum": ["user", "model"] },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "chat_type", "role", "text", "timestamp"]
     }
   },
   "firestore": {
@@ -107,6 +121,10 @@
     "/users/{userId}/prayer_log/{logId}": {
       "schema": "PrayerLog",
       "description": "Log of prayers performed or missed"
+    },
+    "/users/{userId}/chat_history/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "History of AI chat messages"
     },
     "/community_posts/{postId}": {
       "schema": "CommunityPost",

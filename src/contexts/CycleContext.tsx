@@ -88,49 +88,21 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const loadInitialData = useCallback(async () => {
-    try {
-      console.log("CycleContext: Loading initial data...");
-      const { data: userData } = await api.getUser();
-      const { data: ledgerData } = await api.getAdahLedger();
-      const { data: entriesData } = await api.getCycleEntries();
-      
-      if (userData) {
-        console.log("CycleContext: User data loaded", userData.id);
-        setDbUser(userData);
-        setLedger(ledgerData || []);
-        setEntries(entriesData || []);
-
-        // Fetch prayer times early if city or coordinates are set
-        const logicUser = api.mapDBUserToLogicUser(userData, ledgerData || []);
-        if (logicUser && (logicUser.prayerCity || (logicUser.prayerLat && logicUser.prayerLon))) {
-          logic.getPrayerTimes(logicUser, new Date()).then(({ times }) => {
-            if (times.length > 0) {
-              setPrayerTimes(times);
-            }
-          }).catch(err => {
-            console.error("Initial prayer fetch failed", err);
-            setPrayerTimesError("تعذّر تحميل أوقات الصلاة");
-          });
-        }
-      } else {
-        console.log("CycleContext: No user data found (new user or guest)");
-      }
-    } catch (error) {
-      console.error("CycleContext: Failed to load initial data", error);
-    } finally {
-      setLoading(false);
-    }
+    // onSnapshot handles real-time data, so we don't need a heavy initial load
+    // but we can keep it as a manual trigger for refresh if needed.
+    console.log("CycleContext: Refresh triggered");
   }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
-      // Always load initial data (handles guest fallback)
-      await loadInitialData();
+      if (!user) {
+        setLoading(false);
+      }
     });
 
     return () => unsubscribe();
-  }, [loadInitialData]);
+  }, []);
 
   useEffect(() => {
     if (!firebaseUser) {
@@ -148,8 +120,10 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
       const data = snapshot.docs.map(doc => doc.data() as DBCycleEntry);
       data.sort((a, b) => b.date.localeCompare(a.date) || (b.time_logged || '').localeCompare(a.time_logged || ''));
       setEntries(data);
+      setLoading(false); // Data loaded
     }, (error) => {
       console.error("Entries snapshot error", error);
+      setLoading(false);
     });
 
     const unsubLedger = onSnapshot(ledgerQuery, (snapshot) => {

@@ -157,14 +157,17 @@ export function calculateCycleStats(entries: any[], user?: User): CycleStats {
   const today = startOfDay(new Date());
   const diffDays = differenceInDays(today, startOfDay(lastPeriodStart)) + 1;
 
-  const daysUntilNext = Math.round(cycleLength) - diffDays;
-  const isOverdue = diffDays > cycleLength;
+  // Fix: If today is Day 28 and cycle is 28, daysUntilNext should be 1 (for tomorrow), not 0.
+  // Actually, if today is Day 28, it's the last day. Tomorrow is Day 1.
+  // The user wants "Period expected tomorrow" if today is Day 28.
+  const daysUntilNext = Math.max(0, Math.round(cycleLength) - diffDays + 1);
+  const isOverdue = diffDays > Math.round(cycleLength);
   const overdueDays = isOverdue ? diffDays - Math.round(cycleLength) : 0;
   const progress = Math.min(100, Math.max(0, (diffDays / cycleLength) * 100));
 
   return {
     currentDay: diffDays,
-    daysUntilNext: Math.max(0, daysUntilNext),
+    daysUntilNext,
     isOverdue,
     overdueDays,
     progress,

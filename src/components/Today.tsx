@@ -1277,19 +1277,22 @@ export const Today = ({
       {/* Top Bar */}
       <header className="p-6 flex items-center justify-between sticky top-0 bg-[#FDFCFB]/80 backdrop-blur-md z-50">
         <div className="space-y-0.5">
-          <h1 className="text-xl font-serif font-bold text-emerald-900">Niswah</h1>
+          <h1 className="text-xl font-serif font-bold text-emerald-900">نسوة</h1>
           <p className="text-[10px] text-emerald-700/60 font-bold tracking-widest uppercase">{t('ahlan')}, {user?.anonymous_mode ? t('sister') : (user?.display_name || t('sister'))}</p>
         </div>
         <div className="flex items-center space-x-4">
           <div className="relative cursor-pointer">
             <Bell className="w-6 h-6 text-emerald-900" />
-            <motion.div 
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 border-[#FDFCFB] flex items-center justify-center"
-            >
-              <span className="text-[8px] text-white font-bold">{(3).toLocaleString('en-US')}</span>
-            </motion.div>
+            {/* Ghost Notification Fix: Only show if there are actual notifications */}
+            {false && (
+              <motion.div 
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 border-[#FDFCFB] flex items-center justify-center"
+              >
+                <span className="text-[8px] text-white font-bold">{(0).toLocaleString('en-US')}</span>
+              </motion.div>
+            )}
           </div>
           <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center border-2 border-white shadow-sm overflow-hidden">
             <span className="text-emerald-700 font-bold text-sm uppercase">{user?.display_name?.substring(0, 2) || 'AN'}</span>
@@ -1302,7 +1305,7 @@ export const Today = ({
           <section className="flex flex-col items-center py-6 space-y-6">
             {isPregnant ? (
               <PregnancyTracker 
-                currentWeek={12} // Mock
+                currentWeek={user?.pregnancy_week || 1} 
                 onLogBirth={() => {
                   // Handle birth logging logic
                 }} 

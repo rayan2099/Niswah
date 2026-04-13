@@ -26,6 +26,9 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
   const [dbStatus, setDbStatus] = useState<'checking' | 'ok' | 'error'>('checking');
 
@@ -97,6 +100,10 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
       setError('يرجى إدخال البريد الإلكتروني وكلمة المرور');
       return;
     }
+    if (!agreed) {
+      setError('يرجى الموافقة على سياسة الخصوصية وشروط الاستخدام');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -142,6 +149,10 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
 
   const handleGoogle = async () => {
     console.log("Auth: handleGoogle started");
+    if (!agreed) {
+      setError('يرجى الموافقة على سياسة الخصوصية وشروط الاستخدام');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -172,6 +183,10 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
 
   const handleApple = async () => {
     console.log("Auth: handleApple started");
+    if (!agreed) {
+      setError('يرجى الموافقة على سياسة الخصوصية وشروط الاستخدام');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -226,8 +241,9 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         >
           {/* Logo area */}
           <div className="flex-1 flex flex-col items-center justify-center gap-6">
-            <div className="w-28 h-28 rounded-3xl bg-white border border-rose-100 flex items-center justify-center overflow-hidden shadow-sm">
-              <img src="/logo.svg" alt="Niswah Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+            <div className="w-28 h-28 rounded-[32px] bg-white border border-rose-100 flex items-center justify-center shadow-sm relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-rose-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <span className="text-6xl font-serif font-bold text-rose-500 select-none transform transition-transform group-hover:scale-110">ن</span>
             </div>
             <div className="text-center">
               <h1 className="text-3xl font-bold text-rose-600 mb-1">نسوة</h1>
@@ -282,13 +298,69 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               المتابعة بالبريد الإلكتروني
             </button>
 
-            <p className="text-xs text-gray-400 text-center mt-2 leading-relaxed">
-              بالمتابعة، أنتِ توافقين على{' '}
-              <span className="text-rose-500 underline">سياسة الخصوصية</span>
-              {' '}و{' '}
-              <span className="text-rose-500 underline">شروط الاستخدام</span>
-            </p>
+            <div className="flex items-start gap-3 mt-4 px-2">
+              <input
+                type="checkbox"
+                id="consent"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-1 w-4 h-4 rounded border-gray-300 text-rose-500 focus:ring-rose-500"
+              />
+              <label htmlFor="consent" className="text-xs text-gray-400 leading-relaxed text-right">
+                بالمتابعة، أنتِ توافقين على{' '}
+                <button 
+                  type="button"
+                  onClick={() => setShowPrivacy(true)}
+                  className="text-rose-500 underline"
+                >
+                  سياسة الخصوصية
+                </button>
+                {' '}و{' '}
+                <button 
+                  type="button"
+                  onClick={() => setShowTerms(true)}
+                  className="text-rose-500 underline"
+                >
+                  شروط الاستخدام
+                </button>
+              </label>
+            </div>
           </div>
+
+          <AnimatePresence>
+            {showPrivacy && (
+              <LegalModal 
+                title="سياسة الخصوصية" 
+                onClose={() => setShowPrivacy(false)}
+              >
+                <div className="space-y-4 text-right" dir="rtl">
+                  <p>نحن في "نسوة" نأخذ خصوصيتكِ على محمل الجد. بياناتكِ الصحية مشفرة ومخزنة بشكل آمن.</p>
+                  <h3 className="font-bold">1. البيانات التي نجمعها</h3>
+                  <p>نجمع فقط البيانات الضرورية لتتبع دورتكِ الشهرية وتقديم النصائح الفقهية والصحية، مثل تواريخ الدورة والأعراض.</p>
+                  <h3 className="font-bold">2. كيف نستخدم بياناتكِ</h3>
+                  <p>تُستخدم البيانات حصرياً داخل التطبيق لتحسين دقة التوقعات وتقديم محتوى مخصص لكِ.</p>
+                  <h3 className="font-bold">3. مشاركة البيانات</h3>
+                  <p>لا نقوم ببيع أو مشاركة بياناتكِ الشخصية مع أي أطراف ثالثة لأغراض تسويقية.</p>
+                </div>
+              </LegalModal>
+            )}
+            {showTerms && (
+              <LegalModal 
+                title="شروط الاستخدام" 
+                onClose={() => setShowTerms(false)}
+              >
+                <div className="space-y-4 text-right" dir="rtl">
+                  <p>باستخدامكِ لتطبيق "نسوة"، أنتِ توافقين على الالتزام بالشروط التالية:</p>
+                  <h3 className="font-bold">1. الاستخدام الشخصي</h3>
+                  <p>التطبيق مخصص للاستخدام الشخصي فقط.</p>
+                  <h3 className="font-bold">2. إخلاء المسؤولية الطبية</h3>
+                  <p>المعلومات المقدمة في التطبيق هي لأغراض تعليمية وتثقيفية ولا تغني عن استشارة الطبيب المختص.</p>
+                  <h3 className="font-bold">3. دقة المعلومات</h3>
+                  <p>نحن نسعى جاهدين لتقديم معلومات دقيقة، ولكن لا نضمن خلوها من الأخطاء البشرية أو التقنية.</p>
+                </div>
+              </LegalModal>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
 
@@ -469,3 +541,36 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     </div>
   );
 };
+
+const LegalModal = ({ title, children, onClose }: { title: string, children: React.ReactNode, onClose: () => void }) => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+  >
+    <motion.div
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl"
+    >
+      <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-rose-50/30">
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+          ✕
+        </button>
+        <h3 className="text-xl font-bold text-gray-800">{title}</h3>
+      </div>
+      <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar">
+        {children}
+      </div>
+      <div className="p-6 bg-gray-50 flex justify-center">
+        <button
+          onClick={onClose}
+          className="px-8 py-3 bg-rose-500 text-white rounded-2xl font-bold shadow-lg shadow-rose-200 active:scale-95 transition-transform"
+        >
+          فهمت ذلك
+        </button>
+      </div>
+    </motion.div>
+  </motion.div>
+);

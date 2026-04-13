@@ -20,6 +20,8 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Madhhab } from '../logic/types.ts';
+import * as api from '../api/index.ts';
+import { DBChatMessage } from '../api/db-types.ts';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -109,6 +111,24 @@ export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpre
     }
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    if (isOpen) {
+      loadHistory();
+    }
+  }, [isOpen]);
+
+  const loadHistory = async () => {
+    const { data: history, error } = await api.getChatHistory('dream');
+    if (history && history.length > 0) {
+      setMessages(history.map(m => ({
+        id: m.id,
+        role: m.role as any,
+        text: m.text,
+        timestamp: new Date(m.timestamp).getTime()
+      })));
+    }
+  };
+
   const handleSend = async (text: string = inputText) => {
     if (!text.trim()) return;
 
@@ -123,6 +143,14 @@ export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpre
     setInputText('');
     setIsTyping(true);
 
+    // Save user message to history
+    api.saveChatMessage({
+      chat_type: 'dream',
+      role: 'user',
+      text: userMsg.text,
+      timestamp: new Date().toISOString()
+    });
+
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const systemPrompt = t('dream_system_instruction') + `\n\nUser's Madhhab: ${userMadhhab}`;
@@ -133,12 +161,14 @@ export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpre
       }));
 
       const responseStream = await ai.models.generateContentStream({
-        model: "gemini-1.5-flash",
+        model: "gemini-3-flash-preview",
         contents: [
-          { role: 'user', parts: [{ text: systemPrompt }] },
           ...chatHistory,
           { role: 'user', parts: [{ text: text.trim() }] }
         ],
+        config: {
+          systemInstruction: systemPrompt
+        }
       });
 
       const aiMsgId = (Date.now() + 1).toString();
@@ -158,6 +188,14 @@ export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpre
           setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: fullText } : m));
         }
       }
+
+      // Save AI response to history
+      api.saveChatMessage({
+        chat_type: 'dream',
+        role: 'model',
+        text: fullText,
+        timestamp: new Date().toISOString()
+      });
 
     } catch (err) {
       console.error("Dream Interpreter Error:", err);

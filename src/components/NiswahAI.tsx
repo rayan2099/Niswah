@@ -22,6 +22,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import * as api from '../api/index.ts';
 import { State, Madhhab } from '../logic/types.ts';
+import { DBChatMessage } from '../api/db-types.ts';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -135,6 +136,24 @@ export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
     }
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    if (isOpen) {
+      loadHistory();
+    }
+  }, [isOpen]);
+
+  const loadHistory = async () => {
+    const { data: history } = await api.getChatHistory('niswah');
+    if (history && history.length > 0) {
+      setMessages(history.map(m => ({
+        id: m.id,
+        role: m.role === 'model' ? 'niswah' : 'user',
+        text: m.text,
+        timestamp: new Date(m.timestamp).getTime()
+      })));
+    }
+  };
+
   const handleSend = async (text: string = inputText) => {
     if (!text.trim()) return;
 
@@ -148,6 +167,14 @@ export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
     setMessages(prev => [...prev, userMsg]);
     setInputText('');
     setIsTyping(true);
+
+    // Save user message
+    api.saveChatMessage({
+      chat_type: 'niswah',
+      role: 'user',
+      text: userMsg.text,
+      timestamp: new Date().toISOString()
+    });
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -204,6 +231,14 @@ Respond to the user's message warmly and concisely.`;
           setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: fullText } : m));
         }
       }
+
+      // Save AI response
+      api.saveChatMessage({
+        chat_type: 'niswah',
+        role: 'model',
+        text: fullText,
+        timestamp: new Date().toISOString()
+      });
 
     } catch (err) {
       console.error("Niswah AI Error:", err);

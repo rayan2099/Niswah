@@ -22,6 +22,9 @@ export interface DBUser {
   goal_flags: string[];
   conditions: string[];
   notification_prefs: Record<string, any>;
+  pregnant?: boolean;
+  pregnancy_week?: number;
+  reflect_health?: boolean;
   prayerCity?: string;
   prayerCountry?: string;
   prayerCityAr?: string;
@@ -145,4 +148,13 @@ export interface DBSecretVaultEntry {
   encrypted_content: string;
   entry_type: string;
   created_at: string;
+}
+
+export interface DBChatMessage {
+  id: string;
+  user_id: string;
+  chat_type: 'dream' | 'doctor' | 'niswah';
+  role: 'user' | 'model';
+  text: string;
+  timestamp: string;
 }

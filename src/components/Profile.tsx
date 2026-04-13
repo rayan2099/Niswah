@@ -534,26 +534,42 @@ export const Profile = ({ }: ProfileProps) => {
           </div>
         </section>
 
-        {/* Prayer Times Settings */}
+        {/* Health Profile */}
         <section className="space-y-4">
-          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">أوقات الصلاة</h3>
-          
-          <CitySearch 
-            currentCity={user?.prayerCity} 
-            currentCountry={user?.prayerCountry}
-            currentCityAr={user?.prayerCityAr}
-            onSelect={async (city) => {
-            await handleUpdateUser({
-              prayerCity: city.nameEn,
-              prayerCountry: city.countryEn,
-              prayerCityAr: city.name,
-              prayerCountryAr: city.country,
-              prayerLat: city.lat,
-              prayerLon: city.lon
-            });
-          }}
-        />
-      </section>
+          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('health_profile')}</h3>
+          <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
+            <ToggleRow 
+              label={t('currently_pregnant')} 
+              active={user?.pregnant} 
+              onChange={async (val) => {
+                await api.updateUser({ pregnant: val });
+                await refresh();
+              }} 
+            />
+            <ToggleRow 
+              label={t('postpartum_mode')} 
+              active={user?.conditions?.includes('postpartum')} 
+              onChange={async (val) => {
+                const conditions = user?.conditions || [];
+                await api.updateUser({ 
+                  conditions: val ? [...conditions, 'postpartum'] : conditions.filter((c: string) => c !== 'postpartum')
+                });
+                await refresh();
+              }} 
+            />
+            <ToggleRow 
+              label={t('ttc_mode')} 
+              active={user?.conditions?.includes('ttc')} 
+              onChange={async (val) => {
+                const conditions = user?.conditions || [];
+                await api.updateUser({ 
+                  conditions: val ? [...conditions, 'ttc'] : conditions.filter((c: string) => c !== 'ttc')
+                });
+                await refresh();
+              }} 
+            />
+          </div>
+        </section>
 
         {/* Madhhab Selector */}
         <section className="space-y-4">
@@ -585,47 +601,6 @@ export const Profile = ({ }: ProfileProps) => {
           </div>
         </section>
 
-
-        {/* Health Profile */}
-        <section className="space-y-4">
-          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('health_profile')}</h3>
-          <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
-            <ToggleRow 
-              label={t('currently_pregnant')} 
-              active={user?.pregnant} 
-              onChange={(val) => handleUpdateUser({ pregnant: val })} 
-            />
-            <ToggleRow 
-              label={t('postpartum_mode')} 
-              active={user?.conditions?.includes('postpartum')} 
-              onChange={(val) => {
-                const conditions = user?.conditions || [];
-                handleUpdateUser({ 
-                  conditions: val ? [...conditions, 'postpartum'] : conditions.filter((c: string) => c !== 'postpartum')
-                });
-              }} 
-            />
-            <ToggleRow 
-              label={t('ttc_mode')} 
-              active={user?.conditions?.includes('ttc')} 
-              onChange={(val) => {
-                const conditions = user?.conditions || [];
-                handleUpdateUser({ 
-                  conditions: val ? [...conditions, 'ttc'] : conditions.filter((c: string) => c !== 'ttc')
-                });
-              }} 
-            />
-            <ToggleRow 
-              label={t('health_profile')} 
-              active={user?.reflect_health} 
-              onChange={(val) => handleUpdateUser({ reflect_health: val })} 
-            />
-            <p className="px-5 py-3 text-[9px] text-gray-400 italic leading-relaxed rtl:text-right">
-              {t('health_profile_toggle_desc')}
-            </p>
-          </div>
-        </section>
-
         {/* Privacy & Security */}
         <section className="space-y-4">
           <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('privacy_settings')}</h3>
@@ -634,17 +609,66 @@ export const Profile = ({ }: ProfileProps) => {
               icon={EyeOff}
               label={t('anonymous_mode')} 
               active={user?.anonymous_mode} 
-              onChange={(val) => handleUpdateUser({ anonymous_mode: val })} 
+              onChange={async (val) => {
+                await api.updateUser({ anonymous_mode: val });
+                await refresh();
+              }} 
             />
-            <LinkRow icon={Lock} label={t('internal_tracking')} onClick={() => {}} />
+            <LinkRow icon={Trash2} label={t('delete_account')} color="text-rose-500" onClick={() => setShowDeleteConfirm(true)} />
+          </div>
+        </section>
+
+        {/* Notifications */}
+        <section className="space-y-4">
+          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('notifications')}</h3>
+          <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
             <ToggleRow 
-              icon={Fingerprint}
-              label={t('biometric_lock')} 
-              active={false} 
-              onChange={() => {}} 
+              label={t('prayer_alerts')} 
+              active={user?.notification_prefs?.prayer_alerts ?? true} 
+              onChange={async (val) => {
+                const newPrefs = { ...user?.notification_prefs, prayer_alerts: val };
+                await api.updateUser({ notification_prefs: newPrefs });
+                if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
+                await refresh();
+              }} 
             />
-            <LinkRow icon={Stethoscope} label={t('share_provider')} onClick={() => setShowClinicShare(true)} />
-            
+            <ToggleRow 
+              label={t('haid_prediction_alerts')} 
+              active={user?.notification_prefs?.haid_prediction_alerts ?? true} 
+              onChange={async (val) => {
+                const newPrefs = { ...user?.notification_prefs, haid_prediction_alerts: val };
+                await api.updateUser({ notification_prefs: newPrefs });
+                if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
+                await refresh();
+              }} 
+            />
+            <ToggleRow 
+              label={t('ghusl_reminders')} 
+              active={user?.notification_prefs?.ghusl_reminders ?? true} 
+              onChange={async (val) => {
+                const newPrefs = { ...user?.notification_prefs, ghusl_reminders: val };
+                await api.updateUser({ notification_prefs: newPrefs });
+                if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
+                await refresh();
+              }} 
+            />
+            <ToggleRow 
+              label={t('daily_insight_alerts')} 
+              active={user?.notification_prefs?.daily_insight_alerts ?? true} 
+              onChange={async (val) => {
+                const newPrefs = { ...user?.notification_prefs, daily_insight_alerts: val };
+                await api.updateUser({ notification_prefs: newPrefs });
+                if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
+                await refresh();
+              }} 
+            />
+          </div>
+        </section>
+
+        {/* Tools */}
+        <section className="space-y-4">
+          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('tools' as any) || 'الأدوات'}</h3>
+          <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
             <div className="w-full p-5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-black/5">
               <div className="flex items-center space-x-3">
                 <Download className="w-5 h-5 text-rose-400" />
@@ -686,113 +710,14 @@ export const Profile = ({ }: ProfileProps) => {
                 {isGeneratingHusbandPDF ? t('preparing') : t('download')}
               </button>
             </div>
-          </div>
-        </section>
 
-        {/* App Settings */}
-        <section className="space-y-4">
-          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('app_settings')}</h3>
-          <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
-            <div className="px-6 py-4 flex items-center justify-between border-b border-black/5 hover:bg-gray-50 transition-colors">
-              <PWAInstallButton showLabel={true} />
-            </div>
-            <LinkRow icon={Share2} label={t('invite_friends')} onClick={handleInvite} />
-            <LinkRow icon={Star} label={t('rate_app')} onClick={handleRate} />
-            <LinkRow icon={Trash2} label={t('delete_account')} color="text-rose-500" onClick={() => setShowDeleteConfirm(true)} />
-          </div>
-        </section>
-
-        {/* Delete Confirmation Overlay */}
-        <AnimatePresence>
-          {showDeleteConfirm && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-4"
-              onClick={() => !isDeleting && setShowDeleteConfirm(false)}
-            >
-              <motion.div 
-                initial={{ y: 100 }}
-                animate={{ y: 0 }}
-                exit={{ y: 100 }}
-                className="bg-white w-full max-w-md rounded-[32px] p-8 space-y-6"
-                onClick={e => e.stopPropagation()}
-              >
-                <div className="space-y-2 text-center">
-                  <h3 className="text-xl font-serif font-bold text-rose-900">{t('delete_account_confirm_title')}</h3>
-                  <p className="text-sm text-rose-900/60 leading-relaxed">
-                    {t('delete_account_confirm_desc')}
-                  </p>
-                </div>
-                
-                <div className="space-y-3 pt-4">
-                  <button 
-                    onClick={handleDeleteAccount}
-                    disabled={isDeleting}
-                    className="w-full py-4 bg-rose-600 text-white rounded-2xl font-bold text-sm shadow-lg shadow-rose-200 disabled:opacity-50"
-                  >
-                    {isDeleting ? t('deleting') : t('confirm_delete')}
-                  </button>
-                  <button 
-                    onClick={() => setShowDeleteConfirm(false)}
-                    disabled={isDeleting}
-                    className="w-full py-4 bg-gray-50 text-gray-400 rounded-2xl font-bold text-sm"
-                  >
-                    {t('cancel')}
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Notifications */}
-        <section className="space-y-4">
-          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('notifications')}</h3>
-          <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
-            <ToggleRow 
-              label={t('prayer_alerts')} 
-              active={user?.notification_prefs?.prayer_alerts ?? true} 
-              onChange={(val) => {
-                const newPrefs = { ...user?.notification_prefs, prayer_alerts: val };
-                handleUpdateUser({ notification_prefs: newPrefs });
-                if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
-              }} 
-            />
-            <ToggleRow 
-              label={t('haid_prediction_alerts')} 
-              active={user?.notification_prefs?.haid_prediction_alerts ?? true} 
-              onChange={(val) => {
-                const newPrefs = { ...user?.notification_prefs, haid_prediction_alerts: val };
-                handleUpdateUser({ notification_prefs: newPrefs });
-                if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
-              }} 
-            />
-            <ToggleRow 
-              label={t('ghusl_reminders')} 
-              active={user?.notification_prefs?.ghusl_reminders ?? true} 
-              onChange={(val) => {
-                const newPrefs = { ...user?.notification_prefs, ghusl_reminders: val };
-                handleUpdateUser({ notification_prefs: newPrefs });
-                if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
-              }} 
-            />
-            <ToggleRow 
-              label={t('daily_insight_alerts')} 
-              active={user?.notification_prefs?.daily_insight_alerts ?? true} 
-              onChange={(val) => {
-                const newPrefs = { ...user?.notification_prefs, daily_insight_alerts: val };
-                handleUpdateUser({ notification_prefs: newPrefs });
-                if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
-              }} 
-            />
+            <LinkRow icon={Calendar} label={t('adah_ledger' as any) || 'سجل العادة'} onClick={() => {}} />
           </div>
         </section>
 
         {/* Language */}
         <section className="space-y-4">
-          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('app_settings')}</h3>
+          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('language')}</h3>
           <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
             <div className="p-5 flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -820,7 +745,7 @@ export const Profile = ({ }: ProfileProps) => {
         <div className="pt-8 pb-4 text-center">
           <button 
             onClick={() => signOut(auth)}
-            className="px-8 py-3 bg-rose-50 text-rose-500 rounded-2xl font-bold text-sm border border-rose-100 active:scale-95 transition-transform"
+            className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-sm active:scale-95 transition-transform"
           >
             {t('sign_out')}
           </button>
@@ -986,26 +911,41 @@ const LinkRow = ({ icon: Icon, label, onClick, color = "text-rose-800" }: { icon
   </button>
 );
 
+const NiswahToggle = ({ 
+  value, 
+  onChange, 
+  disabled = false 
+}: { 
+  value: boolean; 
+  onChange: (v: boolean) => void; 
+  disabled?: boolean;
+}) => (
+  <button
+    role="switch"
+    aria-checked={value}
+    disabled={disabled}
+    onClick={() => {
+      HapticService.medium();
+      onChange(!value);
+    }}
+    className={`relative inline-flex h-[31px] w-[51px] flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 ${
+      value ? 'bg-[#34C759]' : 'bg-[#E5E5EA]'
+    }`}
+  >
+    <span
+      className={`pointer-events-none inline-block h-[27px] w-[27px] transform rounded-full bg-white shadow-[0_2px_4px_rgba(0,0,0,0.3)] ring-0 transition-transform duration-200 ease-in-out ${
+        value ? 'translate-x-[20px]' : 'translate-x-0'
+      }`}
+    />
+  </button>
+);
+
 const ToggleRow = ({ icon: Icon, label, active, onChange }: { icon?: any, label: string, active: boolean, onChange: (val: boolean) => void }) => (
   <div className="p-5 flex items-center justify-between border-b border-black/5 last:border-0">
     <div className="flex items-center space-x-3">
       {Icon && <Icon className="w-5 h-5 text-rose-400" />}
       <span className="text-sm font-bold text-rose-800">{label}</span>
     </div>
-    <button 
-      onClick={() => {
-        HapticService.medium();
-        onChange(!active);
-      }}
-      className={cn(
-        "w-12 h-6 rounded-full relative transition-colors duration-300",
-        active ? "bg-rose-400" : "bg-gray-200"
-      )}
-    >
-      <motion.div 
-        animate={{ x: active ? 24 : 4 }}
-        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
-      />
-    </button>
+    <NiswahToggle value={active} onChange={onChange} />
   </div>
 );

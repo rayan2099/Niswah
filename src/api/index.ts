@@ -21,7 +21,8 @@ import {
   onSnapshot,
   Timestamp,
   getDocFromServer,
-  deleteDoc
+  deleteDoc,
+  orderBy
 } from 'firebase/firestore';
 import { auth, db } from '../firebase.ts';
 import CryptoJS from 'crypto-js';
@@ -36,7 +37,8 @@ import {
   DBNifasRecord, 
   DBRamadanRecord, 
   DBPregnancyRecord, 
-  DBSecretVaultEntry 
+  DBSecretVaultEntry,
+  DBChatMessage
 } from './db-types.ts';
 
 export type { DBCycleEntry } from './db-types.ts';
@@ -95,6 +97,13 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   }
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
+}
+
+// Helper to remove undefined values from objects
+function cleanObject<T extends object>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([_, v]) => v !== undefined)
+  ) as T;
 }
 
 // API LAYER
@@ -162,7 +171,7 @@ export async function upsertUser(updates: Partial<DBUser>): Promise<ApiResponse<
   try {
     const userData: DBUser = {
       ...defaults,
-      ...updates,
+      ...cleanObject(updates),
       id: user.uid,
       email_hash: hashEmail(user.email || ''),
       updated_at: new Date().toISOString()
@@ -192,7 +201,7 @@ export async function updateUser(updates: Partial<DBUser>): Promise<ApiResponse<
 
   const path = `users/${user.uid}`;
   try {
-    const updateData = { ...updates, updated_at: new Date().toISOString() };
+    const updateData = { ...cleanObject(updates), updated_at: new Date().toISOString() };
     await setDoc(doc(db, path), updateData, { merge: true });
     const updatedDoc = await getDoc(doc(db, path));
     const data = updatedDoc.data() as DBUser;
@@ -239,7 +248,7 @@ export async function logCycleEntry(entry: Partial<DBCycleEntry>): Promise<ApiRe
   try {
     const entryData: DBCycleEntry = {
       ...defaults,
-      ...entry,
+      ...cleanObject(entry),
       user_id: user.uid
     } as DBCycleEntry;
 
@@ -262,7 +271,7 @@ export async function logSymptoms(symptoms: Partial<DBSymptomLog>[]): Promise<Ap
   try {
     const results: DBSymptomLog[] = [];
     for (const symptom of symptoms) {
-      const symptomData = { ...symptom, user_id: user.uid };
+      const symptomData = { ...cleanObject(symptom), user_id: user.uid };
       const docRef = await addDoc(collection(db, path), symptomData);
       results.push({ ...symptomData, id: docRef.id } as DBSymptomLog);
     }
@@ -412,6 +421,14 @@ export function mapDBUserToLogicUser(userData: DBUser, ledger: DBAdahLedger[] = 
     prayerLon: userData.prayerLon,
     locationName: userData.location_name,
     manualPrayerOffsets: userData.manual_prayer_offsets,
+    pregnant: userData.pregnant,
+    pregnancy_week: userData.pregnancy_week,
+    reflect_health: userData.reflect_health,
+    conditions: userData.conditions,
+    display_name: userData.display_name,
+    anonymous_mode: userData.anonymous_mode,
+    notification_prefs: userData.notification_prefs,
+    language: userData.language,
     qadhaFastingDays: 0,
     qadhaCompleted: 0,
     qadhaRemaining: 0,
@@ -536,7 +553,7 @@ export async function deleteAccount(): Promise<ApiResponse<boolean>> {
   const uid = user.uid;
   try {
     // Delete subcollections
-    const subcollections = ['cycle_entries', 'adah_ledger', 'prayer_log', 'symptoms_log', 'nifas_records', 'ramadan_records', 'pregnancy_records', 'secret_vault'];
+    const subcollections = ['cycle_entries', 'adah_ledger', 'prayer_log', 'symptoms_log', 'nifas_records', 'ramadan_records', 'pregnancy_records', 'secret_vault', 'chat_history'];
     for (const sub of subcollections) {
       const snap = await getDocs(collection(db, 'users', uid, sub));
       await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
@@ -557,5 +574,44 @@ export async function deleteAccount(): Promise<ApiResponse<boolean>> {
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
     return { data: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function saveChatMessage(message: Omit<DBChatMessage, 'id' | 'user_id'>): Promise<ApiResponse<DBChatMessage>> {
+  const user = auth.currentUser;
+  if (!user) return { data: null, error: 'Not authenticated' };
+
+  const path = `users/${user.uid}/chat_history`;
+  try {
+    const messageData = {
+      ...cleanObject(message),
+      user_id: user.uid,
+      timestamp: new Date().toISOString()
+    };
+    const docRef = await addDoc(collection(db, path), messageData);
+    return { data: { ...messageData, id: docRef.id } as DBChatMessage, error: null };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    return { data: null, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function getChatHistory(chatType: DBChatMessage['chat_type']): Promise<ApiResponse<DBChatMessage[]>> {
+  const user = auth.currentUser;
+  if (!user) return { data: null, error: 'Not authenticated' };
+
+  const path = `users/${user.uid}/chat_history`;
+  try {
+    const q = query(
+      collection(db, path),
+      where('chat_type', '==', chatType),
+      orderBy('timestamp', 'asc')
+    );
+    const querySnapshot = await getDocs(q);
+    const messages = querySnapshot.docs.map(d => ({ ...d.data(), id: d.id } as DBChatMessage));
+    return { data: messages, error: null };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return { data: null, error: error instanceof Error ? error.message : String(error) };
   }
 }

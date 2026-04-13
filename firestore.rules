@@ -36,7 +36,7 @@ service cloud.firestore {
     //   - user_id: string (required)
     //   - date: string (required, ISO 8601 date)
     //   - time_logged: string (ISO 8601 date-time)
-    //   - fiqh_state: string (required, enum)
+    //   - fiqh_state: string (required, enum: 'HAID', 'TAHARA', 'ISTIHADAH', 'NIFAS')
     //   - flow_intensity: string
     //   - blood_color: string
     //   - blood_thickness: string
@@ -71,7 +71,7 @@ service cloud.firestore {
 
     function isValidCycleEntry(data) {
       return data.keys().hasAll(['user_id', 'date', 'fiqh_state']) &&
-             data.fiqh_state in ['HAID', 'TUHR', 'ISTIHADAH', 'NIFAS'] &&
+             data.fiqh_state in ['HAID', 'TAHARA', 'ISTIHADAH', 'NIFAS'] &&
              data.user_id == request.auth.uid;
     }
 
@@ -114,11 +114,15 @@ service cloud.firestore {
       match /secret_vault/{entryId} {
         allow read, write: if isOwner(userId) || isAdmin();
       }
+
+      match /chat_history/{messageId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
     }
 
-    // Allow public read for connection testing
+    // Allow read for connection testing (authenticated only)
     match /test/connection {
-      allow read: if true;
+      allow read: if isAuthenticated();
     }
 
     match /community_posts/{postId} {

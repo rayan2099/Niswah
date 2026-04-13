@@ -53,6 +53,7 @@ export interface User {
   nifasStartTime?: number;
   scholarConsultationRequired?: boolean;
   pregnant?: boolean;
+  pregnancy_week?: number;
   conditions?: string[];
   display_name?: string;
   reflect_health?: boolean;

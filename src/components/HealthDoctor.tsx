@@ -7,6 +7,8 @@ import { Send } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { GoogleGenAI } from "@google/genai";
+import * as api from '../api/index.ts';
+import { DBChatMessage } from '../api/db-types.ts';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -92,6 +94,23 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     scrollToBottom();
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    if (isOpen) {
+      loadHistory();
+    }
+  }, [isOpen]);
+
+  const loadHistory = async () => {
+    const { data: history } = await api.getChatHistory('doctor');
+    if (history && history.length > 0) {
+      setStep('chat');
+      setMessages(history.map(m => ({
+        role: m.role === 'model' ? 'ai' : 'user',
+        text: m.text
+      })));
+    }
+  };
+
   const toggleSymptom = (key: string) => {
     setSelectedSymptoms(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -134,10 +153,25 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       const aiText = result.text || 'عذراً، حدث خطأ. حاولي مرة أخرى.';
 
       setIsTyping(false);
-      setMessages([
+      const newMsgs: Array<{ role: 'ai' | 'user'; text: string }> = [
         { role: 'user', text: `أعاني من: ${symptomsText}${userNotes ? `\n\nملاحظات: ${userNotes}` : ''}` },
         { role: 'ai', text: aiText },
-      ]);
+      ];
+      setMessages(newMsgs);
+
+      // Save to history
+      api.saveChatMessage({
+        chat_type: 'doctor',
+        role: 'user',
+        text: newMsgs[0].text,
+        timestamp: new Date().toISOString()
+      });
+      api.saveChatMessage({
+        chat_type: 'doctor',
+        role: 'model',
+        text: newMsgs[1].text,
+        timestamp: new Date().toISOString()
+      });
     } catch (err) {
       console.error("Gemini Error:", err);
       setIsTyping(false);
@@ -154,6 +188,14 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
     setMessages(newMessages);
     setIsTyping(true);
 
+    // Save user message
+    api.saveChatMessage({
+      chat_type: 'doctor',
+      role: 'user',
+      text: followUpText,
+      timestamp: new Date().toISOString()
+    });
+
     try {
       const ai = getGeminiAI();
       const result = await ai.models.generateContent({
@@ -167,6 +209,14 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       const aiText = result.text || 'عذراً، حدث خطأ.';
       setIsTyping(false);
       setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
+
+      // Save AI response
+      api.saveChatMessage({
+        chat_type: 'doctor',
+        role: 'model',
+        text: aiText,
+        timestamp: new Date().toISOString()
+      });
     } catch (err) {
       console.error("Gemini Error:", err);
       setIsTyping(false);

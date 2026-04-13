@@ -3,46 +3,56 @@ import { format } from 'date-fns';
 import { toHijri } from 'hijri-converter';
 
 // Load and embed Arabic font into jsPDF instance
-const loadArabicFont = async (doc: jsPDF): Promise<void> => {
-  try {
-    // Try Cairo-Regular-Static.ttf which is a standard TTF
-    const fontUrl = '/fonts/Cairo-Regular-Static.ttf';
-    console.log(`Attempting to load font from: ${fontUrl}`);
-    const response = await fetch(fontUrl);
-    if (!response.ok) throw new Error(`Font fetch failed: ${response.status}`);
-    
-    const arrayBuffer = await response.arrayBuffer();
-    const base64 = btoa(
-      new Uint8Array(arrayBuffer)
-        .reduce((data, byte) => data + String.fromCharCode(byte), '')
-    );
-    
-    const fontName = 'Cairo';
-    const fileName = 'Cairo-Regular-Static.ttf';
+const loadArabicFont = async (doc: jsPDF): Promise<boolean> => {
+  // Try fonts in order of reliability
+  const fontPaths = [
+    '/fonts/Amiri-Regular.ttf',
+    '/fonts/Cairo-Regular-Static.ttf', 
+    '/fonts/Cairo-Regular.ttf',
+    '/fonts/Cairo.ttf',
+  ];
 
-    // Add to VFS
-    doc.addFileToVFS(fileName, base64);
-    
-    // Register font. Using 'Identity-H' is critical for Unicode/Arabic.
-    // We use (doc as any) to avoid TS errors with the 4th argument in some @types versions
+  for (const fontPath of fontPaths) {
     try {
-      (doc as any).addFont(fileName, fontName, 'normal', 'Identity-H');
+      const response = await fetch(fontPath);
+      if (!response.ok) {
+        console.warn(`Font not found: ${fontPath} (${response.status})`);
+        continue;
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      if (arrayBuffer.byteLength < 10000) {
+        console.warn(`Font too small: ${fontPath} (${arrayBuffer.byteLength} bytes)`);
+        continue;
+      }
+
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binary = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        binary += String.fromCharCode(...uint8Array.subarray(i, i + chunkSize));
+      }
+      const base64 = btoa(binary);
+      
+      const fontName = fontPath.split('/').pop()?.replace('.ttf', '') || 'Arabic';
+      doc.addFileToVFS(`${fontName}.ttf`, base64);
+      // Use Identity-H for better Unicode support
+      (doc as any).addFont(`${fontName}.ttf`, 'Arabic', 'normal', 'Identity-H');
+      doc.setFont('Arabic');
+      
+      (doc as any)._arabicFontLoaded = true;
+      (doc as any)._arabicFontName = 'Arabic';
+      
+      console.log(`✓ Font loaded: ${fontPath} (${arrayBuffer.byteLength} bytes)`);
+      return true;
     } catch (err) {
-      console.warn('addFont with Identity-H failed, trying without:', err);
-      (doc as any).addFont(fileName, fontName, 'normal');
+      console.warn(`Font load failed: ${fontPath}`, err);
     }
-    
-    // Set the font to verify it's working
-    doc.setFont(fontName, 'normal');
-    (doc as any)._arabicFontLoaded = true;
-    (doc as any)._arabicFontName = fontName;
-    
-    console.log(`Arabic font (${fileName}) loaded successfully`);
-  } catch (e) {
-    console.error('Arabic font load failed:', e);
-    doc.setFont('helvetica', 'normal');
-    (doc as any)._arabicFontLoaded = false;
   }
+  
+  console.error('ALL FONTS FAILED — PDF will show text errors');
+  (doc as any)._arabicFontLoaded = false;
+  return false;
 };
 
 const safe = (val: any, fallback = '—'): string => {
@@ -84,7 +94,15 @@ const R = (doc: jsPDF, text: string, x: number, y: number, size = 10, align: 'le
 
     if (hasArabic && fontLoaded) {
       try {
-        doc.setFont('Cairo', 'normal');
+        doc.setFont('Arabic', 'normal');
+        
+        // Defensive check for font metrics to prevent 'widths' crash
+        const currentFont = doc.internal.getFont();
+        if (hasArabic && (!currentFont || !currentFont.metadata || !currentFont.metadata.widths)) {
+          console.warn('Arabic font loaded but missing widths metadata. Falling back.');
+          throw new Error('Missing font widths');
+        }
+
         const processedText = reshapeArabic(val);
         // Use a small try-catch for the specific text call to avoid crashing the whole PDF
         try {
@@ -118,7 +136,19 @@ const R = (doc: jsPDF, text: string, x: number, y: number, size = 10, align: 'le
 
 export const generateFiqhPDF = async (user: any, ledger: any[], fiqhState: string): Promise<Blob> => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  await loadArabicFont(doc);
+  const fontLoaded = await loadArabicFont(doc);
+  
+  if (!fontLoaded) {
+    // Absolute fallback: generate English-only PDF
+    doc.setFont('helvetica');
+    doc.setFontSize(14);
+    doc.text('Niswah | Fiqh Report', 105, 20, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text('Arabic font failed to load. Please try again.', 105, 35, { align: 'center' });
+    doc.text(`Current state: ${fiqhState}`, 105, 50, { align: 'center' });
+    doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd')}`, 105, 60, { align: 'center' });
+    return doc.output('blob');
+  }
   
   const W = doc.internal.pageSize.getWidth();
   const right = W - 15;
@@ -219,7 +249,18 @@ export const generateFiqhPDF = async (user: any, ledger: any[], fiqhState: strin
 
 export const generateDoctorPDF = async (user: any, ledger: any[], stats: any): Promise<Blob> => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  await loadArabicFont(doc);
+  const fontLoaded = await loadArabicFont(doc);
+
+  if (!fontLoaded) {
+    doc.setFont('helvetica');
+    doc.setFontSize(14);
+    doc.text('Niswah | Medical Cycle Report', 105, 20, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text('Arabic font failed to load. Please try again.', 105, 35, { align: 'center' });
+    doc.text(`Patient: ${user?.display_name || 'Sister'}`, 105, 50, { align: 'center' });
+    doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd')}`, 105, 60, { align: 'center' });
+    return doc.output('blob');
+  }
 
   const W = doc.internal.pageSize.getWidth();
   const right = W - 15;
@@ -297,7 +338,18 @@ export const generateHusbandPDF = async (
   fertilityEnd: Date | null
 ): Promise<Blob> => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  await loadArabicFont(doc);
+  const fontLoaded = await loadArabicFont(doc);
+
+  if (!fontLoaded) {
+    doc.setFont('helvetica');
+    doc.setFontSize(14);
+    doc.text('Niswah | Summary for Husband', 105, 20, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text('Arabic font failed to load. Please try again.', 105, 35, { align: 'center' });
+    doc.text(`Current state: ${fiqhState}`, 105, 50, { align: 'center' });
+    doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd')}`, 105, 60, { align: 'center' });
+    return doc.output('blob');
+  }
 
   const W = doc.internal.pageSize.getWidth();
   const right = W - 15;

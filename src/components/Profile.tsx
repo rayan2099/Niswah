@@ -534,6 +534,26 @@ export const Profile = ({ }: ProfileProps) => {
           </div>
         </section>
 
+        {/* Location & Prayer Times */}
+        <section className="space-y-4">
+          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('prayer_times_settings')}</h3>
+          <CitySearch 
+            currentCity={user?.prayerCity}
+            currentCountry={user?.prayerCountry}
+            currentCityAr={user?.prayerCityAr}
+            onSelect={async (city) => {
+              await handleUpdateUser({
+                prayerCity: city.nameEn || city.name,
+                prayerCountry: city.countryEn || city.country,
+                prayerCityAr: city.name,
+                prayerCountryAr: city.country,
+                prayerLat: typeof city.lat === 'string' ? parseFloat(city.lat) : city.lat,
+                prayerLon: typeof city.lon === 'string' ? parseFloat(city.lon) : city.lon
+              });
+            }}
+          />
+        </section>
+
         {/* Health Profile */}
         <section className="space-y-4">
           <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('health_profile')}</h3>
@@ -665,9 +685,9 @@ export const Profile = ({ }: ProfileProps) => {
           </div>
         </section>
 
-        {/* Tools */}
+        {/* Data Export & Tools */}
         <section className="space-y-4">
-          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('tools' as any) || 'الأدوات'}</h3>
+          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('data_export')}</h3>
           <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
             <div className="w-full p-5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-black/5">
               <div className="flex items-center space-x-3">

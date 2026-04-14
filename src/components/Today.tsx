@@ -172,10 +172,12 @@ const CycleRing = ({
   const segments = [
     { 
       id: 'haid', 
-      label: isRTL ? (isActualHaid ? 'حيض' : 'حيض متوقع') : (isActualHaid ? t('haid') : t('expected_period')), 
+      label: isRTL 
+        ? (isActualHaid ? 'حيض' : (fiqhState === 'TAHARA' && currentDay <= avgPeriodLength ? 'طهارة' : 'حيض متوقع')) 
+        : (isActualHaid ? t('haid') : (fiqhState === 'TAHARA' && currentDay <= avgPeriodLength ? t('tahara') : t('expected_period'))), 
       duration: avgPeriodLength, 
-      color: isActualHaid ? STATE_COLORS.HAID : '#FB7185',
-      dashed: !isActualHaid
+      color: isActualHaid ? STATE_COLORS.HAID : (fiqhState === 'TAHARA' && currentDay <= avgPeriodLength ? STATE_COLORS.TAHARA : '#FB7185'),
+      dashed: !isActualHaid && !(fiqhState === 'TAHARA' && currentDay <= avgPeriodLength)
     },
     { id: 'tahara_1', label: isRTL ? 'طهارة' : t('tahara'), duration: tahara1Duration, color: STATE_COLORS.TAHARA },
     { id: 'fertile', label: isRTL ? 'خصوبة' : t('fertile_window'), duration: fertileDuration, color: '#D97706' },
@@ -535,7 +537,7 @@ const FiqhStateBanner = ({ state, madhhab, currentDay, cycleLength, haidDuration
   const { t, isRTL } = useTranslation();
   const locale = isRTL ? 'ar-SA' : 'en-US';
   
-  const isExpectedPeriod = state === 'TAHARA' && (currentDay <= haidDuration || currentDay > cycleLength);
+  const isExpectedPeriod = state === 'TAHARA' && currentDay > cycleLength;
   
   const config = {
     HAID: {

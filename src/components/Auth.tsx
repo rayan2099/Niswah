@@ -114,10 +114,20 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
           setLoading(false); 
           return; 
         }
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        console.log("Auth: Registration success, updating profile...");
-        await updateProfile(cred.user, { displayName: name });
-        await onSuccess();
+        try {
+          const cred = await createUserWithEmailAndPassword(auth, email, password);
+          console.log("Auth: Registration success, updating profile...");
+          await updateProfile(cred.user, { displayName: name });
+          await onSuccess();
+        } catch (regErr: any) {
+          if (regErr.code === 'auth/email-already-in-use') {
+            setIsRegistering(false);
+            setError('هذا البريد مسجل مسبقاً، يرجى تسجيل الدخول باستخدام كلمة المرور الخاصة بكِ');
+            setLoading(false);
+            return;
+          }
+          throw regErr;
+        }
       } else {
         console.log("Auth: Attempting login...");
         try {
@@ -148,9 +158,11 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   };
 
   const handleGoogle = async () => {
-    console.log("Auth: handleGoogle started");
+    console.log("Auth: handleGoogle started, agreed:", agreed);
     if (!agreed) {
-      setError('يرجى الموافقة على سياسة الخصوصية وشروط الاستخدام');
+      setError('يرجى الموافقة على سياسة الخصوصية وشروط الاستخدام أولاً');
+      // Scroll to checkbox
+      document.getElementById('consent-checkbox')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
     setLoading(true);
@@ -166,11 +178,18 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         await onSuccess();
       } catch (popupErr: any) {
         console.warn("Auth: Google Popup Error:", popupErr.code, popupErr.message);
+        const messages: Record<string, string> = {
+          'auth/popup-closed-by-user': 'أُغلقت النافذة قبل الإتمام — حاولي مرة أخرى',
+          'auth/popup-blocked': 'المتصفح منع النافذة المنبثقة — اسمحي للنوافذ المنبثقة وأعيدي المحاولة',
+          'auth/cancelled-popup-request': 'طلب مُلغى — حاولي مرة أخرى',
+          'auth/network-request-failed': 'تحققي من الاتصال بالإنترنت',
+        };
+        
         if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request' || popupErr.code === 'auth/popup-closed-by-user') {
           console.warn("Auth: Popup issue, falling back to Redirect...");
           await signInWithRedirect(auth, provider);
         } else {
-          throw popupErr;
+          setError(messages[popupErr.code] || `خطأ في تسجيل الدخول: ${popupErr.message}`);
         }
       }
     } catch (err: any) {
@@ -256,6 +275,38 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
 
           {/* Auth buttons */}
           <div className="w-full flex flex-col gap-3">
+            
+            {/* Consent — required for ALL auth methods */}
+            <div className="flex items-start gap-2 w-full mb-2" dir="rtl">
+              <input
+                type="checkbox"
+                id="consent-checkbox"
+                checked={agreed}
+                onChange={e => { setAgreed(e.target.checked); setError(''); }}
+                className="mt-1 w-4 h-4 accent-rose-500 flex-shrink-0"
+              />
+              <label htmlFor="consent-checkbox" className="text-xs text-gray-500 text-right leading-relaxed">
+                أوافق على{' '}
+                <button type="button" onClick={() => setShowPrivacy(true)} className="text-rose-500 underline">
+                  سياسة الخصوصية
+                </button>
+                {' '}و{' '}
+                <button type="button" onClick={() => setShowTerms(true)} className="text-rose-500 underline">
+                  شروط الاستخدام
+                </button>
+              </label>
+            </div>
+
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-50 border border-red-200 rounded-xl p-3 mb-2"
+              >
+                <p className="text-xs text-red-600 text-right">{error}</p>
+              </motion.div>
+            )}
+
             {/* Google */}
             <button
               onClick={handleGoogle}
@@ -297,34 +348,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
             >
               المتابعة بالبريد الإلكتروني
             </button>
-
-            <div className="flex items-start gap-3 mt-4 px-2">
-              <input
-                type="checkbox"
-                id="consent"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-                className="mt-1 w-4 h-4 rounded border-gray-300 text-rose-500 focus:ring-rose-500"
-              />
-              <label htmlFor="consent" className="text-xs text-gray-400 leading-relaxed text-right">
-                بالمتابعة، أنتِ توافقين على{' '}
-                <button 
-                  type="button"
-                  onClick={() => setShowPrivacy(true)}
-                  className="text-rose-500 underline"
-                >
-                  سياسة الخصوصية
-                </button>
-                {' '}و{' '}
-                <button 
-                  type="button"
-                  onClick={() => setShowTerms(true)}
-                  className="text-rose-500 underline"
-                >
-                  شروط الاستخدام
-                </button>
-              </label>
-            </div>
           </div>
 
           <AnimatePresence>

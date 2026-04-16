@@ -928,7 +928,9 @@ const PrayerStatusWidget = ({ state, onOpenSettings }: { state: State; onOpenSet
     updatePrayerTimes 
   } = useCycleData();
 
-  const isHaidOrNifas = state === 'HAID' || state === 'NIFAS';
+  const isInHaid = state === 'HAID' || state === 'ISTIHADAH' || state === 'NIFAS';
+  const isInTahara = !isInHaid;
+  const prayerLifted = state === 'HAID' || state === 'NIFAS';
 
   // Find the latest HAID start in the current cycle
   const latestHaidStart = useMemo(() => {
@@ -957,7 +959,7 @@ const PrayerStatusWidget = ({ state, onOpenSettings }: { state: State; onOpenSet
       
       if (isPrayed) {
         status = 'prayed';
-      } else if (isHaidOrNifas) {
+      } else if (prayerLifted) {
         // If we are in HAID or NIFAS, prayers are either lifted or qadha required
         if (latestHaidStart && pt.adhanTime < latestHaidStart) {
           status = 'qadha_required';
@@ -1025,7 +1027,7 @@ const PrayerStatusWidget = ({ state, onOpenSettings }: { state: State; onOpenSet
     );
   }
 
-  if (isHaidOrNifas) {
+  if (prayerLifted) {
     const stateColor = STATE_COLORS[state];
     return (
       <motion.div 
@@ -1197,7 +1199,7 @@ export const Today = ({
     return Math.round(logic.getAverageHaidDuration(user));
   }, [user]);
 
-  const isPredictedPeriod = state === 'TAHARA' && (currentDay <= haidDuration || currentDay > cycleLength);
+  const isPredictedPeriod = state === 'TAHARA' && currentDay > cycleLength;
 
   const handleSaveLog = async (logData: any) => {
     try {
@@ -1350,9 +1352,10 @@ export const Today = ({
                       setDefaultIntensity('medium');
                       setIsLogOpen(true);
                     }}
+                    disabled={isInHaid}
                     className={cn(
                       "flex-1 py-4 rounded-2xl font-bold flex items-center justify-center space-x-2 shadow-sm transition-all",
-                      state !== 'HAID' ? "bg-rose-600 text-white shadow-rose-200" : "bg-gray-100 text-gray-400 cursor-not-allowed",
+                      !isInHaid ? "bg-rose-600 text-white shadow-rose-200 cursor-pointer active:scale-95" : "bg-gray-100 text-gray-400 cursor-not-allowed opacity-40",
                       isPredictedPeriod && "shadow-lg shadow-rose-300 ring-2 ring-rose-400 ring-offset-2"
                     )}
                   >
@@ -1365,9 +1368,10 @@ export const Today = ({
                       handleSaveLog({ intensity: 'none', timestamp: new Date().toISOString() });
                       if (user) notificationService.scheduleGhuslReminder(user);
                     }}
+                    disabled={isInTahara}
                     className={cn(
                       "flex-1 py-4 rounded-2xl font-bold border flex items-center justify-center space-x-2 shadow-sm transition-all",
-                      state === 'HAID' ? "border-rose-200 text-rose-600 bg-white" : "border-gray-100 text-gray-300 bg-gray-50/50 cursor-not-allowed"
+                      !isInTahara ? "border-rose-200 text-rose-600 bg-white cursor-pointer active:scale-95" : "border-gray-100 text-gray-300 bg-gray-50/50 cursor-not-allowed opacity-40"
                     )}
                   >
                     <CheckCircle2 className="w-4 h-4" />

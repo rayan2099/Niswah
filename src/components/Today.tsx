@@ -168,6 +168,7 @@ const CycleRing = ({
   
   const isActualHaid = fiqhState === 'HAID';
   const isActualNifas = fiqhState === 'NIFAS';
+  const isActualIstihadah = fiqhState === 'ISTIHADAH';
 
   const segments = [
     { 
@@ -209,6 +210,17 @@ const CycleRing = ({
   }
   
   const currentPhase = segments[currentPhaseIndex];
+  
+  // CRITICAL FIX: The center label must reflect the ACTUAL fiqhState if it's HAID, NIFAS or ISTIHADAH
+  // This prevents the user from seeing "Tahara" in the ring while prayers are "Lifted"
+  const actualStateLabel = isActualHaid ? (isRTL ? 'حيض' : t('haid')) : 
+                           isActualNifas ? (isRTL ? 'نفاس' : t('nifas')) : 
+                           isActualIstihadah ? (isRTL ? 'استحاضة' : t('istihadah')) :
+                           null;
+  
+  const displayLabel = actualStateLabel || currentPhase.label;
+  const displayColor = (isActualHaid || isActualNifas || isActualIstihadah) ? STATE_COLORS[fiqhState] : currentPhase.color;
+
   const nextPhase = segments[(currentPhaseIndex + 1) % segments.length];
   const daysUntilNextPhase = Math.max(1, currentPhase.duration - dayInPhase + 1);
 
@@ -337,9 +349,9 @@ const CycleRing = ({
             </span>
             <span 
               className="text-[32px] font-serif font-bold leading-tight mb-2"
-              style={{ color: currentPhase.color }} 
+              style={{ color: displayColor }} 
             >
-              {currentPhase.label}
+              {displayLabel}
             </span>
             {currentPhase.id === 'expected' && (
               <motion.span 
@@ -533,11 +545,11 @@ const PhaseTimeline = ({ segments, currentPhaseIndex, totalDays, isRTL }: {
 
 // --- FIQH STATE BANNER ---
 
-const FiqhStateBanner = ({ state, madhhab, currentDay, cycleLength, haidDuration }: { state: State; madhhab: Madhhab; currentDay: number; cycleLength: number; haidDuration: number }) => {
+const FiqhStateBanner = ({ fiqhState, madhhab, currentDay, cycleLength, haidDuration }: { fiqhState: State; madhhab: Madhhab; currentDay: number; cycleLength: number; haidDuration: number }) => {
   const { t, isRTL } = useTranslation();
   const locale = isRTL ? 'ar-SA' : 'en-US';
   
-  const isExpectedPeriod = state === 'TAHARA' && currentDay > cycleLength;
+  const isExpectedPeriod = fiqhState === 'TAHARA' && currentDay > cycleLength;
   
   const config = {
     HAID: {
@@ -564,7 +576,7 @@ const FiqhStateBanner = ({ state, madhhab, currentDay, cycleLength, haidDuration
       message: t('log_details_fiqh'),
       sub: ''
     }
-  }[state];
+  }[fiqhState];
 
   return (
     <motion.div
@@ -585,7 +597,7 @@ const FiqhStateBanner = ({ state, madhhab, currentDay, cycleLength, haidDuration
       <p className="text-sm font-medium leading-relaxed text-gray-800 relative z-10">{config.message}</p>
       {config.sub && <p className="text-[10px] opacity-50 font-bold uppercase tracking-wider relative z-10">{config.sub}</p>}
       
-      {state === 'ISTIHADAH' && (
+      {fiqhState === 'ISTIHADAH' && (
         <button className="mt-3 px-4 py-2 bg-rose-400 text-white text-[10px] font-bold rounded-full relative z-10">
           {t('log_today_blood')}
         </button>
@@ -916,7 +928,7 @@ const NoCityPromptCard = ({ onAction }: { onAction: () => void }) => {
 
 // --- PRAYER STATUS WIDGET ---
 
-const PrayerStatusWidget = ({ state, onOpenSettings }: { state: State; onOpenSettings: () => void }) => {
+const PrayerStatusWidget = ({ fiqhState, onOpenSettings }: { fiqhState: State; onOpenSettings: () => void }) => {
   const { t, isRTL } = useTranslation();
   const { 
     user, 
@@ -928,9 +940,9 @@ const PrayerStatusWidget = ({ state, onOpenSettings }: { state: State; onOpenSet
     updatePrayerTimes 
   } = useCycleData();
 
-  const isInHaid = state === 'HAID' || state === 'ISTIHADAH' || state === 'NIFAS';
+  const isInHaid = fiqhState === 'HAID' || fiqhState === 'ISTIHADAH' || fiqhState === 'NIFAS';
   const isInTahara = !isInHaid;
-  const prayerLifted = state === 'HAID' || state === 'NIFAS';
+  const prayerLifted = fiqhState === 'HAID' || fiqhState === 'NIFAS';
 
   // Find the latest HAID start in the current cycle
   const latestHaidStart = useMemo(() => {
@@ -984,7 +996,7 @@ const PrayerStatusWidget = ({ state, onOpenSettings }: { state: State; onOpenSet
         icon: pt.name.toLowerCase() === 'fajr' ? Moon : Sun
       };
     });
-  }, [prayerTimes, prayerLogs, state, latestHaidStart]);
+  }, [prayerTimes, prayerLogs, fiqhState, latestHaidStart]);
 
   if (!user?.prayerCity && !(user?.prayerLat && user?.prayerLon)) {
     return <NoCityPromptCard onAction={onOpenSettings} />;
@@ -1028,7 +1040,7 @@ const PrayerStatusWidget = ({ state, onOpenSettings }: { state: State; onOpenSet
   }
 
   if (prayerLifted) {
-    const stateColor = STATE_COLORS[state];
+    const stateColor = STATE_COLORS[fiqhState];
     return (
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
@@ -1175,7 +1187,7 @@ export const Today = ({
   const isFirstTime = !dataLoading && (!entries || entries.filter(e => !e.is_predicted).length === 0);
 
   const [localFiqhState, setLocalFiqhState] = useState<State | null>(null);
-  const state = localFiqhState || contextState;
+  const fiqhState = localFiqhState || contextState;
 
   useEffect(() => {
     if (contextState === localFiqhState) {
@@ -1199,7 +1211,9 @@ export const Today = ({
     return Math.round(logic.getAverageHaidDuration(user));
   }, [user]);
 
-  const isPredictedPeriod = state === 'TAHARA' && currentDay > cycleLength;
+  const isPredictedPeriod = fiqhState === 'TAHARA' && currentDay > cycleLength;
+  const isInHaid = fiqhState === 'HAID' || fiqhState === 'ISTIHADAH' || fiqhState === 'NIFAS';
+  const isInTahara = !isInHaid;
 
   const handleSaveLog = async (logData: any) => {
     try {
@@ -1221,18 +1235,15 @@ export const Today = ({
         is_predicted: false
       };
 
-      // Optimistic update
-      // No longer needed with context refresh
+      // Optimistic update: Set local state immediately for instant UI feedback
+      setLocalFiqhState(newState);
 
       await api.logCycleEntry(entry);
-      
-      // Nuclear Option: Set local state immediately
-      setLocalFiqhState(newState);
       
       await refresh();
       
       // Update state and trigger animations
-      if (newState !== state) {
+      if (newState !== fiqhState) {
         if (newState === 'HAID') {
           setBloomMessage(t('ease_and_rest'));
           setShowBloom(true);
@@ -1266,7 +1277,7 @@ export const Today = ({
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="fixed inset-0 z-[300] flex items-center justify-center pointer-events-none"
           >
-            <div className="w-64 h-64 rounded-full blur-3xl" style={{ backgroundColor: `${STATE_COLORS[state]}44` }} />
+            <div className="w-64 h-64 rounded-full blur-3xl" style={{ backgroundColor: `${STATE_COLORS[fiqhState]}44` }} />
             <motion.p 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1320,7 +1331,7 @@ export const Today = ({
               <>
                 <CycleRing 
                   cycleStats={cycleStats}
-                  fiqhState={state}
+                  fiqhState={fiqhState}
                   prediction={prediction}
                   ovulation={ovulation}
                   onTap={() => {
@@ -1355,7 +1366,7 @@ export const Today = ({
                     disabled={isInHaid}
                     className={cn(
                       "flex-1 py-4 rounded-2xl font-bold flex items-center justify-center space-x-2 shadow-sm transition-all",
-                      !isInHaid ? "bg-rose-600 text-white shadow-rose-200 cursor-pointer active:scale-95" : "bg-gray-100 text-gray-400 cursor-not-allowed opacity-40",
+                      isInHaid ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-40" : "bg-rose-600 text-white shadow-rose-200 cursor-pointer active:scale-95",
                       isPredictedPeriod && "shadow-lg shadow-rose-300 ring-2 ring-rose-400 ring-offset-2"
                     )}
                   >
@@ -1371,7 +1382,7 @@ export const Today = ({
                     disabled={isInTahara}
                     className={cn(
                       "flex-1 py-4 rounded-2xl font-bold border flex items-center justify-center space-x-2 shadow-sm transition-all",
-                      !isInTahara ? "border-rose-200 text-rose-600 bg-white cursor-pointer active:scale-95" : "border-gray-100 text-gray-300 bg-gray-50/50 cursor-not-allowed opacity-40"
+                      isInTahara ? "border-gray-100 text-gray-300 bg-gray-50/50 cursor-not-allowed opacity-40" : "border-rose-200 text-rose-600 bg-white cursor-pointer active:scale-95"
                     )}
                   >
                     <CheckCircle2 className="w-4 h-4" />
@@ -1452,7 +1463,7 @@ export const Today = ({
 
         {/* Fiqh State Banner */}
         <FiqhStateBanner 
-          state={state} 
+          fiqhState={fiqhState} 
           madhhab={user?.madhhab || 'HANAFI'} 
           currentDay={currentDay}
           cycleLength={cycleLength}
@@ -1461,7 +1472,7 @@ export const Today = ({
 
         {/* Dynamic Widgets */}
         <div className="space-y-4">
-          <PrayerStatusWidget state={state} onOpenSettings={onOpenSettings} />
+          <PrayerStatusWidget fiqhState={fiqhState} onOpenSettings={onOpenSettings} />
           
         </div>
 
@@ -1506,7 +1517,7 @@ export const Today = ({
         }} 
         madhhab={user?.madhhab || 'HANAFI'} 
         onSave={handleSaveLog}
-        currentState={state}
+        currentState={fiqhState}
         defaultIntensity={defaultIntensity}
       />
 

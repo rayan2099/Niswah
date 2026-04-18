@@ -79,9 +79,6 @@ export const Calendar = () => {
     }
   }, [entries, currentDate, calendarType]);
 
-  const haidDays = useMemo(() => monthEntries.filter(e => e.fiqh_state === 'HAID').length, [monthEntries]);
-  const taharaDays = useMemo(() => monthEntries.filter(e => e.fiqh_state === 'TAHARA').length, [monthEntries]);
-  const hasBloodLogged = useMemo(() => monthEntries.some(e => e.flow_intensity && e.flow_intensity !== 'none'), [monthEntries]);
   const isHanafiPending = user?.madhhab === 'HANAFI' && user?.pendingBloodStart;
 
   const cycleDates = useMemo(() => {
@@ -170,6 +167,8 @@ export const Calendar = () => {
     }
   };
 
+  const { fiqhState } = useCycleData();
+
   const getDayState = (day: Date): { state: State | null; isExpected?: boolean; isFertile?: boolean; isOvulation?: boolean } => {
     const dayString = format(day, 'yyyy-MM-dd');
     const entry = entries.find(e => e.date === dayString);
@@ -181,6 +180,27 @@ export const Calendar = () => {
       const diff = differenceInDays(day, lastPeriod);
       const dayInCycle = diff % Math.round(cycleLength);
       
+      const isTodayDay = isToday(day);
+      
+      // If it is today, use the official fiqhState from context
+      if (isTodayDay) {
+        // Also check if today is predicted fertile
+        let predictedFertile = false;
+        let predictedOvulation = false;
+        if (ovulation) {
+          const fertileStart = new Date(ovulation.fertileWindowStart);
+          const fertileEnd = new Date(ovulation.fertileWindowEnd);
+          const ovulationDay = new Date(ovulation.predictedOvulationDate);
+          if (isSameDay(day, ovulationDay)) predictedOvulation = true;
+          if (day >= fertileStart && day <= fertileEnd) predictedFertile = true;
+        }
+        return { 
+          state: fiqhState, 
+          isFertile: predictedFertile, 
+          isOvulation: predictedOvulation 
+        };
+      }
+
       if (dayInCycle >= 0 && dayInCycle < Math.round(cycleStats.avgPeriodLength)) return { state: 'HAID', isExpected: true };
       
       if (ovulation) {
@@ -195,6 +215,46 @@ export const Calendar = () => {
     
     return { state: null };
   };
+
+  const monthlyStats = useMemo(() => {
+    const today = new Date();
+    const periodStart = startOfMonth(currentDate);
+    const periodEnd = endOfMonth(currentDate);
+    const monthDays = eachDayOfInterval({ start: periodStart, end: periodEnd });
+
+    let haidDays = 0;
+    let tuhrDays = 0;
+
+    monthDays.forEach(day => {
+      // Only count days up to today (inclusive) for the summary to keep it grounded in "current reality"
+      // or count all if it's a past month
+      if (day > today && isSameMonth(currentDate, today)) return;
+
+      const { state } = getDayState(day);
+      
+      // If state is HAID (logged or predicted), count as haid
+      if (state === 'HAID') {
+        haidDays++;
+      } else {
+        // Everything else (TAHARA, ISTIHADAH, or even null/none logged) counts as Tuhr for the summary progression
+        tuhrDays++;
+      }
+    });
+
+    // Days remaining until next period from cycleStats
+    const daysUntilNext = cycleStats?.daysUntilNext ?? null;
+
+    // Cycle length from adah or user default
+    const avgCycle = cycleStats?.avgCycleLength || user?.knownAdahDays || null;
+
+    return { haidDays, tuhrDays, daysUntilNext, avgCycle };
+  }, [entries, currentDate, prediction, cycleStats, user, getDayState]);
+
+  const regularity = cycleStats.regularity;
+  const regularityLabel = regularity === null ? '—'
+    : regularity > 80 ? (isRTL ? 'منتظمة' : 'Regular')
+    : regularity > 50 ? (isRTL ? 'متوسطة' : 'Moderate')
+    : (isRTL ? 'غير منتظمة' : 'Irregular');
 
   const weekDays = isRTL 
     ? [t('sat'), t('fri'), t('thu'), t('wed'), t('tue'), t('mon'), t('sun')]
@@ -287,45 +347,69 @@ export const Calendar = () => {
                   )}
                 >
                   {/* Fiqh State Backgrounds */}
-                  {state === 'HAID' && (
-                    <div className={cn(
-                      "absolute inset-1 rounded-full",
-                      isExpected ? "border-2 border-[#BE123C] bg-transparent opacity-50" : "bg-[#BE123C]"
-                    )} />
+                  {state === 'HAID' && !isExpected && (
+                    <div className="absolute inset-1 rounded-[8px] bg-[#D4537E]" />
+                  )}
+                  {isExpected && (
+                    <div className="absolute inset-1 rounded-[8px] bg-[#FBEAF0] border-[1.5px] border-dashed border-[#F4C0D1]" />
                   )}
                   {state === 'TAHARA' && !isFertile && (
-                    <div className="absolute inset-1 rounded-full bg-[#0D9488]/10" />
+                    <div className="absolute inset-1 rounded-[8px] bg-[#E1F5EE]" />
                   )}
                   {state === 'ISTIHADAH' && (
-                    <div className="absolute inset-1 rounded-full bg-[#4F46E5]/20 border border-[#4F46E5]/40" />
+                    <div className="absolute inset-1 rounded-[8px] bg-[#4F46E5]/20 border border-[#4F46E5]/40" />
                   )}
                   {state === 'NIFAS' && (
-                    <div className="absolute inset-1 rounded-full bg-[#D97706]" />
+                    <div className="absolute inset-1 rounded-[8px] bg-[#D97706]" />
                   )}
 
                   {/* Fertile Markers */}
                   {isFertile && (
                     <div className={cn(
-                      "absolute inset-1 rounded-full bg-[#D97706]/10",
+                      "absolute inset-1 rounded-[8px] bg-[#FAEEDA] border-[1.5px] border-amber-200",
                       isOvulation && "border-2 border-[#D97706] scale-110 z-20"
                     )} />
                   )}
 
                   {/* Today Indicator */}
                   {isTodayDay && (
-                    <div className="absolute inset-0 border-2 border-emerald-500 rounded-full z-30" />
+                    <div className="absolute inset-0 border-2 border-emerald-500 rounded-[10px] z-30" />
                   )}
 
                   <span className={cn(
                     "relative z-10 text-[13px]",
-                    state === 'HAID' && !isExpected && "text-white",
-                    isFertile && "text-[#D97706]"
+                    state === 'HAID' && !isExpected && "text-white font-semibold",
+                    isExpected && "text-[#D4537E] font-semibold",
+                    state === 'TAHARA' && !isFertile && "text-[#0F6E56]",
+                    isFertile && "text-[#633806] font-semibold"
                   )}>
                     {calendarType === 'gregorian' ? format(day, 'd') : hijri.hd}
                   </span>
                 </motion.div>
               );
             })}
+          </div>
+
+          {/* New Pill Legend */}
+          <div className="flex flex-wrap gap-2 mt-6 px-2" dir={isRTL ? "rtl" : "ltr"}>
+            {[
+              { label: isRTL ? 'حيض' : t('haid'), bg: '#D4537E', text: 'white' },
+              { label: isRTL ? 'حيض متوقع' : t('expected_period'), bg: '#FBEAF0', text: '#D4537E', dashed: true },
+              { label: isRTL ? 'طهارة' : t('tahara'), bg: '#E1F5EE', text: '#0F6E56' },
+              { label: isRTL ? 'خصوبة' : t('fertile_window'), bg: '#FAEEDA', text: '#633806' },
+            ].map(item => (
+              <div
+                key={item.label}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider"
+                style={{
+                  background: item.bg,
+                  color: item.text,
+                  border: item.dashed ? '1.5px dashed #F4C0D1' : 'none',
+                }}
+              >
+                {item.label}
+              </div>
+            ))}
           </div>
         </div>
 
@@ -405,17 +489,6 @@ export const Calendar = () => {
           )}
         </section>
 
-        {/* Legend */}
-        <section className="space-y-4">
-          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('legend')}</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <LegendCard color={STATE_COLORS.HAID} label={t('haid')} icon={Droplets} />
-            <LegendCard color={STATE_COLORS.TAHARA} label={t('tahara')} icon={Sparkles} />
-            <LegendCard color={STATE_COLORS.ISTIHADAH} label={t('istihadah')} icon={Info} />
-            <LegendCard color={STATE_COLORS.NIFAS} label={t('nifas')} icon={Info} />
-          </div>
-        </section>
-
         {/* Stats Summary */}
         <section className="bg-emerald-50 rounded-[40px] p-8 border border-emerald-100 space-y-8">
           <div className="flex items-center justify-between">
@@ -431,7 +504,7 @@ export const Calendar = () => {
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-bold text-emerald-700/40 uppercase tracking-widest">{t('cycle_regularity')}</span>
               <span className="text-xl font-serif font-bold text-emerald-900">
-                {cycleStats.regularity !== null ? `${cycleStats.regularity}%` : '—'}
+                {regularityLabel}
               </span>
             </div>
           </div>
@@ -442,31 +515,27 @@ export const Calendar = () => {
               <div className="flex flex-col">
                 <div className="flex items-baseline space-x-1">
                   <p className={cn(
-                    "text-2xl font-serif font-bold",
-                    isHanafiPending ? "text-amber-600 text-lg" : 
-                    haidDays === 0 ? "text-gray-400" : "text-emerald-900"
+                    "text-2xl font-serif font-bold text-emerald-900"
                   )}>
-                    {isHanafiPending ? t('pending_confirmation') : haidDays.toLocaleString('en-US')}
+                    {monthlyStats.haidDays > 0 ? (
+                      isRTL 
+                        ? `${monthlyStats.haidDays.toLocaleString('ar-SA-u-nu-latn')} ${t('days')}`
+                        : `${monthlyStats.haidDays} ${t('days')}`
+                    ) : (isRTL ? 'لم يُسجَّل حيض هذا الشهر' : 'No haid logged')}
                   </p>
-                  {!isHanafiPending && <span className="text-[10px] font-bold text-emerald-700/60">{t('days')}</span>}
                 </div>
-                <span className={cn(
-                  "text-[8px] font-bold uppercase tracking-tight",
-                  isHanafiPending ? "text-amber-600/60" : "text-emerald-700/40"
-                )}>
-                  {isHanafiPending ? t('hanafi_72h_note') : 
-                   haidDays === 0 ? (hasBloodLogged ? t('below_minimum_duration') : t('no_haid_this_month')) : 
-                   ''}
-                </span>
               </div>
             </div>
             <div className="bg-white/50 p-4 rounded-3xl space-y-1">
               <span className="text-[9px] font-bold text-emerald-700/40 uppercase tracking-widest">{t('total_tahara_days')}</span>
               <div className="flex items-baseline space-x-1">
                 <p className="text-2xl font-serif font-bold text-emerald-900">
-                  {taharaDays.toLocaleString('en-US')}
+                  {monthlyStats.tuhrDays > 0 ? (
+                    isRTL
+                      ? `${monthlyStats.tuhrDays.toLocaleString('ar-SA-u-nu-latn')} ${t('days')}`
+                      : `${monthlyStats.tuhrDays} ${t('days')}`
+                  ) : '—'}
                 </p>
-                <span className="text-[10px] font-bold text-emerald-700/60">{t('days')}</span>
               </div>
             </div>
             <div className="bg-white/50 p-4 rounded-3xl space-y-1">
@@ -474,12 +543,14 @@ export const Calendar = () => {
               <div className="flex flex-col">
                 <div className="flex items-baseline space-x-1">
                   <p className={cn(
-                    "font-serif font-bold text-emerald-900",
-                    (user?.adahLedger?.length || 0) < 2 ? "text-xs" : "text-2xl"
+                    "font-serif font-bold text-emerald-900 text-2xl"
                   )}>
-                    {(user?.adahLedger?.length || 0) < 2 ? t('insufficient_data_for_calculation') : Math.round(cycleStats.avgCycleLength).toLocaleString('en-US')}
+                    {monthlyStats.avgCycle ? (
+                      isRTL
+                        ? `${Math.round(monthlyStats.avgCycle).toLocaleString('ar-SA-u-nu-latn')} ${t('days')}`
+                        : `${Math.round(monthlyStats.avgCycle)} ${t('days')}`
+                    ) : (isRTL ? 'غير كافٍ للحساب' : '—')}
                   </p>
-                  {(user?.adahLedger?.length || 0) >= 2 && <span className="text-[10px] font-bold text-emerald-700/60">{t('days')}</span>}
                 </div>
               </div>
             </div>
@@ -487,47 +558,13 @@ export const Calendar = () => {
               <span className="text-[9px] font-bold text-emerald-700/40 uppercase tracking-widest">{t('next_period')}</span>
               <div className="flex items-baseline space-x-1">
                 <p className={cn(
-                  "text-2xl font-serif font-bold",
-                  cycleStats.isOverdue ? "text-amber-600" : "text-emerald-900"
+                  "text-2xl font-serif font-bold text-emerald-900"
                 )}>
-                  {cycleStats.isOverdue ? 
-                    cycleStats.overdueDays.toLocaleString('en-US') : 
-                    (cycleStats.daysUntilNext === 0 ? t('today') : cycleStats.daysUntilNext.toLocaleString('en-US'))}
-                </p>
-                <span className={cn(
-                  "text-[10px] font-bold",
-                  cycleStats.isOverdue ? "text-amber-600/60" : "text-emerald-700/60"
-                )}>
-                  {cycleStats.isOverdue ? 
-                    t('overdue_x_days', { days: cycleStats.overdueDays.toString() }) : 
-                    (cycleStats.daysUntilNext === 0 ? '' : t('days_left'))}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Enhanced Insights Section */}
-          <div className="grid grid-cols-1 gap-4 pt-4 border-t border-emerald-100">
-            <div className="bg-white/40 p-4 rounded-3xl flex items-start space-x-4 rtl:space-x-reverse">
-              <div className="w-10 h-10 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 flex-shrink-0">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div className="space-y-1">
-                <h5 className="text-xs font-bold text-emerald-900">{t('fiqh_insight')}</h5>
-                <p className="text-[10px] text-emerald-700/60 leading-relaxed">
-                  {cycleStats.currentDay <= 5 ? t('haid_fiqh_reminder') : t('tahara_fiqh_reminder')}
-                </p>
-              </div>
-            </div>
-            
-            <div className="bg-white/40 p-4 rounded-3xl flex items-start space-x-4 rtl:space-x-reverse">
-              <div className="w-10 h-10 bg-rose-100 rounded-2xl flex items-center justify-center text-rose-600 flex-shrink-0">
-                <Heart className="w-5 h-5" />
-              </div>
-              <div className="space-y-1">
-                <h5 className="text-xs font-bold text-rose-900">{t('health_tip')}</h5>
-                <p className="text-[10px] text-rose-700/60 leading-relaxed">
-                  {cycleStats.currentDay <= 5 ? t('haid_health_tip') : t('tahara_health_tip')}
+                  {monthlyStats.daysUntilNext !== null ? (
+                    isRTL 
+                      ? `${monthlyStats.daysUntilNext.toLocaleString('ar-SA-u-nu-latn')} ${t('days_left')}`
+                      : `${monthlyStats.daysUntilNext} ${t('days_left')}`
+                  ) : '—'}
                 </p>
               </div>
             </div>
@@ -552,14 +589,5 @@ export const Calendar = () => {
     </div>
   );
 };
-
-const LegendCard = ({ color, label, icon: Icon }: { color: string; label: string; icon: any }) => (
-  <div className="bg-white p-4 rounded-3xl border border-black/5 flex items-center space-x-3 shadow-sm">
-    <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}1A`, color }}>
-      <Icon className="w-4 h-4" />
-    </div>
-    <span className="text-xs font-bold text-gray-700">{label}</span>
-  </div>
-);
 
 import { Activity } from 'lucide-react';

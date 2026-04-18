@@ -51,15 +51,14 @@ export function calculateFiqhState(entries: any[], madhhab: Madhhab): State {
   // Take the most recent one
   const latest = sorted[0];
   
-  // If its flow is anything other than "none" or null -> return HAID
+  // Primary source of truth is the fiqh_state field
+  if (latest.fiqh_state) {
+    return latest.fiqh_state as State;
+  }
+  
+  // Fallback to flow_intensity for legacy data or partial logs
   if (latest.flow_intensity && latest.flow_intensity !== 'none') {
     return 'HAID';
-  }
-
-  // If it explicitly marks end of period -> return TAHARA
-  // (In this app, intensity 'none' is the end of period)
-  if (latest.flow_intensity === 'none') {
-    return 'TAHARA';
   }
 
   return 'TAHARA';

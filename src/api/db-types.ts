@@ -53,6 +53,8 @@ export interface DBCycleEntry {
   ramadan_day: number | null;
   fasting_status: 'obligatory' | 'lifted' | 'qadha' | null;
   symptoms?: Record<string, number>;
+  sleep_quality?: number; // 1-5 scale
+  energy_level?: number;  // 1-5 scale
   mood?: number;
   feeling?: string;
   notes: string | null;

@@ -33,10 +33,11 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import confetti from 'canvas-confetti';
-import { format, addMinutes, subMinutes, isSameDay } from 'date-fns';
+import { format, addMinutes, subMinutes, isSameDay, differenceInDays, startOfDay } from 'date-fns';
 import * as api from '../api/index.ts';
 import * as logic from '../logic/index.ts';
 import { State, Madhhab, CycleEntry, STATE_COLORS, User, CycleStats, PredictionResult, OvulationResult } from '../logic/types.ts';
+import { DBCycleEntry } from '../api/db-types.ts';
 import { useTranslation } from '../i18n/LanguageContext.tsx';
 import { useCycleData } from '../contexts/CycleContext.tsx';
 import { PregnancyTracker } from './PregnancyTracker.tsx';
@@ -109,6 +110,14 @@ const FirstTimeWelcome = ({ onStart }: { onStart: () => void }) => (
   </div>
 );
 
+const MOODS_DATA = [
+  { icon: Frown, key: 'mood_sad' },
+  { icon: Meh, key: 'mood_neutral' },
+  { icon: Smile, key: 'mood_happy' },
+  { icon: Laugh, key: 'mood_joyful' },
+  { icon: Angry, key: 'mood_angry' }
+];
+
 const CycleSkeleton = () => (
   <div className="animate-pulse px-4 pt-4">
     <div className="w-64 h-64 rounded-full bg-gray-100 mx-auto mb-6 border-8 border-gray-50" />
@@ -125,12 +134,14 @@ const CycleSkeleton = () => (
 const CycleRing = ({ 
   cycleStats,
   fiqhState,
+  entries,
   prediction,
   ovulation,
   onTap 
 }: { 
   cycleStats: CycleStats;
   fiqhState: State;
+  entries: DBCycleEntry[];
   prediction: PredictionResult | null;
   ovulation: OvulationResult | null;
   onTap: () => void;
@@ -144,15 +155,47 @@ const CycleRing = ({
   const cycleLength = cycleStats.avgCycleLength || 28;
   const currentDay = cycleStats.currentDay || 1;
   const avgPeriodLength = cycleStats.avgPeriodLength || 5;
-  
+
+  const isActualHaid = fiqhState === 'HAID';
+  const isActualNifas = fiqhState === 'NIFAS';
+  const isActualIstihadah = fiqhState === 'ISTIHADAH';
+
+  // Calculate actual duration of the most recent Haid to align the ring precisely
+  let periodPartDuration = avgPeriodLength;
+  let isPhaseOneHaid = true;
+
+  if (cycleStats.lastPeriodDate) {
+    const lastStart = startOfDay(new Date(cycleStats.lastPeriodDate));
+    const loggedHaidDays = entries.filter(e => 
+      e.fiqh_state === 'HAID' && 
+      !e.is_predicted && 
+      startOfDay(new Date(e.date)) >= lastStart
+    ).map(e => startOfDay(new Date(e.date)).getTime());
+
+    if (loggedHaidDays.length > 0) {
+      const lastHaid = new Date(Math.max(...loggedHaidDays));
+      const loggedSpan = differenceInDays(lastHaid, lastStart) + 1;
+      
+      if (isActualHaid) {
+        periodPartDuration = Math.max(avgPeriodLength, loggedSpan);
+      } else {
+        periodPartDuration = loggedSpan;
+      }
+    } else if (fiqhState === 'TAHARA' && currentDay <= avgPeriodLength) {
+      // CD 1-X is logged as Tahara (Bleeding ended or didn't start)
+      isPhaseOneHaid = false;
+      periodPartDuration = avgPeriodLength;
+    }
+  }
+
   // Calculate segments for outer ring
   let fertileStart = Math.floor(cycleLength / 2) - 3;
   let fertileEnd = fertileStart + 5;
   
   if (ovulation && cycleStats.lastPeriodDate) {
-    const lastPeriod = new Date(cycleStats.lastPeriodDate).getTime();
-    fertileStart = Math.round((ovulation.fertileWindowStart - lastPeriod) / (24 * 60 * 60 * 1000)) + 1;
-    fertileEnd = Math.round((ovulation.fertileWindowEnd - lastPeriod) / (24 * 60 * 60 * 1000)) + 1;
+    const lastPeriod = startOfDay(new Date(cycleStats.lastPeriodDate));
+    fertileStart = differenceInDays(startOfDay(new Date(ovulation.fertileWindowStart)), lastPeriod) + 1;
+    fertileEnd = differenceInDays(startOfDay(new Date(ovulation.fertileWindowEnd)), lastPeriod) + 1;
   }
 
   // Ensure logical order and durations
@@ -162,32 +205,43 @@ const CycleRing = ({
 
   const prePeriodDuration = 3;
   const expectedDuration = 1;
+  const displayHaidDuration = periodPartDuration;
   
-  const tahara1Duration = Math.max(0, fertileStart - avgPeriodLength - 1);
+  const tahara1Duration = Math.max(0, fertileStart - displayHaidDuration - 1);
   const tahara2Duration = Math.max(0, (cycleLength - prePeriodDuration - expectedDuration) - fertileEnd);
   
-  const isActualHaid = fiqhState === 'HAID';
-  const isActualNifas = fiqhState === 'NIFAS';
-  const isActualIstihadah = fiqhState === 'ISTIHADAH';
-
-  const segments = [
+  const initialSegments = [
     { 
       id: 'haid', 
-      label: isRTL 
-        ? (isActualHaid ? 'حيض' : (fiqhState === 'TAHARA' && currentDay <= avgPeriodLength ? 'طهارة' : 'حيض متوقع')) 
-        : (isActualHaid ? t('haid') : (fiqhState === 'TAHARA' && currentDay <= avgPeriodLength ? t('tahara') : t('expected_period'))), 
-      duration: avgPeriodLength, 
-      color: isActualHaid ? STATE_COLORS.HAID : (fiqhState === 'TAHARA' && currentDay <= avgPeriodLength ? STATE_COLORS.TAHARA : '#FB7185'),
-      dashed: !isActualHaid && !(fiqhState === 'TAHARA' && currentDay <= avgPeriodLength)
+      label: isActualHaid ? (isRTL ? 'حيض' : t('haid')) : 
+             (isActualNifas ? (isRTL ? 'نفاس' : t('nifas')) :
+             (fiqhState === 'TAHARA' && currentDay <= displayHaidDuration ? (isRTL ? 'طهارة' : t('tahara')) : (isRTL ? 'حيض متوقع' : t('expected_period')))), 
+      duration: displayHaidDuration, 
+      color: isActualHaid ? STATE_COLORS.HAID : (isActualNifas ? STATE_COLORS.NIFAS : (fiqhState === 'TAHARA' && currentDay <= displayHaidDuration ? STATE_COLORS.TAHARA : '#FB7185')),
+      dashed: !isActualHaid && !isActualNifas && !(fiqhState === 'TAHARA' && currentDay <= displayHaidDuration)
     },
-    { id: 'tahara_1', label: isRTL ? 'طهارة' : t('tahara'), duration: tahara1Duration, color: STATE_COLORS.TAHARA },
-    { id: 'fertile', label: isRTL ? 'خصوبة' : t('fertile_window'), duration: fertileDuration, color: '#D97706' },
-    { id: 'tahara_2', label: isRTL ? 'طهارة' : t('tahara'), duration: tahara2Duration, color: STATE_COLORS.TAHARA },
-    { id: 'pre_period', label: isRTL ? 'ما قبل الحيض' : t('pre_period'), duration: prePeriodDuration, color: '#4F46E5' },
+    { id: 'tahara_1', label: isRTL ? 'طهارة' : t('tahara'), duration: tahara1Duration, color: STATE_COLORS.TAHARA, dashed: false },
+    { id: 'fertile', label: isRTL ? 'خصوبة' : t('fertile_window'), duration: fertileDuration, color: '#D97706', dashed: false },
+    { id: 'tahara_2', label: isRTL ? 'طهارة' : t('tahara'), duration: tahara2Duration, color: STATE_COLORS.TAHARA, dashed: false },
+    { id: 'pre_period', label: isRTL ? 'ما قبل الحيض' : t('pre_period'), duration: prePeriodDuration, color: '#4F46E5', dashed: false },
     { id: 'expected', label: isRTL ? 'حيض متوقع' : t('expected_period'), duration: expectedDuration, color: '#FB7185', dashed: true },
   ].filter(s => s.duration > 0);
 
-  // Find current phase
+  // Merge identical adjacent segments (e.g., Tahara + Tahara)
+  const segments: typeof initialSegments = [];
+  for (const s of initialSegments) {
+    const last = segments[segments.length - 1];
+    const sDashed = !!s.dashed;
+    const lDashed = last ? !!last.dashed : false;
+    
+    if (last && last.label === s.label && last.color === s.color && lDashed === sDashed) {
+      last.duration += s.duration;
+    } else {
+      segments.push({ ...s, dashed: sDashed });
+    }
+  }
+
+  // Find current phase based on cycle math
   let currentPhaseIndex = 0;
   let accumulatedDays = 0;
   let dayInPhase = 0;
@@ -209,7 +263,13 @@ const CycleRing = ({
     }
   }
   
-  const currentPhase = segments[currentPhaseIndex];
+  // OVERRIDE: If actual logged state is HAID or NIFAS, force the stepper to show HAID phase
+  const haidSegmentIndex = segments.findIndex(s => s.id === 'haid');
+  const correctedPhaseIndex = (fiqhState === 'HAID' || fiqhState === 'NIFAS') && haidSegmentIndex !== -1
+    ? haidSegmentIndex
+    : currentPhaseIndex;
+
+  const currentPhase = segments[correctedPhaseIndex];
   
   // CRITICAL FIX: The center label must reflect the ACTUAL fiqhState if it's HAID, NIFAS or ISTIHADAH
   // This prevents the user from seeing "Tahara" in the ring while prayers are "Lifted"
@@ -221,8 +281,24 @@ const CycleRing = ({
   const displayLabel = actualStateLabel || currentPhase.label;
   const displayColor = (isActualHaid || isActualNifas || isActualIstihadah) ? STATE_COLORS[fiqhState] : currentPhase.color;
 
-  const nextPhase = segments[(currentPhaseIndex + 1) % segments.length];
-  const daysUntilNextPhase = Math.max(1, currentPhase.duration - dayInPhase + 1);
+  // Find the next DISTINCT phase label
+  let nextPhase = segments[(correctedPhaseIndex + 1) % segments.length];
+  let daysUntilNextPhase = Math.max(1, currentPhase.duration - dayInPhase + 1);
+  
+  // Search forward for a different phase label
+  for (let j = 1; j < segments.length; j++) {
+    const candidate = segments[(correctedPhaseIndex + j) % segments.length];
+    if (candidate.label !== currentPhase.label) {
+      nextPhase = candidate;
+      // Recalculate days until that distinct start
+      let daysToTarget = currentPhase.duration - dayInPhase + 1;
+      for (let k = 1; k < j; k++) {
+        daysToTarget += segments[(correctedPhaseIndex + k) % segments.length].duration;
+      }
+      daysUntilNextPhase = daysToTarget;
+      break;
+    }
+  }
 
   const normalizedRadiusOuter = radius - outerStroke / 2;
   const circumferenceOuter = normalizedRadiusOuter * 2 * Math.PI;
@@ -256,7 +332,7 @@ const CycleRing = ({
                 const offset = cumulativeOffset;
                 cumulativeOffset += arcLength;
                 
-                const isActive = idx === currentPhaseIndex;
+                const isActive = idx === correctedPhaseIndex;
                 
                 return (
                   <circle
@@ -344,15 +420,25 @@ const CycleRing = ({
             animate={{ y: 0, opacity: 1 }}
             className="flex flex-col items-center"
           >
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
-              {isRTL ? `${dayInPhase.toLocaleString('ar-SA-u-nu-latn')} يوم من ${currentPhase.duration.toLocaleString('ar-SA-u-nu-latn')}` : `Day ${dayInPhase} of ${currentPhase.duration}`}
-            </span>
-            <span 
-              className="text-[32px] font-serif font-bold leading-tight mb-2"
-              style={{ color: displayColor }} 
-            >
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-1">
               {displayLabel}
             </span>
+            <div className="flex flex-row items-baseline space-x-1 rtl:space-x-reverse mb-1">
+              <span 
+                className="text-[48px] font-serif font-black leading-tight"
+                style={{ color: displayColor }} 
+              >
+                {isRTL ? currentDay.toLocaleString('ar-SA-u-nu-latn') : currentDay}
+              </span>
+              <span className="text-gray-400 font-bold text-sm">
+                / {isRTL ? Math.round(cycleLength).toLocaleString('ar-SA-u-nu-latn') : Math.round(cycleLength)}
+              </span>
+            </div>
+            
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+              {isRTL ? 'يوم من الدورة' : 'Cycle Day'}
+            </span>
+
             {currentPhase.id === 'expected' && (
               <motion.span 
                 animate={{ opacity: [1, 0.4, 1] }}
@@ -362,7 +448,9 @@ const CycleRing = ({
                 ← هل بدأ؟
               </motion.span>
             )}
-            <div className="h-[1px] w-8 bg-gray-200 mb-3" />
+            
+            <div className="h-[1px] w-8 bg-gray-100 mb-3" />
+            
             <span className="text-[11px] font-medium text-gray-400 flex items-center space-x-1 rtl:space-x-reverse">
               <span className="opacity-50">←</span>
               <span className="font-bold text-gray-600">
@@ -375,8 +463,9 @@ const CycleRing = ({
 
       {/* Phase Timeline Strip */}
       <PhaseTimeline 
-        segments={segments.map((s, idx) => ({ ...s, isActive: idx === currentPhaseIndex }))} 
-        currentPhaseIndex={currentPhaseIndex} 
+        segments={segments.map((s, idx) => ({ ...s, isActive: idx === correctedPhaseIndex }))} 
+        currentPhaseIndex={correctedPhaseIndex} 
+        dayInPhase={dayInPhase}
         totalDays={cycleLength}
         isRTL={isRTL}
       />
@@ -384,9 +473,10 @@ const CycleRing = ({
   );
 };
 
-const PhaseTimeline = ({ segments, currentPhaseIndex, totalDays, isRTL }: {
+const PhaseTimeline = ({ segments, currentPhaseIndex, dayInPhase, totalDays, isRTL }: {
   segments: any[];
   currentPhaseIndex: number;
+  dayInPhase: number;
   totalDays: number;
   isRTL: boolean;
 }) => {
@@ -471,17 +561,19 @@ const PhaseTimeline = ({ segments, currentPhaseIndex, totalDays, isRTL }: {
                 }}>
                   <span style={{
                     fontSize: i === currentPhaseIndex ? '13px' : '11px',
-                    fontWeight: i === currentPhaseIndex ? 600 : 400,
+                    fontWeight: i === currentPhaseIndex ? 700 : 400,
                     color: i === currentPhaseIndex ? seg.color : '#9CA3AF',
                   }}>
-                    {seg.duration}
+                    {i === currentPhaseIndex 
+                      ? (isRTL ? dayInPhase.toLocaleString('ar-SA-u-nu-latn') : dayInPhase) 
+                      : (isRTL ? seg.duration.toLocaleString('ar-SA-u-nu-latn') : seg.duration)}
                   </span>
                   <span style={{
                     fontSize: '7px',
                     color: i === currentPhaseIndex ? seg.color : '#C4C4C4',
-                    marginTop: '1px',
+                    marginTop: '2px',
                   }}>
-                    أيام
+                    {i === currentPhaseIndex ? (isRTL ? `من ${seg.duration.toLocaleString('ar-SA-u-nu-latn')}` : `of ${seg.duration}`) : (isRTL ? 'أيام' : 'days')}
                   </span>
                 </div>
                 {/* Active indicator dot */}
@@ -620,21 +712,22 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
   const [kursuf, setKursuf] = useState(false);
   const [internal, setInternal] = useState(false);
   const [symptoms, setSymptoms] = useState<Record<string, number>>({});
+  const [sleepQuality, setSleepQuality] = useState(3);
+  const [energyLevel, setEnergyLevel] = useState(3);
   const [mood, setMood] = useState(2);
   const [feeling, setFeeling] = useState('');
   const [notes, setNotes] = useState('');
 
   const symptomList = [
-    { key: 'cramps', labelAr: 'تشنجات' },
-    { key: 'headache', labelAr: 'صداع' },
-    { key: 'backache', labelAr: 'ألم الظهر' },
-    { key: 'bloating', labelAr: 'انتفاخ' },
-    { key: 'nausea', labelAr: 'غثيان' },
-    { key: 'fatigue', labelAr: 'تعب' },
-    { key: 'acne', labelAr: 'حب الشباب' },
-    { key: 'breastpain', labelAr: 'آلام الثدي' },
-    { key: 'spotting', labelAr: 'تبقيع' },
-    { key: 'clots', labelAr: 'تجلطات' },
+    { key: 'cramps' },
+    { key: 'mood' },
+    { key: 'headache' },
+    { key: 'bloating' },
+    { key: 'backache' },
+    { key: 'nausea' },
+    { key: 'fatigue' },
+    { key: 'acne' },
+    { key: 'tender_breasts' },
   ];
 
   const cycleSymptom = (key: string) => {
@@ -645,7 +738,7 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
   };
 
   const levelColors = ['transparent', '#FBEAF0', '#F4C0D1', '#D4537E'];
-  const levelLabels = ['', 'خفيف', 'متوسط', 'شديد'];
+  const levelLabels = ['', t('light' as any), t('medium' as any), t('severe' as any)];
   const levelTextColors = ['#9CA3AF', '#D4537E', '#993556', '#ffffff'];
 
   const feelingTags = [
@@ -654,13 +747,10 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
     t('feeling_stressed'), t('feeling_happy')
   ];
 
-  const moods = [
-    { Icon: Frown, label: t('mood_sad') },
-    { Icon: Meh, label: t('mood_neutral') },
-    { Icon: Smile, label: t('mood_happy') },
-    { Icon: Laugh, label: t('mood_joyful') },
-    { Icon: Angry, label: t('mood_angry') }
-  ];
+  const moods = MOODS_DATA.map(({ icon: Icon, key }) => ({
+    Icon,
+    label: t(key as any)
+  }));
 
   const handleSave = () => {
     onSave({
@@ -670,6 +760,8 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
       kursuf,
       internal,
       symptoms: symptoms,
+      sleep_quality: sleepQuality,
+      energy_level: energyLevel,
       mood,
       feeling,
       notes,
@@ -705,7 +797,7 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
             
             {/* Intensity */}
             <section className="space-y-4">
-              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('flow_intensity')}</h4>
+              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('flow_intensity')}</h4>
               <div className="flex justify-between">
                 {['none', 'spotting', 'light', 'medium', 'heavy'].map(lvl => (
                   <motion.button
@@ -731,7 +823,7 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
 
             {/* Color */}
             <section className="space-y-4">
-              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('blood_color')}</h4>
+              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('blood_color')}</h4>
               <div className="flex space-x-4">
                 {[
                   { id: 'red', hex: '#F43F5E' },
@@ -803,9 +895,59 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
               </section>
             )}
 
+            {/* Energy & Sleep Scales */}
+            <section className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('energy')}</h4>
+                <div className="flex items-center justify-between bg-gray-50 p-2 rounded-2xl border border-gray-100">
+                  {[1, 2, 3, 4, 5].map((lvl) => (
+                    <button
+                      key={lvl}
+                      onClick={() => setEnergyLevel(lvl)}
+                      className={cn(
+                        "w-8 h-8 rounded-full text-[10px] font-bold transition-all",
+                        energyLevel === lvl 
+                          ? "bg-rose-400 text-white shadow-md scale-110" 
+                          : "text-gray-400 hover:bg-gray-100"
+                      )}
+                    >
+                      {lvl}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex justify-between px-1">
+                  <span className="text-[8px] text-gray-400 uppercase">{t('energy_low')}</span>
+                  <span className="text-[8px] text-gray-400 uppercase">{t('energy_high')}</span>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('sleep')}</h4>
+                <div className="flex items-center justify-between bg-gray-50 p-2 rounded-2xl border border-gray-100">
+                  {[1, 2, 3, 4, 5].map((lvl) => (
+                    <button
+                      key={lvl}
+                      onClick={() => setSleepQuality(lvl)}
+                      className={cn(
+                        "w-8 h-8 rounded-full text-[10px] font-bold transition-all",
+                        sleepQuality === lvl 
+                          ? "bg-indigo-400 text-white shadow-md scale-110" 
+                          : "text-gray-400 hover:bg-gray-100"
+                      )}
+                    >
+                      {lvl}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex justify-between px-1">
+                  <span className="text-[8px] text-gray-400 uppercase">{t('sleep_poor')}</span>
+                  <span className="text-[8px] text-gray-400 uppercase">{t('sleep_excellent')}</span>
+                </div>
+              </div>
+            </section>
+
             {/* Symptoms */}
             <section className="space-y-4">
-              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('symptoms')}</h4>
+              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('symptoms')}</h4>
               <div className="flex flex-wrap gap-2">
                 {symptomList.map(symptom => (
                   <motion.button
@@ -826,10 +968,10 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
                       transition: 'all 0.2s',
                     }}
                   >
-                    {symptom.labelAr}
+                    {t(symptom.key as any)}
                     {symptoms[symptom.key] > 0 && (
-                      <span style={{ fontSize: '10px', opacity: 0.8 }}>
-                        · {levelLabels[symptoms[symptom.key]]}
+                      <span className="ml-1 rtl:mr-1 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">
+                        {symptoms[symptom.key]}
                       </span>
                     )}
                   </motion.button>
@@ -839,9 +981,9 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
 
             {/* Mood */}
             <section className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('mood')}</h4>
-                <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">{moods[mood].label}</span>
+              <div className="flex flex-col items-center justify-center space-y-2">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('mood')}</h4>
+                <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest text-center">{moods[mood].label}</span>
               </div>
               <div className="flex justify-between px-2">
                 {moods.map(({ Icon }, i) => (
@@ -864,7 +1006,7 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
 
               {/* Expressive Feeling Input */}
               <div className="space-y-4 pt-2">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('feeling')}</h4>
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('feeling')}</h4>
                 <input 
                   type="text"
                   value={feeling}
@@ -877,7 +1019,7 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
 
             {/* Notes */}
             <section className="space-y-4">
-              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('notes')}</h4>
+              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('notes')}</h4>
               <textarea 
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -940,9 +1082,10 @@ const PrayerStatusWidget = ({ fiqhState, onOpenSettings }: { fiqhState: State; o
     updatePrayerTimes 
   } = useCycleData();
 
-  const isInHaid = fiqhState === 'HAID' || fiqhState === 'ISTIHADAH' || fiqhState === 'NIFAS';
-  const isInTahara = !isInHaid;
-  const prayerLifted = fiqhState === 'HAID' || fiqhState === 'NIFAS';
+  const prayerIsLifted = fiqhState === 'HAID' || fiqhState === 'NIFAS';
+
+  // Debug line as requested
+  console.log('PRAYER DEBUG — fiqhState:', fiqhState, 'prayerIsLifted:', prayerIsLifted);
 
   // Find the latest HAID start in the current cycle
   const latestHaidStart = useMemo(() => {
@@ -971,7 +1114,7 @@ const PrayerStatusWidget = ({ fiqhState, onOpenSettings }: { fiqhState: State; o
       
       if (isPrayed) {
         status = 'prayed';
-      } else if (prayerLifted) {
+      } else if (prayerIsLifted) {
         // If we are in HAID or NIFAS, prayers are either lifted or qadha required
         if (latestHaidStart && pt.adhanTime < latestHaidStart) {
           status = 'qadha_required';
@@ -1039,7 +1182,7 @@ const PrayerStatusWidget = ({ fiqhState, onOpenSettings }: { fiqhState: State; o
     );
   }
 
-  if (prayerLifted) {
+  if (prayerIsLifted) {
     const stateColor = STATE_COLORS[fiqhState];
     return (
       <motion.div 
@@ -1183,17 +1326,13 @@ export const Today = ({
   onOpenSettings: () => void;
 }) => {
   const { t, isRTL } = useTranslation();
-  const { user, fiqhState: contextState, currentDay, cycleStats, prediction, ovulation, entries, loading: dataLoading, refresh } = useCycleData();
+  const { user, fiqhState, currentDay, cycleStats, prediction, ovulation, entries, loading: dataLoading, refresh } = useCycleData();
+  
+  if (!dataLoading) {
+    console.log('PRAYER DEBUG — fiqhState:', fiqhState);
+  }
   const isFirstTime = !dataLoading && (!entries || entries.filter(e => !e.is_predicted).length === 0);
 
-  const [localFiqhState, setLocalFiqhState] = useState<State | null>(null);
-  const fiqhState = localFiqhState || contextState;
-
-  useEffect(() => {
-    if (contextState === localFiqhState) {
-      setLocalFiqhState(null);
-    }
-  }, [contextState, localFiqhState]);
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [isHealthDoctorOpen, setIsHealthDoctorOpen] = useState(false);
   const [defaultIntensity, setDefaultIntensity] = useState('none');
@@ -1211,8 +1350,13 @@ export const Today = ({
     return Math.round(logic.getAverageHaidDuration(user));
   }, [user]);
 
+  const todayEntry = useMemo(() => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    return (entries || []).find(e => e.date === todayStr && !e.is_predicted);
+  }, [entries]);
+
   const isPredictedPeriod = fiqhState === 'TAHARA' && currentDay > cycleLength;
-  const isInHaid = fiqhState === 'HAID' || fiqhState === 'ISTIHADAH' || fiqhState === 'NIFAS';
+  const isInHaid = fiqhState === 'HAID' || fiqhState === 'NIFAS';
   const isInTahara = !isInHaid;
 
   const handleSaveLog = async (logData: any) => {
@@ -1229,14 +1373,13 @@ export const Today = ({
         kursuf_used: logData.kursuf,
         discharge_internal: logData.internal,
         symptoms: logData.symptoms,
+        sleep_quality: logData.sleep_quality,
+        energy_level: logData.energy_level,
         mood: logData.mood,
         feeling: logData.feeling,
         notes: logData.notes,
         is_predicted: false
       };
-
-      // Optimistic update: Set local state immediately for instant UI feedback
-      setLocalFiqhState(newState);
 
       await api.logCycleEntry(entry);
       
@@ -1332,6 +1475,7 @@ export const Today = ({
                 <CycleRing 
                   cycleStats={cycleStats}
                   fiqhState={fiqhState}
+                  entries={entries}
                   prediction={prediction}
                   ovulation={ovulation}
                   onTap={() => {
@@ -1389,6 +1533,90 @@ export const Today = ({
                     <span className="text-xs">{t('period_end')}</span>
                   </motion.button>
                 </div>
+
+                {/* Daily Log Summary */}
+                {todayEntry && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="w-full max-w-sm bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 border border-black/5 space-y-6"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-gray-800">{t('logged_today')}</h3>
+                      <div className="flex items-center gap-2">
+                        {todayEntry.flow_intensity && todayEntry.flow_intensity !== 'none' && (
+                          <div className="px-3 py-1 bg-rose-50 text-rose-600 rounded-full text-[10px] font-bold uppercase tracking-wider border border-rose-100">
+                            {t(todayEntry.flow_intensity as any)}
+                          </div>
+                        )}
+                        <button 
+                          onClick={() => setIsLogOpen(true)}
+                          className="text-xs font-bold text-rose-400 uppercase tracking-widest hover:text-rose-500 transition-colors"
+                        >
+                          {t('edit')}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {todayEntry.energy_level !== undefined && (
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">{t('energy')}</span>
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 font-bold text-xs border border-rose-100">
+                              {todayEntry.energy_level}
+                            </div>
+                            <span className="text-[10px] text-gray-500 font-medium uppercase">
+                              {todayEntry.energy_level <= 2 ? t('energy_low') : todayEntry.energy_level >= 4 ? t('energy_high') : t('medium')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {todayEntry.sleep_quality !== undefined && (
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">{t('sleep')}</span>
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs border border-indigo-100">
+                              {todayEntry.sleep_quality}
+                            </div>
+                            <span className="text-[10px] text-gray-500 font-medium uppercase">
+                              {todayEntry.sleep_quality <= 2 ? t('sleep_poor') : todayEntry.sleep_quality >= 4 ? t('sleep_excellent') : t('medium')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {todayEntry.symptoms && Object.entries(todayEntry.symptoms).filter(([_, v]) => (v as number) > 0).length > 0 && (
+                      <div className="space-y-3">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">{t('symptoms')}</span>
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {Object.entries(todayEntry.symptoms)
+                            .filter(([_, v]) => (v as number) > 0)
+                            .map(([key, level]) => (
+                            <div key={key} className="px-3 py-1.5 bg-gray-50 rounded-full text-xs font-medium text-gray-700 flex items-center gap-2 border border-gray-100 shadow-sm">
+                              {t(key as any)}
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" style={{ opacity: (level as number) / 3 }} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(todayEntry.mood !== undefined || todayEntry.feeling) && (
+                      <div className="space-y-3 pt-2 border-t border-gray-50 flex flex-col items-center">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">
+                          {t('mood')} ({t(MOODS_DATA[todayEntry.mood || 0]?.key as any)})
+                        </span>
+                        <div className="flex flex-col items-center">
+                          {todayEntry.feeling && (
+                            <p className="text-sm font-medium text-gray-800 text-center italic">"{todayEntry.feeling}"</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
 
                 {/* Health Doctor Card */}
                 <div
@@ -1473,7 +1701,6 @@ export const Today = ({
         {/* Dynamic Widgets */}
         <div className="space-y-4">
           <PrayerStatusWidget fiqhState={fiqhState} onOpenSettings={onOpenSettings} />
-          
         </div>
 
         {/* Dream Interpreter */}

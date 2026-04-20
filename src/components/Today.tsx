@@ -160,88 +160,46 @@ const CycleRing = ({
   const isActualNifas = fiqhState === 'NIFAS';
   const isActualIstihadah = fiqhState === 'ISTIHADAH';
 
-  // Calculate actual duration of the most recent Haid to align the ring precisely
-  let periodPartDuration = avgPeriodLength;
-  let isPhaseOneHaid = true;
+  // Get segments from shared logic
+  const initialSegments = logic.getCycleSegments(cycleStats, ovulation);
+  
+  // Enhance segments with labels and styles for Today screen
+  const segments = initialSegments.map(s => {
+    let label = '';
+    let color = '';
+    let dashed = false;
 
-  if (cycleStats.lastPeriodDate) {
-    const lastStart = startOfDay(new Date(cycleStats.lastPeriodDate));
-    const loggedHaidDays = entries.filter(e => 
-      e.fiqh_state === 'HAID' && 
-      !e.is_predicted && 
-      startOfDay(new Date(e.date)) >= lastStart
-    ).map(e => startOfDay(new Date(e.date)).getTime());
-
-    if (loggedHaidDays.length > 0) {
-      const lastHaid = new Date(Math.max(...loggedHaidDays));
-      const loggedSpan = differenceInDays(lastHaid, lastStart) + 1;
-      
-      if (isActualHaid) {
-        periodPartDuration = Math.max(avgPeriodLength, loggedSpan);
-      } else {
-        periodPartDuration = loggedSpan;
-      }
-    } else if (fiqhState === 'TAHARA' && currentDay <= avgPeriodLength) {
-      // CD 1-X is logged as Tahara (Bleeding ended or didn't start)
-      isPhaseOneHaid = false;
-      periodPartDuration = avgPeriodLength;
+    switch (s.id) {
+      case 'haid':
+        label = isActualHaid ? (isRTL ? 'حيض' : t('haid')) : 
+                isActualNifas ? (isRTL ? 'نفاس' : t('nifas')) : 
+                (fiqhState === 'TAHARA' && currentDay <= s.duration ? (isRTL ? 'طهارة' : t('tahara')) : (isRTL ? 'حيض متوقع' : t('expected_period')));
+        color = isActualHaid ? STATE_COLORS.HAID : (isActualNifas ? STATE_COLORS.NIFAS : (fiqhState === 'TAHARA' && currentDay <= s.duration ? STATE_COLORS.TAHARA : '#FB7185'));
+        dashed = !isActualHaid && !isActualNifas && !(fiqhState === 'TAHARA' && currentDay <= s.duration);
+        break;
+      case 'tahara':
+        label = isRTL ? 'طهارة' : t('tahara');
+        color = STATE_COLORS.TAHARA;
+        break;
+      case 'fertile':
+        label = isRTL ? 'خصوبة' : t('fertile_window');
+        color = '#D97706';
+        break;
+      case 'pre_period':
+        label = isRTL ? 'ما قبل الحيض' : t('pre_period');
+        color = '#4F46E5';
+        break;
+      case 'expected':
+        label = isRTL ? 'حيض متوقع' : t('expected_period');
+        color = '#FB7185';
+        dashed = true;
+        break;
     }
-  }
 
-  // Calculate segments for outer ring
-  let fertileStart = Math.floor(cycleLength / 2) - 3;
-  let fertileEnd = fertileStart + 5;
-  
-  if (ovulation && cycleStats.lastPeriodDate) {
-    const lastPeriod = startOfDay(new Date(cycleStats.lastPeriodDate));
-    fertileStart = differenceInDays(startOfDay(new Date(ovulation.fertileWindowStart)), lastPeriod) + 1;
-    fertileEnd = differenceInDays(startOfDay(new Date(ovulation.fertileWindowEnd)), lastPeriod) + 1;
-  }
+    return { ...s, label, color, dashed };
+  });
 
-  // Ensure logical order and durations
-  fertileStart = Math.max(avgPeriodLength + 1, fertileStart);
-  fertileEnd = Math.min(cycleLength - 4, fertileEnd);
-  const fertileDuration = fertileEnd - fertileStart + 1;
-
-  const prePeriodDuration = 3;
-  const expectedDuration = 1;
-  const displayHaidDuration = periodPartDuration;
-  
-  const tahara1Duration = Math.max(0, fertileStart - displayHaidDuration - 1);
-  const tahara2Duration = Math.max(0, (cycleLength - prePeriodDuration - expectedDuration) - fertileEnd);
-  
-  const initialSegments = [
-    { 
-      id: 'haid', 
-      label: isActualHaid ? (isRTL ? 'حيض' : t('haid')) : 
-             (isActualNifas ? (isRTL ? 'نفاس' : t('nifas')) :
-             (fiqhState === 'TAHARA' && currentDay <= displayHaidDuration ? (isRTL ? 'طهارة' : t('tahara')) : (isRTL ? 'حيض متوقع' : t('expected_period')))), 
-      duration: displayHaidDuration, 
-      color: isActualHaid ? STATE_COLORS.HAID : (isActualNifas ? STATE_COLORS.NIFAS : (fiqhState === 'TAHARA' && currentDay <= displayHaidDuration ? STATE_COLORS.TAHARA : '#FB7185')),
-      dashed: !isActualHaid && !isActualNifas && !(fiqhState === 'TAHARA' && currentDay <= displayHaidDuration)
-    },
-    { id: 'tahara_1', label: isRTL ? 'طهارة' : t('tahara'), duration: tahara1Duration, color: STATE_COLORS.TAHARA, dashed: false },
-    { id: 'fertile', label: isRTL ? 'خصوبة' : t('fertile_window'), duration: fertileDuration, color: '#D97706', dashed: false },
-    { id: 'tahara_2', label: isRTL ? 'طهارة' : t('tahara'), duration: tahara2Duration, color: STATE_COLORS.TAHARA, dashed: false },
-    { id: 'pre_period', label: isRTL ? 'ما قبل الحيض' : t('pre_period'), duration: prePeriodDuration, color: '#4F46E5', dashed: false },
-    { id: 'expected', label: isRTL ? 'حيض متوقع' : t('expected_period'), duration: expectedDuration, color: '#FB7185', dashed: true },
-  ].filter(s => s.duration > 0);
-
-  // Merge identical adjacent segments (e.g., Tahara + Tahara)
-  const segments: typeof initialSegments = [];
-  for (const s of initialSegments) {
-    const last = segments[segments.length - 1];
-    const sDashed = !!s.dashed;
-    const lDashed = last ? !!last.dashed : false;
-    
-    if (last && last.label === s.label && last.color === s.color && lDashed === sDashed) {
-      last.duration += s.duration;
-    } else {
-      segments.push({ ...s, dashed: sDashed });
-    }
-  }
-
-  // Find current phase based on cycle math
+  // Find current phase based on shared logic behavior
   let currentPhaseIndex = 0;
   let accumulatedDays = 0;
   let dayInPhase = 0;

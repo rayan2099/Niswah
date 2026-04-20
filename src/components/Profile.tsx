@@ -730,8 +730,6 @@ export const Profile = ({ }: ProfileProps) => {
                 {isGeneratingHusbandPDF ? t('preparing') : t('download')}
               </button>
             </div>
-
-            <LinkRow icon={Calendar} label={t('adah_ledger' as any) || 'سجل العادة'} onClick={() => {}} />
           </div>
         </section>
 

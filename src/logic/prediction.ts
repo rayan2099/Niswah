@@ -157,9 +157,28 @@ export function calculateCycleStats(entries: any[], user?: User): CycleStats {
   const today = startOfDay(new Date());
   const diffDays = differenceInDays(today, startOfDay(lastPeriodStart)) + 1;
 
+  // Calculate actual period duration if we are currently in or just finished one
+  let currentPeriodLength = user ? getAverageHaidDuration(user) : 5;
+  const periodEntries = actualEntries.filter(e => {
+    const d = new Date(e.date);
+    return e.fiqh_state === 'HAID' && d >= lastPeriodStart!;
+  });
+  
+  if (periodEntries.length > 0) {
+    const entryDates = periodEntries.map(e => new Date(e.date).getTime());
+    const lastEntryDate = new Date(Math.max(...entryDates));
+    const actualSpan = differenceInDays(lastEntryDate, lastPeriodStart) + 1;
+    // If currently in HAID, we use max of avg and actual so far. 
+    // If TAHARA, the actual length is precisely what was logged.
+    const latestState = [...actualEntries].sort((a,b) => b.date.localeCompare(a.date))[0]?.fiqh_state;
+    if (latestState === 'HAID') {
+      currentPeriodLength = Math.max(currentPeriodLength, actualSpan);
+    } else {
+      currentPeriodLength = actualSpan;
+    }
+  }
+
   // Fix: If today is Day 28 and cycle is 28, daysUntilNext should be 1 (for tomorrow), not 0.
-  // Actually, if today is Day 28, it's the last day. Tomorrow is Day 1.
-  // The user wants "Period expected tomorrow" if today is Day 28.
   const daysUntilNext = Math.max(0, Math.round(cycleLength) - diffDays + 1);
   const isOverdue = diffDays > Math.round(cycleLength);
   const overdueDays = isOverdue ? diffDays - Math.round(cycleLength) : 0;
@@ -172,10 +191,74 @@ export function calculateCycleStats(entries: any[], user?: User): CycleStats {
     overdueDays,
     progress,
     avgCycleLength: cycleLength,
-    avgPeriodLength: user ? getAverageHaidDuration(user) : 5,
+    avgPeriodLength: currentPeriodLength,
     regularity,
     lastPeriodDate: lastPeriodStart.toISOString()
   };
+}
+
+export type CyclePhaseId = 'haid' | 'tahara' | 'fertile' | 'pre_period' | 'expected';
+
+export interface CycleSegment {
+  id: CyclePhaseId;
+  duration: number;
+}
+
+export function getCycleSegments(cycleStats: CycleStats, ovulation: OvulationResult | null): CycleSegment[] {
+  const cycleLength = Math.round(cycleStats.avgCycleLength || 28);
+  const avgPeriodLength = Math.round(cycleStats.avgPeriodLength || 5);
+
+  let fertileStart = Math.floor(cycleLength / 2) - 3;
+  let fertileEnd = fertileStart + 5;
+  
+  if (ovulation && cycleStats.lastPeriodDate) {
+    const lastPeriod = startOfDay(new Date(cycleStats.lastPeriodDate));
+    fertileStart = differenceInDays(startOfDay(new Date(ovulation.fertileWindowStart)), lastPeriod) + 1;
+    fertileEnd = differenceInDays(startOfDay(new Date(ovulation.fertileWindowEnd)), lastPeriod) + 1;
+  }
+
+  // Ensure logical order
+  fertileStart = Math.max(avgPeriodLength + 1, fertileStart);
+  fertileEnd = Math.min(cycleLength - 4, fertileEnd);
+  const fertileDuration = Math.max(0, fertileEnd - fertileStart + 1);
+
+  const prePeriodDuration = 3;
+  const expectedDuration = 1;
+  
+  const tahara1Duration = Math.max(0, fertileStart - avgPeriodLength - 1);
+  const tahara2Duration = Math.max(0, (cycleLength - prePeriodDuration - expectedDuration) - fertileEnd);
+  
+  const segments: CycleSegment[] = [
+    { id: 'haid' as CyclePhaseId, duration: avgPeriodLength },
+    { id: 'tahara' as CyclePhaseId, duration: tahara1Duration },
+    { id: 'fertile' as CyclePhaseId, duration: fertileDuration },
+    { id: 'tahara' as CyclePhaseId, duration: tahara2Duration },
+    { id: 'pre_period' as CyclePhaseId, duration: prePeriodDuration },
+    { id: 'expected' as CyclePhaseId, duration: expectedDuration },
+  ].filter(s => s.duration > 0);
+
+  // Merge adjacent Tahara segments
+  const merged: CycleSegment[] = [];
+  for (const s of segments) {
+    const last = merged[merged.length - 1];
+    if (last && last.id === s.id && s.id === 'tahara') {
+      last.duration += s.duration;
+    } else {
+      merged.push(s);
+    }
+  }
+  return merged;
+}
+
+export function getPhaseForDayInCycle(dayInCycle: number, segments: CycleSegment[]): CyclePhaseId {
+  let accumulated = 0;
+  for (const s of segments) {
+    if (dayInCycle <= accumulated + s.duration) {
+      return s.id;
+    }
+    accumulated += s.duration;
+  }
+  return segments[segments.length - 1]?.id || 'tahara';
 }
 
 export function predictOvulation(user: User): OvulationResult {

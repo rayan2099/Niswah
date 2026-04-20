@@ -189,7 +189,7 @@ export const translations = {
     period_expected_today: "من المتوقع بدء الدورة اليوم",
     tap_start_haid_to_log: "اضغطي لتسجيل بدء الحيض",
     period_start: "بدء الحيض",
-    period_end: "طهارة (نهاية الحيض)",
+    period_end: "انتهى الحيض",
     ease_and_rest: "خفف الله عنكِ وارزقكِ الراحة",
     welcome_back_tahara: "هنيئاً لكِ العودة للطهارة والصلاة",
     haid: "حيض",
@@ -288,6 +288,16 @@ export const translations = {
     cycle_history: "سجل الدورات",
     no_cycle_history_yet: "لا يوجد سجل دورات بعد",
     cycle_history_details: "تفاصيل سجل الدورة",
+    cycle_history_details_desc: "كانت هذه الدورة منتظمة. متوسط مدتك هو 5 أيام. التتبع باستمرار يساعد طبيبة نسوة في تقديم توقعات أفضل.",
+    log_more_for_insights: "سجلي دورتك لرؤية رؤى مخصصة",
+    more_logs_better_accuracy: "كلما سجلتِ أكثر، كانت الرؤى أدق",
+    cycle_variance_detected: "تفاوت في طول الدورة",
+    prepare_and_rest: "استعدي واحرصي على الراحة الكافية",
+    insufficient_data: "بيانات غير كافية",
+    log_cycle_for_regularity: "سجلي دورتك لرؤية مخطط الانتظام",
+    duration: "المدة",
+    guidance: "إرشاد",
+    close: "إغلاق",
 
     // Community
     guest_user: "زائرة",
@@ -712,6 +722,16 @@ export const translations = {
     cycle_history: "Cycle History",
     no_cycle_history_yet: "No cycle history yet",
     cycle_history_details: "Cycle History Details",
+    cycle_history_details_desc: "This cycle was regular. Your average duration is 5 days. Tracking consistently helps Niswah AI provide better predictions.",
+    log_more_for_insights: "Log more for insights",
+    more_logs_better_accuracy: "More logs, better accuracy",
+    cycle_variance_detected: "Cycle variance detected",
+    prepare_and_rest: "Prepare and get enough rest",
+    insufficient_data: "Insufficient data",
+    log_cycle_for_regularity: "Log your cycle to see regularity chart",
+    duration: "Duration",
+    guidance: "Guidance",
+    close: "Close",
 
     // Community
     guest_user: "Guest",
@@ -782,23 +802,6 @@ export const translations = {
     ask_nisa: "Ask Nisa",
     nisa_companion: "Your Health & Fiqh Companion",
     ask_nisa_placeholder: "Ask any Fiqh or health question...",
-    dream_system_instruction: "You are an expert in dream interpretation based on Islamic heritage and the works of Ibn Sirin and Al-Nabulsi. Provide privacy-conscious and psychologically supportive interpretations.",
-    nisa_error: "Sorry, a system error occurred. Please try again later.",
-    online_status: "Online Now",
-    dream_interpreter_title: "Dream Interpreter",
-    dream_intro: "Share your dream for a Fiqh-rooted interpretation",
-    dream_placeholder: "What did you dream about?",
-    nisa_disclaimer: "These responses are AI-generated for general guidance. Consult specialists for specific cases.",
-    nisa_greeting: "How can I help you today, Sister?",
-    nisa_intro: "I am Nisa, your companion, here to support your healthy and spiritual journey.",
-    nisa_knows: "Nisa knows about you:",
-    conditions_label: "Conditions:",
-    status_label: "Status:",
-    pregnant_status: "Pregnant",
-    ramadan_active_status: "Fasting (Ramadan)",
-    normal_cycle_status: "Normal Cycle",
-
-    // Dream & AI section removed from here because it's duplicated below
 
     // Paywall
     feat_advanced_fiqh: "Precise Fiqh rulings for all cases",
@@ -866,11 +869,8 @@ export const translations = {
     health_data_only: "Health Data Only",
     health_fiqh: "Health & Fiqh Data",
     grant_access: "Grant Access",
-
     profile: "Profile",
     language: "Language",
-    settings: "Settings",
-    logout: "Log Out",
-    sign_out: "Sign Out",
+    settings: "Settings"
   }
 };

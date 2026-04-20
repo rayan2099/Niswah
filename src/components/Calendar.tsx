@@ -27,7 +27,8 @@ import {
   isToday,
   parseISO,
   addDays,
-  differenceInDays
+  differenceInDays,
+  startOfDay
 } from 'date-fns';
 import { ResponsiveContainer, AreaChart, Area, XAxis, ReferenceLine, ReferenceArea } from 'recharts';
 import { useTranslation } from '../i18n/LanguageContext.tsx';
@@ -174,17 +175,16 @@ export const Calendar = () => {
     const entry = entries.find(e => e.date === dayString);
     if (entry) return { state: entry.fiqh_state as State };
     
-    // Prediction logic using cycleStats
+    // Prediction logic using shared segments
     if (user && cycleStats.lastPeriodDate) {
-      const lastPeriod = parseISO(cycleStats.lastPeriodDate);
-      const diff = differenceInDays(day, lastPeriod);
-      const dayInCycle = diff % Math.round(cycleLength);
+      const lastPeriod = startOfDay(parseISO(cycleStats.lastPeriodDate));
+      const targetDay = startOfDay(day);
+      const diff = differenceInDays(targetDay, lastPeriod);
       
       const isTodayDay = isToday(day);
       
       // If it is today, use the official fiqhState from context
       if (isTodayDay) {
-        // Also check if today is predicted fertile
         let predictedFertile = false;
         let predictedOvulation = false;
         if (ovulation) {
@@ -201,16 +201,34 @@ export const Calendar = () => {
         };
       }
 
-      if (dayInCycle >= 0 && dayInCycle < Math.round(cycleStats.avgPeriodLength)) return { state: 'HAID', isExpected: true };
+      // Use segments for future/other days
+      const cycleLength = Math.round(cycleStats.avgCycleLength || 28);
+      // Normalized dayInCycle (1-indexed)
+      const dayInCycle = ((diff % cycleLength) + cycleLength) % cycleLength + 1;
       
-      if (ovulation) {
-        const fertileStart = new Date(ovulation.fertileWindowStart);
-        const fertileEnd = new Date(ovulation.fertileWindowEnd);
-        const ovulationDay = new Date(ovulation.predictedOvulationDate);
-        
-        if (isSameDay(day, ovulationDay)) return { state: 'TAHARA', isFertile: true, isOvulation: true };
-        if (day >= fertileStart && day <= fertileEnd) return { state: 'TAHARA', isFertile: true };
+      const segments = logic.getCycleSegments(cycleStats, ovulation);
+      const phaseId = logic.getPhaseForDayInCycle(dayInCycle, segments);
+
+      if (phaseId === 'haid' || phaseId === 'expected') {
+        return { state: 'HAID', isExpected: true };
       }
+      
+      if (phaseId === 'fertile') {
+        let isOvu = false;
+        if (ovulation) {
+          const ovulationDay = new Date(ovulation.predictedOvulationDate);
+          if (isSameDay(day, ovulationDay)) isOvu = true;
+        }
+        return { state: 'TAHARA', isFertile: true, isOvulation: isOvu };
+      }
+
+      if (phaseId === 'pre_period') {
+        // Visually we can make it a light indigo or just Tahara for now to avoid confusion
+        // The user wants 9 green boxes if the ring says Taharah.
+        return { state: 'TAHARA' };
+      }
+
+      return { state: 'TAHARA' };
     }
     
     return { state: null };

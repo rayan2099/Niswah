@@ -170,14 +170,15 @@ function AppContent() {
 
   if (authLoading) {
     return (
-      <div className="fixed inset-0 bg-[#FDFCFB] flex flex-col items-center justify-center gap-6">
+      <div className="fixed inset-0 bg-[#FDFCFB] flex flex-col items-center justify-center gap-10">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-24 h-24 rounded-3xl bg-white border border-rose-100 flex items-center justify-center overflow-hidden shadow-sm"
+          className="w-32 h-32 rounded-[40px] bg-white border border-rose-100 flex items-center justify-center overflow-hidden shadow-sm"
         >
           <img src="/logo.svg" alt="Niswah Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
         </motion.div>
+        
         <motion.div 
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}

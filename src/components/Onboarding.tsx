@@ -121,23 +121,15 @@ const Screen1Splash = ({ onNext }: { onNext: () => void }) => {
 
   return (
     <div className="flex flex-col items-center justify-center space-y-8">
-      <div className="flex flex-col items-center justify-center space-y-4">
+      <div className="flex flex-col items-center justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
-          className="w-32 h-32 rounded-3xl bg-white border border-rose-100 flex items-center justify-center overflow-hidden shadow-sm"
+          className="w-40 h-40 rounded-[40px] bg-white border border-rose-100 flex items-center justify-center overflow-hidden shadow-sm"
         >
           <img src="/logo.svg" alt="Niswah Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
         </motion.div>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4, duration: 0.8 }}
-          className="text-rose-400 font-medium tracking-widest uppercase text-xs text-center"
-        >
-          {t('splash_tagline')}
-        </motion.p>
       </div>
 
       <motion.button
@@ -208,7 +200,7 @@ const Screen3Madhhab = ({ data, update, onNext }: { data: OnboardingData; update
   const madhhabs: { id: Madhhab; label: string; rule: string }[] = [
     { id: 'HANAFI', label: t('hanafi'), rule: t('hanafi_rule_onboarding') },
     { id: 'MALIKI', label: t('maliki'), rule: t('maliki_rule_onboarding') },
-    { id: 'SHAFII', label: t('shafi'), rule: t('shafii_rule_onboarding') },
+    { id: 'SHAFII', label: t('shafii'), rule: t('shafii_rule_onboarding') },
     { id: 'HANBALI', label: t('hanbali'), rule: t('hanbali_rule_onboarding') },
   ];
 
@@ -277,7 +269,7 @@ const Screen3Madhhab = ({ data, update, onNext }: { data: OnboardingData; update
               <div className="space-y-4 text-sm text-gray-600 leading-relaxed">
                 <p><strong>{t('hanafi')}:</strong> {t('hanafi_summary')}</p>
                 <p><strong>{t('maliki')}:</strong> {t('maliki_summary')}</p>
-                <p><strong>{t('shafi')} & {t('hanbali')}:</strong> {t('shafii_summary')}</p>
+                <p><strong>{t('shafii')} & {t('hanbali')}:</strong> {t('shafii_summary')}</p>
                 <p>{t('scholar_consult_note')}</p>
               </div>
               <button 

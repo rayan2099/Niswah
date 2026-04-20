@@ -44,7 +44,7 @@ import { popularCities } from '../logic/constants.ts';
 import { useTranslation } from '../i18n/LanguageContext.tsx';
 import { useCycleData } from '../contexts/CycleContext.tsx';
 import { Paywall } from './Paywall.tsx';
-import { NotificationService } from '../services/NotificationService.ts';
+import { NotificationService, notificationService } from '../services/NotificationService.ts';
 import { PWAInstallButton } from './PWAInstallBanner.tsx';
 
 function cn(...inputs: ClassValue[]) {
@@ -386,6 +386,23 @@ export const Profile = ({ }: ProfileProps) => {
     }
   };
 
+  const handleTogglePreference = async (key: string, val: boolean) => {
+    if (val) {
+      const granted = await notificationService.requestPermission();
+      if (!granted) {
+        alert(t('notif_permission_required'));
+        // We still save the preference, but notifications won't work
+      }
+    }
+    const newPrefs = { ...(user?.notification_prefs || {}), [key]: val };
+    const { data } = await api.updateUser({ notification_prefs: newPrefs });
+    if (data) {
+      setUser(data);
+      if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
+      await refresh();
+    }
+  };
+
   const handleDownloadFiqhReport = async () => {
     if (!user) return;
     setIsGeneratingFiqhPDF(true);
@@ -645,42 +662,22 @@ export const Profile = ({ }: ProfileProps) => {
             <ToggleRow 
               label={t('prayer_alerts')} 
               active={user?.notification_prefs?.prayer_alerts ?? true} 
-              onChange={async (val) => {
-                const newPrefs = { ...user?.notification_prefs, prayer_alerts: val };
-                await api.updateUser({ notification_prefs: newPrefs });
-                if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
-                await refresh();
-              }} 
+              onChange={(val) => handleTogglePreference('prayer_alerts', val)} 
             />
             <ToggleRow 
               label={t('haid_prediction_alerts')} 
               active={user?.notification_prefs?.haid_prediction_alerts ?? true} 
-              onChange={async (val) => {
-                const newPrefs = { ...user?.notification_prefs, haid_prediction_alerts: val };
-                await api.updateUser({ notification_prefs: newPrefs });
-                if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
-                await refresh();
-              }} 
+              onChange={(val) => handleTogglePreference('haid_prediction_alerts', val)} 
             />
             <ToggleRow 
               label={t('ghusl_reminders')} 
               active={user?.notification_prefs?.ghusl_reminders ?? true} 
-              onChange={async (val) => {
-                const newPrefs = { ...user?.notification_prefs, ghusl_reminders: val };
-                await api.updateUser({ notification_prefs: newPrefs });
-                if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
-                await refresh();
-              }} 
+              onChange={(val) => handleTogglePreference('ghusl_reminders', val)} 
             />
             <ToggleRow 
               label={t('daily_insight_alerts')} 
               active={user?.notification_prefs?.daily_insight_alerts ?? true} 
-              onChange={async (val) => {
-                const newPrefs = { ...user?.notification_prefs, daily_insight_alerts: val };
-                await api.updateUser({ notification_prefs: newPrefs });
-                if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
-                await refresh();
-              }} 
+              onChange={(val) => handleTogglePreference('daily_insight_alerts', val)} 
             />
           </div>
         </section>

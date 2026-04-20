@@ -34,7 +34,10 @@ interface CycleContextType {
 
 const CycleContext = createContext<CycleContextType | undefined>(undefined);
 
+import { useTranslation } from '../i18n/LanguageContext.tsx';
+
 export const CycleProvider = ({ children }: { children: ReactNode }) => {
+  const { t } = useTranslation();
   const [dbUser, setDbUser] = useState<DBUser | null>(null);
   const [entries, setEntries] = useState<DBCycleEntry[]>([]);
   const [ledger, setLedger] = useState<DBAdahLedger[]>([]);
@@ -201,15 +204,15 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (user && prayerTimes.length > 0) {
-      notificationService.schedulePrayerReminders(user, prayerTimes);
+      notificationService.schedulePrayerReminders(user, prayerTimes, t);
     }
-  }, [user, prayerTimes]);
+  }, [user, prayerTimes, t]);
 
   useEffect(() => {
     if (user && prediction) {
-      notificationService.scheduleCycleReminders(user, prediction);
+      notificationService.scheduleCycleReminders(user, prediction, t);
     }
-  }, [user, prediction]);
+  }, [user, prediction, t]);
 
   return (
     <CycleContext.Provider value={{ 

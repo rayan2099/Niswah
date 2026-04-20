@@ -1,4 +1,5 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="512" height="512" rx="120" fill="#FDFCFB"/>
-  <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="#D4537E" style="font-family: 'Cairo', 'serif'; font-weight: 700; font-size: 320px;">ن</text>
+  <text x="50%" y="42%" dominant-baseline="middle" text-anchor="middle" fill="#D4537E" style="font-family: 'Cairo', sans-serif; font-weight: 800; font-size: 140px;">نسوة</text>
+  <text x="50%" y="68%" dominant-baseline="middle" text-anchor="middle" fill="#64748b" style="font-family: sans-serif; font-weight: 500; font-size: 60px; letter-spacing: 2px;">Niswah</text>
 </svg>

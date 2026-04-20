@@ -1403,7 +1403,7 @@ describe('🔔 Notification Service Coverage', () => {
     const { notificationService } = await import('./services/NotificationService');
     const mockUser = { notification_prefs: { ghusl_reminders: true } };
     
-    await notificationService.scheduleGhuslReminder(mockUser as any);
+    await notificationService.scheduleGhuslReminder(mockUser as any, (k: string) => k);
     console.log('✅ TEST 16.2 PASSED: scheduleGhuslReminder runs');
   });
 
@@ -1412,7 +1412,7 @@ describe('🔔 Notification Service Coverage', () => {
     const mockUser = { notification_prefs: { haid_prediction_alerts: true } };
     const prediction = { predictedStartDate: new Date(Date.now() + 86400000).toISOString() };
     
-    await notificationService.scheduleCycleReminders(mockUser as any, prediction);
+    await notificationService.scheduleCycleReminders(mockUser as any, prediction, (k: string) => k);
     console.log('✅ TEST 16.3 PASSED: scheduleCycleReminders runs');
   });
 
@@ -1449,7 +1449,7 @@ describe('🔔 Notification Service Coverage', () => {
       { name: 'Fajr', time: new Date(Date.now() + 3600000).toISOString() }
     ];
     
-    await notificationService.schedulePrayerReminders(mockUser as any, mockPrayers as any);
+    await notificationService.schedulePrayerReminders(mockUser as any, mockPrayers as any, (k: string) => k);
     console.log('✅ TEST 16.6 PASSED: schedulePrayerReminders runs');
   });
 
@@ -1471,7 +1471,7 @@ describe('🔔 Notification Service Coverage', () => {
     const mockUser = { notification_prefs: { haid_prediction_alerts: true } };
     const mockPrediction = { predictedStartDate: new Date(Date.now() - 86400000).toISOString() };
     
-    await notificationService.scheduleCycleReminders(mockUser as any, mockPrediction);
+    await notificationService.scheduleCycleReminders(mockUser as any, mockPrediction, (k: string) => k);
     console.log('✅ TEST 16.8 PASSED: scheduleCycleReminders handles past dates');
   });
 });

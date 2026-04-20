@@ -259,15 +259,13 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
           className="flex-1 flex flex-col items-center justify-between p-8 pb-16"
         >
           {/* Logo area */}
-          <div className="flex-1 flex flex-col items-center justify-center gap-6">
-            <div className="w-28 h-28 rounded-[32px] bg-white border border-rose-100 flex items-center justify-center shadow-sm relative overflow-hidden group">
+          <div className="flex-1 flex flex-col items-center justify-center gap-8">
+            <div className="w-32 h-32 rounded-[40px] bg-white border border-rose-100 flex items-center justify-center shadow-sm relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-rose-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <span className="text-6xl font-serif font-bold text-rose-500 select-none transform transition-transform group-hover:scale-110">ن</span>
+              <img src="/logo.svg" alt="Niswah Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
-            <div className="text-center">
-              <h1 className="text-3xl font-bold text-rose-600 mb-1">نسوة</h1>
-              <p className="text-lg text-gray-500">Niswah</p>
-              <p className="text-sm text-gray-400 mt-3 max-w-xs text-center leading-relaxed">
+            <div className="text-center px-6">
+              <p className="text-sm text-gray-400 max-w-xs text-center leading-relaxed">
                 تتبع دورتك بوعي فقهي وعناية صحية — خصوصيتك محمية تماماً
               </p>
             </div>
@@ -356,14 +354,89 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
                 title="سياسة الخصوصية" 
                 onClose={() => setShowPrivacy(false)}
               >
-                <div className="space-y-4 text-right" dir="rtl">
-                  <p>نحن في "نسوة" نأخذ خصوصيتكِ على محمل الجد. بياناتكِ الصحية مشفرة ومخزنة بشكل آمن.</p>
-                  <h3 className="font-bold">1. البيانات التي نجمعها</h3>
-                  <p>نجمع فقط البيانات الضرورية لتتبع دورتكِ الشهرية وتقديم النصائح الفقهية والصحية، مثل تواريخ الدورة والأعراض.</p>
-                  <h3 className="font-bold">2. كيف نستخدم بياناتكِ</h3>
-                  <p>تُستخدم البيانات حصرياً داخل التطبيق لتحسين دقة التوقعات وتقديم محتوى مخصص لكِ.</p>
-                  <h3 className="font-bold">3. مشاركة البيانات</h3>
-                  <p>لا نقوم ببيع أو مشاركة بياناتكِ الشخصية مع أي أطراف ثالثة لأغراض تسويقية.</p>
+                <div className="space-y-6 text-right" dir="rtl">
+                  <div className="text-xs text-gray-400 mb-4">آخر تحديث: محرم ١٤٤٧ هـ</div>
+                  
+                  <div className="space-y-4">
+                    <p className="font-bold text-rose-600">مقدمة</p>
+                    <p className="text-sm leading-relaxed">
+                      تطبيق نسوة ("التطبيق") مُصمَّم خصيصاً للمرأة المسلمة لتتبع دورتها الشهرية بوعي فقهي وعناية صحية. نحن نُدرك حساسية البيانات الصحية التي تشاركينها معنا، ونلتزم بحمايتها بأعلى معايير الخصوصية.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">١. البيانات التي نجمعها</p>
+                    <p className="text-sm">نجمع فقط ما تحتاجه لتشغيل التطبيق:</p>
+                    <ul className="list-disc list-inside text-sm space-y-1 pr-2">
+                      <li>بيانات الدورة الشهرية: أيام الحيض، الطهارة، الكثافة، اللون، الأعراض</li>
+                      <li>المذهب الفقهي المختار</li>
+                      <li>الموقع الجغرافي (لحساب أوقات الصلاة فقط — لا يُخزَّن)</li>
+                      <li>البريد الإلكتروني عند إنشاء الحساب</li>
+                      <li>اسم العرض (اختياري)</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٢. كيف نستخدم بياناتك</p>
+                    <p className="text-sm">تُستخدم بياناتك حصراً لـ:</p>
+                    <ul className="list-disc list-inside text-sm space-y-1 pr-2">
+                      <li>حساب حالتك الفقهية (حيض، طهارة، استحاضة)</li>
+                      <li>عرض تقويمك الشخصي وتوقعات الدورة</li>
+                      <li>إرسال الإشعارات التي طلبتِها فقط</li>
+                      <li>إعداد تقارير PDF التي تطلبينها</li>
+                    </ul>
+                    <p className="text-sm font-bold text-rose-500">لا نستخدم بياناتك للإعلانات. لا نبيعها. لا نشاركها مع أي طرف ثالث.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٣. تخزين البيانات وحمايتها</p>
+                    <ul className="list-disc list-inside text-sm space-y-1 pr-2">
+                      <li>تُخزَّن بياناتك في خوادم Firebase (Google Cloud) بتشفير كامل</li>
+                      <li>لا يمكن لأحد — بما في ذلك فريق نسوة — الاطلاع على بياناتك الشخصية</li>
+                      <li>أنتِ الوحيدة التي تملك الوصول الكامل إلى بياناتك</li>
+                      <li>نستخدم بروتوكولات HTTPS وFirestore Security Rules لضمان عزل بيانات كل مستخدمة</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٤. حقوقك الكاملة</p>
+                    <p className="text-sm">يحق لكِ في أي وقت:</p>
+                    <ul className="list-disc list-inside text-sm space-y-1 pr-2">
+                      <li>تصدير بياناتك كاملةً كتقارير PDF</li>
+                      <li>تعديل أي معلومة سجّلتِها</li>
+                      <li>حذف حسابك وجميع بياناتك نهائياً وفورياً من إعدادات الملف الشخصي</li>
+                      <li>تفعيل الوضع المجهول لإخفاء اسمك في أي مكان بالتطبيق</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٥. البيانات الصحية الحساسة</p>
+                    <p className="text-sm">نُعامل بيانات الدورة الشهرية كبيانات صحية بالغة الحساسية. لا نشاركها مع:</p>
+                    <ul className="list-disc list-inside text-sm space-y-1 pr-2 text-red-500">
+                      <li>شركات التأمين</li>
+                      <li>جهات التوظيف</li>
+                      <li>المعلنين</li>
+                      <li>أي طرف ثالث بأي شكل</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٦. الأطفال</p>
+                    <p className="text-sm">التطبيق مخصص للنساء البالغات. لا نجمع بيانات من أي شخص دون سن ١٢ عاماً.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٧. التغييرات على هذه السياسة</p>
+                    <p className="text-sm">في حال تغيير هذه السياسة، سنُخطركِ داخل التطبيق قبل ٧ أيام من تطبيق أي تغيير.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٨. التواصل معنا</p>
+                    <p className="text-sm">
+                      لأي استفسار أو طلب متعلق ببياناتك:<br />
+                      البريد الإلكتروني: <a href="mailto:mayson.ogc@gmail.com" className="text-rose-500 font-bold">mayson.ogc@gmail.com</a>
+                    </p>
+                  </div>
                 </div>
               </LegalModal>
             )}
@@ -372,14 +445,74 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
                 title="شروط الاستخدام" 
                 onClose={() => setShowTerms(false)}
               >
-                <div className="space-y-4 text-right" dir="rtl">
-                  <p>باستخدامكِ لتطبيق "نسوة"، أنتِ توافقين على الالتزام بالشروط التالية:</p>
-                  <h3 className="font-bold">1. الاستخدام الشخصي</h3>
-                  <p>التطبيق مخصص للاستخدام الشخصي فقط.</p>
-                  <h3 className="font-bold">2. إخلاء المسؤولية الطبية</h3>
-                  <p>المعلومات المقدمة في التطبيق هي لأغراض تعليمية وتثقيفية ولا تغني عن استشارة الطبيب المختص.</p>
-                  <h3 className="font-bold">3. دقة المعلومات</h3>
-                  <p>نحن نسعى جاهدين لتقديم معلومات دقيقة، ولكن لا نضمن خلوها من الأخطاء البشرية أو التقنية.</p>
+                <div className="space-y-6 text-right" dir="rtl">
+                  <div className="text-xs text-gray-400 mb-4">آخر تحديث: محرم ١٤٤٧ هـ</div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">١. قبول الشروط</p>
+                    <p className="text-sm">باستخدامك تطبيق نسوة، فإنك توافقين على هذه الشروط. إن لم توافقي عليها، يُرجى عدم استخدام التطبيق.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٢. طبيعة الخدمة</p>
+                    <p className="text-sm">نسوة أداة مساعدة للتتبع والإرشاد الفقهي العام. يجب أن تعلمي أن:</p>
+                    <ul className="list-disc list-inside text-sm space-y-2 pr-2">
+                      <li>المعلومات الفقهية المقدَّمة مبنية على المذاهب الأربعة المعتمدة وتُعرَض للإرشاد العام فقط</li>
+                      <li>التطبيق لا يُغني عن استشارة عالمة دين أو فقيهة متخصصة في المسائل الدقيقة</li>
+                      <li>المعلومات الصحية المقدَّمة للتوعية فقط ولا تُعدّ تشخيصاً طبياً</li>
+                      <li>يجب استشارة طبيبة مختصة لأي قرار طبي</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٣. الاستخدام المقبول</p>
+                    <p className="text-sm">يُسمح باستخدام التطبيق لـ:</p>
+                    <ul className="list-disc list-inside text-sm space-y-1 pr-2 mb-2">
+                      <li>تتبع الدورة الشهرية الشخصية</li>
+                      <li>الاطلاع على الأحكام الفقهية العامة المتعلقة بالحيض والطهارة</li>
+                      <li>استخراج التقارير الشخصية</li>
+                    </ul>
+                    <p className="text-sm">يُحظر استخدام التطبيق لـ:</p>
+                    <ul className="list-disc list-inside text-sm space-y-1 pr-2">
+                      <li>انتهاك خصوصية أي شخص آخر</li>
+                      <li>أي غرض مخالف للأنظمة والقوانين المعمول بها</li>
+                      <li>محاولة اختراق أو التلاعب بالبيانات</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٤. الملكية الفكرية</p>
+                    <p className="text-sm">جميع محتويات التطبيق من تصميم وكود وخوارزميات وأحكام فقهية مُعالَجة هي ملك حصري لنسوة. لا يحق نسخها أو توزيعها دون إذن كتابي مسبق.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٥. إخلاء المسؤولية</p>
+                    <ul className="list-disc list-inside text-sm space-y-2 pr-2">
+                      <li>نسوة غير مسؤولة عن أي قرار ديني أو طبي يُتخذ بناءً على معطيات التطبيق وحدها</li>
+                      <li>دقة التوقعات تعتمد على انتظام الدورة وكمية البيانات المُسجَّلة</li>
+                      <li>لسنا مسؤولين عن أي اضطراب في الخدمة ناتج عن ظروف خارجة عن إرادتنا</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٦. تعليق الحساب</p>
+                    <p className="text-sm">نحتفظ بحق تعليق أي حساب يُستخدم بطريقة مخالفة لهذه الشروط.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٧. تغيير الشروط</p>
+                    <p className="text-sm">نحتفظ بحق تعديل هذه الشروط مع إشعار مسبق داخل التطبيق.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٨. القانون المطبَّق</p>
+                    <p className="text-sm">تخضع هذه الشروط لأنظمة المملكة العربية السعودية.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="font-bold">٩. التواصل</p>
+                    <p className="text-sm">لأي استفسار: <a href="mailto:support@niswah.app" className="text-rose-500 font-bold">support@niswah.app</a></p>
+                  </div>
                 </div>
               </LegalModal>
             )}

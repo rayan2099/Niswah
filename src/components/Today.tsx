@@ -1479,7 +1479,7 @@ export const Today = ({
                     whileTap={{ scale: 0.95 }}
                     onClick={() => {
                       handleSaveLog({ intensity: 'none', timestamp: new Date().toISOString() });
-                      if (user) notificationService.scheduleGhuslReminder(user);
+                      if (user) notificationService.scheduleGhuslReminder(user, t);
                     }}
                     disabled={isInTahara}
                     className={cn(

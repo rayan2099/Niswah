@@ -50,7 +50,7 @@ class NotificationService {
     await api.updateUser({ notification_prefs: prefs });
   }
 
-  public schedulePrayerReminders(user: User, prayerTimes: PrayerTime[]) {
+  public schedulePrayerReminders(user: User, prayerTimes: PrayerTime[], t: (key: string, options?: any) => string) {
     if (!user.notification_prefs?.prayer_alerts) return;
 
     prayerTimes.forEach(prayer => {
@@ -63,8 +63,8 @@ class NotificationService {
       if (isAfter(reminderTime, now)) {
         const delay = reminderTime.getTime() - now.getTime();
         setTimeout(() => {
-          this.notify(`Upcoming Prayer: ${prayer.name}`, {
-            body: `It's almost time for ${prayer.name}. Get ready for Salah!`,
+          this.notify(t('notif_prayer_title', { name: prayer.name }), {
+            body: t('notif_prayer_body', { name: prayer.name }),
             tag: `prayer-${prayer.name}-${prayer.time}`
           });
         }, delay);
@@ -72,7 +72,7 @@ class NotificationService {
     });
   }
 
-  public scheduleCycleReminders(user: User, prediction: any) {
+  public scheduleCycleReminders(user: User, prediction: any, t: (key: string) => string) {
     if (!user.notification_prefs?.haid_prediction_alerts || !prediction?.predictedStartDate) return;
 
     const startDate = parseISO(prediction.predictedStartDate);
@@ -84,21 +84,21 @@ class NotificationService {
     if (isAfter(reminderTime, now)) {
       const delay = reminderTime.getTime() - now.getTime();
       setTimeout(() => {
-        this.notify("Cycle Prediction", {
-          body: "Your period is expected to start tomorrow. Be prepared!",
+        this.notify(t('notif_cycle_title'), {
+          body: t('notif_cycle_body'),
           tag: "cycle-prediction"
         });
       }, delay);
     }
   }
 
-  public scheduleGhuslReminder(user: User) {
+  public scheduleGhuslReminder(user: User, t: (key: string) => string) {
     if (!user.notification_prefs?.ghusl_reminders) return;
     
     // Notify in 30 minutes to check for purity/perform Ghusl
     setTimeout(() => {
-      this.notify("Ghusl Reminder", {
-        body: "It's been 30 minutes since you ended your period. Have you performed Ghusl?",
+      this.notify(t('notif_ghusl_title'), {
+        body: t('notif_ghusl_body'),
         tag: "ghusl-reminder"
       });
     }, 30 * 60 * 1000);

@@ -314,6 +314,7 @@ export const Profile = ({ }: ProfileProps) => {
   const [isGeneratingFiqhPDF, setIsGeneratingFiqhPDF] = useState(false);
   const [isGeneratingDoctorPDF, setIsGeneratingDoctorPDF] = useState(false);
   const [isGeneratingHusbandPDF, setIsGeneratingHusbandPDF] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const { t, language, setLanguage, isRTL } = useTranslation();
 
   useEffect(() => {
@@ -400,6 +401,44 @@ export const Profile = ({ }: ProfileProps) => {
       setUser(data);
       if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
       await refresh();
+    }
+  };
+
+  const handleInviteFriend = async () => {
+    if (isSharing) return;
+    
+    const text = t('share_message');
+    const url = window.location.origin;
+    
+    setIsSharing(true);
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'نسوة | Niswah',
+          text: text,
+          url: url,
+        });
+      } catch (err: any) {
+        // Handle AbortError (user cancellation) separately to avoid logging as error
+        if (err.name === 'AbortError') {
+          console.log('Share was canceled by user');
+        } else {
+          console.error('Error sharing:', err);
+        }
+      } finally {
+        setIsSharing(false);
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(`${text} ${url}`);
+        alert(isRTL ? "تم نسخ رابط الدعوة!" : "Invite link copied!");
+      } catch (err) {
+        console.error('Error copying to clipboard:', err);
+      } finally {
+        setIsSharing(false);
+      }
     }
   };
 
@@ -754,6 +793,24 @@ export const Profile = ({ }: ProfileProps) => {
                 </button>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Spread the Word */}
+        <section className="space-y-4">
+          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('community')}</h3>
+          <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
+            <button 
+              onClick={handleInviteFriend}
+              disabled={isSharing}
+              className="w-full p-5 flex items-center justify-between hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <div className="flex items-center space-x-3">
+                <Share2 className="w-5 h-5 text-rose-400" />
+                <span className="text-sm font-bold text-rose-800">{t('invite_friend')}</span>
+              </div>
+              <ChevronRight className={cn("w-4 h-4 text-gray-300 transition-transform", isRTL && "rotate-180")} />
+            </button>
           </div>
         </section>
 

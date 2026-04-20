@@ -445,6 +445,8 @@ export const translations = {
     health_data_only: "بيانات الصحة فقط",
     health_fiqh: "صحة وبيانات فقهية",
     grant_access: "منح صلاحية الوصول",
+    invite_friend: "دعوة صديقة",
+    share_message: "أختي الغالية، أرشح لكِ تطبيق نسوة لتتبع دورتكِ بوعي فقهي وصحي. حمليه من هنا:",
     
     profile: "الملف الشخصي",
     language: "اللغة",
@@ -887,6 +889,8 @@ export const translations = {
     health_data_only: "Health Data Only",
     health_fiqh: "Health & Fiqh Data",
     grant_access: "Grant Access",
+    invite_friend: "Invite a Friend",
+    share_message: "My dear sister, I recommend the Niswah app to track your cycle with Fiqh and health awareness. Download it here:",
     profile: "Profile",
     language: "Language",
     settings: "Settings"

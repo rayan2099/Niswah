@@ -156,14 +156,29 @@ export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpre
       const systemPrompt = t('dream_system_instruction') + `\n\nUser's Madhhab: ${userMadhhab}`;
 
       const chatHistory = messages.map(m => ({
-        role: m.role === 'user' ? 'user' : 'model',
+        role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
         parts: [{ text: m.text }]
       }));
+
+      // Ensure alternating roles and that the last message is from the model
+      const filteredHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
+      let lastRole: string | null = null;
+      for (const msg of chatHistory) {
+        if (msg.role !== lastRole) {
+          filteredHistory.push(msg);
+          lastRole = msg.role;
+        }
+      }
+
+      // If the last message in history is from 'user', remove it to avoid consecutive user messages
+      if (filteredHistory.length > 0 && filteredHistory[filteredHistory.length - 1].role === 'user') {
+        filteredHistory.pop();
+      }
 
       const responseStream = await ai.models.generateContentStream({
         model: "gemini-3-flash-preview",
         contents: [
-          ...chatHistory,
+          ...filteredHistory,
           { role: 'user', parts: [{ text: text.trim() }] }
         ],
         config: {

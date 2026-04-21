@@ -150,7 +150,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
         model: "gemini-3-flash-preview",
         contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userMessage}` }] }],
       });
-      const aiText = result.text || 'عذراً، حدث خطأ. حاولي مرة أخرى.';
+      const aiText = result.text || t('nisa_error');
 
       setIsTyping(false);
       const newMsgs: Array<{ role: 'ai' | 'user'; text: string }> = [
@@ -198,15 +198,33 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
 
     try {
       const ai = getGeminiAI();
+      
+      const chatHistory = newMessages.map(m => ({
+        role: (m.role === 'ai' ? 'model' : 'user') as 'user' | 'model',
+        parts: [{ text: m.text }],
+      }));
+
+      // Ensure alternating roles and that the last message is from the model
+      const filteredHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
+      let lastRole: string | null = null;
+      for (const msg of chatHistory) {
+        if (msg.role !== lastRole) {
+          filteredHistory.push(msg);
+          lastRole = msg.role;
+        }
+      }
+
+      // We are sending the full history where the last message is the new user prompt
+      // So if the last message in filteredHistory is model, it's wrong, we need it to be user.
+      // Actually, for generateContent with a history array, the last item is the prompt.
+      // But we must have [user, model, user, model, user].
+      
       const result = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: newMessages.map(m => ({
-          role: m.role === 'ai' ? 'model' : 'user',
-          parts: [{ text: m.text }],
-        })),
+        contents: filteredHistory,
       });
 
-      const aiText = result.text || 'عذراً، حدث خطأ.';
+      const aiText = result.text || t('nisa_error');
       setIsTyping(false);
       setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
 

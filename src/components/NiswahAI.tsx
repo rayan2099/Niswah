@@ -200,17 +200,34 @@ Current user context:
 Respond to the user's message warmly and concisely.`;
 
       const chatHistory = messages.map(m => ({
-        role: m.role === 'user' ? 'user' : 'model',
+        role: m.role === 'user' ? 'user' : 'model' as 'user' | 'model',
         parts: [{ text: m.text }]
       }));
 
+      // Ensure alternating roles and that the last message is from the model
+      const filteredHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
+      let lastRole: string | null = null;
+      for (const msg of chatHistory) {
+        if (msg.role !== lastRole) {
+          filteredHistory.push(msg);
+          lastRole = msg.role;
+        }
+      }
+
+      // If the last message in history is from 'user', remove it to avoid consecutive user messages
+      if (filteredHistory.length > 0 && filteredHistory[filteredHistory.length - 1].role === 'user') {
+        filteredHistory.pop();
+      }
+
       const responseStream = await ai.models.generateContentStream({
-        model: "gemini-1.5-flash",
+        model: "gemini-3-flash-preview",
         contents: [
-          { role: 'user', parts: [{ text: systemPrompt }] },
-          ...chatHistory,
+          ...filteredHistory,
           { role: 'user', parts: [{ text: text.trim() }] }
         ],
+        config: {
+          systemInstruction: systemPrompt
+        }
       });
 
       const aiMsgId = (Date.now() + 1).toString();

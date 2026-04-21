@@ -173,7 +173,8 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       });
     } catch (err: any) {
       console.error("Gemini Error:", err);
-      const serverError = err.response?.data?.error || err.message;
+      const rawError = err.response?.data?.error || err.message || "Unknown error";
+      const serverError = typeof rawError === 'object' ? JSON.stringify(rawError) : String(rawError);
       setIsTyping(false);
       setMessages([
         { role: 'user', text: `أعاني من: ${symptomsText}${userNotes ? `\n\nملاحظات: ${userNotes}` : ''}` },
@@ -257,7 +258,8 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       });
     } catch (err: any) {
       console.error("Gemini Error:", err);
-      const serverError = err.response?.data?.error || err.message;
+      const rawError = err.response?.data?.error || err.message || "Unknown error";
+      const serverError = typeof rawError === 'object' ? JSON.stringify(rawError) : String(rawError);
       setIsTyping(false);
       setMessages(prev => [...prev, { role: 'ai', text: `عذراً، حدث خطأ في الاتصال. (Error: ${serverError})` }]);
     }

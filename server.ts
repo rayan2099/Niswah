@@ -67,9 +67,10 @@ async function startServer() {
       res.json({ text: responseText });
     } catch (error: any) {
       console.error("Server AI Error:", error);
+      const msg = error.message || "Unknown server error";
       res.status(500).json({ 
-        error: error.message || "Failed to generate content",
-        details: error.stack?.split('\n')[0]
+        error: String(msg),
+        details: error.stack?.split('\n')[0] || "No stack trace"
       });
     }
   });

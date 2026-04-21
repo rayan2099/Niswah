@@ -272,7 +272,8 @@ Current user context:
 
     } catch (err: any) {
       console.error("Niswah AI Error:", err);
-      const serverError = err.response?.data?.error || err.message;
+      const rawError = err.response?.data?.error || err.message || "Unknown error";
+      const serverError = typeof rawError === 'object' ? JSON.stringify(rawError) : String(rawError);
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'niswah',

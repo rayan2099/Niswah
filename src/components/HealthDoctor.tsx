@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import * as api from '../api/index.ts';
 import { DBChatMessage } from '../api/db-types.ts';
 
@@ -75,6 +75,22 @@ function getGeminiAI() {
   return ai;
 }
 
+async function retry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastError = err;
+      const isRetryable = err?.status === 429 || (err?.status >= 500 && err?.status < 600) || err?.message?.includes('fetch failed') || !err?.status;
+      if (!isRetryable || i === maxRetries - 1) throw err;
+      const delay = baseDelay * Math.pow(2, i);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  throw lastError;
+}
+
 export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const { fiqhState, cycleStats } = useCycleData();
   const { t, isRTL } = useTranslation();
@@ -131,12 +147,18 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       return s;
     }).join('، ');
 
-    const systemPrompt = `أنتِ "الطبيبة نسوة" — مساعدة صحية متخصصة في صحة المرأة والدورة الشهرية. 
-تقدمين اقتراحات صحية مبنية على الأدلة العلمية باللغة العربية الفصحى المبسطة.
-يجب أن تبدئي كل رد بتذكير لطيف أن ما تقدمينه اقتراحات وليس تشخيصاً طبياً.
-ردودك موجزة وعملية ومنظمة بنقاط واضحة.
-لا تتجاوزي 200 كلمة في الرد الواحد.
-دائماً أشيري متى يجب مراجعة الطبيب.`;
+    const systemPrompt = `You are the intelligent backend of the "Niswah" application. Your mission is to provide helpful, safe, and culturally appropriate responses for Arab women.
+
+**Handling Diverse Features:**
+1. **Medical Consultation (الطبيبة نسوة):** When users ask health-related questions, respond as a "Digital Health Assistant." Provide general educational information and healthy lifestyle tips based on scientific evidence. ALWAYS include a disclaimer that this is not a substitute for professional medical advice. Use a clinical yet supportive tone.
+2. **Multi-Tasking:** Address complex symptoms in structured points to maintain clarity.
+
+**Safety & Stability Protocols:**
+- NEVER provide high-risk medical diagnoses. Instead, guide the user to see a doctor immediately if symptoms are severe.
+- If you encounter a topic that feels "sensitive" to your internal safety filters, do not crash. Instead, provide a helpful general response about wellness or personal growth.
+- Language: Modern Standard Arabic (MSA) or a polite "White" dialect.
+- Tone: Professional, Empathetic, and Safe.
+- Limit responses to 200 words.`;
 
     const userMessage = `أعاني من الأعراض التالية: ${symptomsText}. 
 ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
@@ -146,10 +168,19 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
 
     try {
       const ai = getGeminiAI();
-      const result = await ai.models.generateContent({
+      const result = await retry(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userMessage}` }] }],
-      });
+        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+        config: {
+          systemInstruction: systemPrompt,
+          safetySettings: [
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+          ]
+        }
+      }));
       const aiText = result.text || t('nisa_error');
 
       setIsTyping(false);
@@ -199,12 +230,25 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
     try {
       const ai = getGeminiAI();
       
+      const systemPrompt = `You are the intelligent backend of the "Niswah" application. Your mission is to provide helpful, safe, and culturally appropriate responses for Arab women.
+
+**Handling Diverse Features:**
+1. **Medical Consultation (الطبيبة نسوة):** When users ask health-related questions, respond as a "Digital Health Assistant." Provide general educational information and healthy lifestyle tips based on scientific evidence. ALWAYS include a disclaimer that this is not a substitute for professional medical advice. Use a clinical yet supportive tone.
+2. **Multi-Tasking:** Address complex symptoms in structured points to maintain clarity.
+
+**Safety & Stability Protocols:**
+- NEVER provide high-risk medical diagnoses. Instead, guide the user to see a doctor immediately if symptoms are severe.
+- If you encounter a topic that feels "sensitive" to your internal safety filters, do not crash. Instead, provide a helpful general response about wellness or personal growth.
+- Language: Modern Standard Arabic (MSA) or a polite "White" dialect.
+- Tone: Professional, Empathetic, and Safe.
+- Limit responses to 200 words.`;
+
       const chatHistory = newMessages.map(m => ({
         role: (m.role === 'ai' ? 'model' : 'user') as 'user' | 'model',
         parts: [{ text: m.text }],
       }));
 
-      // Ensure alternating roles and that the last message is from the model
+      // Robust History Filtering
       const filteredHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
       let lastRole: string | null = null;
       for (const msg of chatHistory) {
@@ -213,16 +257,24 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
           lastRole = msg.role;
         }
       }
-
-      // We are sending the full history where the last message is the new user prompt
-      // So if the last message in filteredHistory is model, it's wrong, we need it to be user.
-      // Actually, for generateContent with a history array, the last item is the prompt.
-      // But we must have [user, model, user, model, user].
+      // Gemini requires first message to be from user
+      while (filteredHistory.length > 0 && filteredHistory[0].role !== 'user') {
+        filteredHistory.shift();
+      }
       
-      const result = await ai.models.generateContent({
+      const result = await retry(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: filteredHistory,
-      });
+        config: {
+          systemInstruction: systemPrompt,
+          safetySettings: [
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+          ]
+        }
+      }));
 
       const aiText = result.text || t('nisa_error');
       setIsTyping(false);

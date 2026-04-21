@@ -17,7 +17,7 @@ import {
   MessageSquare,
   ArrowLeft
 } from 'lucide-react';
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import * as api from '../api/index.ts';
@@ -116,6 +116,22 @@ const QuickPrompt = ({ text, onClick }: { text: string, onClick: () => void }) =
 
 // --- MAIN NISWAH AI COMPONENT ---
 
+async function retry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastError = err;
+      const isRetryable = err?.status === 429 || (err?.status >= 500 && err?.status < 600) || err?.message?.includes('fetch failed') || !err?.status;
+      if (!isRetryable || i === maxRetries - 1) throw err;
+      const delay = baseDelay * Math.pow(2, i);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  throw lastError;
+}
+
 export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
   const { t } = useTranslation();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -177,34 +193,48 @@ export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
     });
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const systemPrompt = `You are Niswah — a warm, knowledgeable AI health companion for Muslim women inside Niswah app.
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
+      const ai = new GoogleGenAI({ apiKey });
+      
+      const systemPrompt = `You are the intelligent backend of the "Niswah" application. Your mission is to provide helpful, safe, and culturally appropriate responses for Arab women.
+
+You are Niswah — a warm, knowledgeable AI health companion for Muslim women.
+
+**Handling Diverse Features:**
+1. **Medical Consultation:** When users ask health-related questions, respond as a "Digital Health Assistant." Provide general educational information and healthy lifestyle tips. ALWAYS include a disclaimer that this is not a substitute for professional medical advice. Use a clinical yet supportive tone.
+2. **Dream Interpretation:** When users describe dreams, act as a "Kind Cultural Consultant." Provide psychological or traditional insights in a friendly, lighthearted way. Avoid making definitive future predictions that might trigger safety blocks.
+3. **Multi-Tasking:** If a user asks about both health and dreams in one prompt, address them in structured points to maintain clarity and prevent logic loops.
 
 Knowledge: women's health (menstruation, hormones, fertility, pregnancy, postpartum, PCOS, endometriosis, thyroid) and Islamic Fiqh for women (Haid, Nifas, Istihadah, Tahara, Ghusl, prayer, fasting, Kursuf, Tamyiz) across all four Sunni Madhhabs.
+
+**Safety & Stability Protocols:**
+- NEVER provide high-risk medical diagnoses. Instead, guide the user to see a doctor.
+- If you encounter a topic that feels "sensitive" to your internal safety filters, do not crash. Instead, provide a helpful general response about wellness or personal growth.
+- Language: Modern Standard Arabic (MSA) or a polite "White" dialect.
+- Tone: Professional, Empathetic, and Safe.
 
 RULES:
 1. Never issue a fatwa or final ruling. Always say: 'According to the [Madhhab] school...' and recommend a scholar for complex personal situations.
 2. Medical questions: give accurate information, always recommend a qualified doctor. Medical emergency: emergency services FIRST.
-3. Tone: warm, sisterly. Use 'sister' naturally.
-4. Explain Arabic and Fiqh terms in English.
-5. Be honest when uncertain.
+3. Be honest when uncertain.
 
 Current user context:
 - Madhhab: ${userContext.madhhab}
 - Fiqh state: ${userContext.fiqh_state}
 - Cycle day: ${userContext.cycle_day}
-- Conditions: ${userContext.conditions.join(', ')}
+- Conditions: ${(userContext.conditions || []).join(', ')}
 - Ramadan active: ${userContext.ramadan_active}
 - Pregnant: ${userContext.pregnant}
 
 Respond to the user's message warmly and concisely.`;
 
       const chatHistory = messages.map(m => ({
-        role: m.role === 'user' ? 'user' : 'model' as 'user' | 'model',
+        role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
         parts: [{ text: m.text }]
       }));
 
-      // Ensure alternating roles and that the last message is from the model
+      // Robust History Filtering
       const filteredHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
       let lastRole: string | null = null;
       for (const msg of chatHistory) {
@@ -213,22 +243,14 @@ Respond to the user's message warmly and concisely.`;
           lastRole = msg.role;
         }
       }
-
-      // If the last message in history is from 'user', remove it to avoid consecutive user messages
+      // Gemini requires first message to be from user
+      while (filteredHistory.length > 0 && filteredHistory[0].role !== 'user') {
+        filteredHistory.shift();
+      }
+      // Ensure the last message in history is from model before appending new user prompt
       if (filteredHistory.length > 0 && filteredHistory[filteredHistory.length - 1].role === 'user') {
         filteredHistory.pop();
       }
-
-      const responseStream = await ai.models.generateContentStream({
-        model: "gemini-3-flash-preview",
-        contents: [
-          ...filteredHistory,
-          { role: 'user', parts: [{ text: text.trim() }] }
-        ],
-        config: {
-          systemInstruction: systemPrompt
-        }
-      });
 
       const aiMsgId = (Date.now() + 1).toString();
       let fullText = "";
@@ -241,13 +263,33 @@ Respond to the user's message warmly and concisely.`;
         timestamp: Date.now()
       }]);
 
-      for await (const chunk of responseStream) {
-        const chunkText = chunk.text;
-        if (chunkText) {
-          fullText += chunkText;
-          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: fullText } : m));
+      await retry(async () => {
+        fullText = ""; // Reset on retry
+        const iter = await ai.models.generateContentStream({
+          model: "gemini-3-flash-preview",
+          contents: [
+            ...filteredHistory,
+            { role: 'user', parts: [{ text: text.trim() }] }
+          ],
+          config: {
+            systemInstruction: systemPrompt,
+            safetySettings: [
+              { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+              { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+              { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+              { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            ]
+          }
+        });
+
+        for await (const chunk of iter) {
+          const chunkText = chunk.text;
+          if (chunkText) {
+            fullText += chunkText;
+            setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: fullText } : m));
+          }
         }
-      }
+      });
 
       // Save AI response
       api.saveChatMessage({

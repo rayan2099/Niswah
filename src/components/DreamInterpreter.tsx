@@ -16,7 +16,7 @@ import {
   ArrowLeft,
   Info
 } from 'lucide-react';
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Madhhab } from '../logic/types.ts';
@@ -98,6 +98,22 @@ const TypingIndicator = () => (
 
 // --- MAIN DREAM INTERPRETER COMPONENT ---
 
+async function retry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastError = err;
+      const isRetryable = err?.status === 429 || (err?.status >= 500 && err?.status < 600) || err?.message?.includes('fetch failed') || !err?.status;
+      if (!isRetryable || i === maxRetries - 1) throw err;
+      const delay = baseDelay * Math.pow(2, i);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  throw lastError;
+}
+
 export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpreterProps) => {
   const { t, isRTL } = useTranslation();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -152,15 +168,30 @@ export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpre
     });
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const systemPrompt = t('dream_system_instruction') + `\n\nUser's Madhhab: ${userMadhhab}`;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
+      const ai = new GoogleGenAI({ apiKey });
+      const systemPrompt = `You are the intelligent backend of the "Niswah" application. Your mission is to provide helpful, safe, and culturally appropriate responses for Arab women.
+
+**Handling Diverse Features:**
+1. **Dream Interpretation:** When users describe dreams, act as a "Kind Cultural Consultant." Provide psychological or traditional insights based on Islamic tradition (like Ibn Sirin and Al-Nabulsi) in a friendly, lighthearted way. Avoid making definitive future predictions that might trigger safety blocks.
+2. **Medical Consultation:** If the dream description involves health concerns, act as a "Digital Health Assistant." Provide general wellness tips but ALWAYS recommend professional medical advice for physical symptoms.
+3. **Multi-Tasking:** Address complex dream sequences in structured points to maintain clarity.
+
+**Safety & Stability Protocols:**
+- NEVER provide high-risk medical diagnoses.
+- If you encounter a topic that feels "sensitive" to your internal safety filters, do not crash. Instead, provide a helpful general response about wellness, spirituality, or personal growth.
+- Language: Modern Standard Arabic (MSA) or a polite "White" dialect.
+- Tone: Professional, Empathetic, and Safe.
+
+User's Madhhab: ${userMadhhab}`;
 
       const chatHistory = messages.map(m => ({
         role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
         parts: [{ text: m.text }]
       }));
 
-      // Ensure alternating roles and that the last message is from the model
+      // Robust History Filtering
       const filteredHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
       let lastRole: string | null = null;
       for (const msg of chatHistory) {
@@ -169,22 +200,14 @@ export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpre
           lastRole = msg.role;
         }
       }
-
-      // If the last message in history is from 'user', remove it to avoid consecutive user messages
+      // Gemini requires first message to be from user
+      while (filteredHistory.length > 0 && filteredHistory[0].role !== 'user') {
+        filteredHistory.shift();
+      }
+      // Ensure the last message in history is from model before appending new user prompt
       if (filteredHistory.length > 0 && filteredHistory[filteredHistory.length - 1].role === 'user') {
         filteredHistory.pop();
       }
-
-      const responseStream = await ai.models.generateContentStream({
-        model: "gemini-3-flash-preview",
-        contents: [
-          ...filteredHistory,
-          { role: 'user', parts: [{ text: text.trim() }] }
-        ],
-        config: {
-          systemInstruction: systemPrompt
-        }
-      });
 
       const aiMsgId = (Date.now() + 1).toString();
       let fullText = "";
@@ -196,13 +219,33 @@ export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpre
         timestamp: Date.now()
       }]);
 
-      for await (const chunk of responseStream) {
-        const chunkText = chunk.text;
-        if (chunkText) {
-          fullText += chunkText;
-          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: fullText } : m));
+      await retry(async () => {
+        fullText = ""; // Reset on retry
+        const iter = await ai.models.generateContentStream({
+          model: "gemini-3-flash-preview",
+          contents: [
+            ...filteredHistory,
+            { role: 'user', parts: [{ text: text.trim() }] }
+          ],
+          config: {
+            systemInstruction: systemPrompt,
+            safetySettings: [
+              { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+              { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+              { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+              { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            ]
+          }
+        });
+
+        for await (const chunk of iter) {
+          const chunkText = chunk.text;
+          if (chunkText) {
+            fullText += chunkText;
+            setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: fullText } : m));
+          }
         }
-      }
+      });
 
       // Save AI response to history
       api.saveChatMessage({

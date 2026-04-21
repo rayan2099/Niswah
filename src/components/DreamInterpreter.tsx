@@ -220,7 +220,7 @@ User's Madhhab: ${userMadhhab}`;
         timestamp: Date.now()
       }]);
 
-      const response = await axios.post("/api/ai/chat", {
+      const response = await axios.post("/gen-ai-proxy", {
         systemPrompt,
         messages: truncatedHistory,
         text: text.trim(),

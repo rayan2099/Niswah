@@ -36,15 +36,16 @@ async function startServer() {
     });
   });
 
-  // API Route for Gemini
-  app.post("/api/ai/chat", async (req, res) => {
-    console.log("Handling AI chat request...");
+  // API Route for Gemini (v2.3)
+  app.post("/gen-ai-proxy", async (req, res) => {
+    console.log(">>> gen-ai-proxy hit");
     try {
       const { systemPrompt, messages, text, model: requestedModel } = req.body;
       const apiKey = process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
-        return res.status(500).json({ error: "GEMINI_API_KEY is missing on server." });
+        console.error("Server Error: No GEMINI_API_KEY");
+        return res.status(500).json({ error: "No API Key" });
       }
 
       const genAI = new GoogleGenAI({ apiKey });
@@ -61,48 +62,55 @@ async function startServer() {
 
       const result = await model.generateContent({
         contents: [
-          ...messages,
-          { role: "user", parts: [{ text }] }
+          ...(messages || []),
+          { role: "user", parts: [{ text: text || "" }] }
         ]
       });
 
       if (!result.response) {
-        throw new Error("No response from Gemini API");
+        throw new Error("Empty response from Gemini");
       }
 
       const responseText = result.response.text();
+      console.log(">>> AI success");
       res.json({ text: responseText });
     } catch (error: any) {
-      console.error("Server AI Error Trace:", error);
-      const msg = error.message || "Unknown server error";
+      console.error("AI Proxy Error:", error);
       res.status(500).json({ 
-        error: String(msg),
-        details: "v2.1-Server-Execution-Error"
+        error: String(error.message || "Internal Proxy Fail"),
+        code: "AI_PROXY_ERROR"
       });
     }
   });
 
-  // Serve static files in production or when dist exists
-  const isProduction = process.env.NODE_ENV === "production";
-  
-  if (!isProduction) {
-    console.log("Starting in DEVELOPMENT mode with Vite middleware...");
+  // Serve static files check dist
+  const distPath = path.join(process.cwd(), "dist");
+  const hasDist = await (async () => {
+    try {
+      await path.join(distPath, "index.html");
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
+  if (process.env.NODE_ENV === "production" || hasDist) {
+    console.log(">>> Serving from DIST folder");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  } else {
+    console.log(">>> Starting VITE dev middleware");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
-    console.log("Starting in PRODUCTION mode...");
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`>>> Express server listening on http://0.0.0.0:${PORT} [Mode: ${process.env.NODE_ENV || 'development'}]`);
+    console.log(`>>> Niswah Server v2.3 listening on 0.0.0.0:${PORT}`);
   });
 }
 

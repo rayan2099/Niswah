@@ -143,7 +143,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
 ما اقتراحاتك؟`;
 
     try {
-      const response = await axios.post("/api/ai/chat", {
+      const response = await axios.post("/gen-ai-proxy", {
         systemPrompt,
         messages: [],
         text: userMessage,
@@ -238,7 +238,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
         truncatedHistory.shift();
       }
       
-      const response = await axios.post("/api/ai/chat", {
+      const response = await axios.post("/gen-ai-proxy", {
         systemPrompt,
         messages: truncatedHistory,
         text: followUpText,

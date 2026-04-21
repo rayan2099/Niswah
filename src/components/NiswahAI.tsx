@@ -153,6 +153,11 @@ export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
   }, [messages, isTyping]);
 
   useEffect(() => {
+    // Diagnostic check for backend
+    axios.get('/api/health')
+      .then(res => console.log("Backend Health:", res.data))
+      .catch(err => console.error("Backend Health Fail:", err));
+    
     if (isOpen) {
       loadHistory();
     }

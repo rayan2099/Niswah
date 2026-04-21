@@ -143,7 +143,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
 ما اقتراحاتك؟`;
 
     try {
-      const response = await axios.post("/niswah-gateway", {
+      const response = await axios.post(`${window.location.origin}/niswah-gateway`, {
         systemPrompt,
         messages: [],
         text: userMessage,
@@ -178,7 +178,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       setIsTyping(false);
       setMessages([
         { role: 'user', text: `أعاني من: ${symptomsText}${userNotes ? `\n\nملاحظات: ${userNotes}` : ''}` },
-        { role: 'ai', text: `عذراً، لم أتمكن من الاتصال. (Error: ${serverError})` },
+        { role: 'ai', text: `عذراً، لم أتمكن من الاتصال. (v3.0-ABS | Error: ${serverError})` },
       ]);
     }
   };
@@ -238,7 +238,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
         truncatedHistory.shift();
       }
       
-      const response = await axios.post("/niswah-gateway", {
+      const response = await axios.post(`${window.location.origin}/niswah-gateway`, {
         systemPrompt,
         messages: truncatedHistory,
         text: followUpText,
@@ -261,7 +261,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       const rawError = err.response?.data?.error || err.message || "Unknown error";
       const serverError = typeof rawError === 'object' ? JSON.stringify(rawError) : String(rawError);
       setIsTyping(false);
-      setMessages(prev => [...prev, { role: 'ai', text: `عذراً، حدث خطأ في الاتصال. (Error: ${serverError})` }]);
+      setMessages(prev => [...prev, { role: 'ai', text: `عذراً، حدث خطأ في الاتصال. (v3.0-ABS | Error: ${serverError})` }]);
     }
   };
 

@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -12,45 +11,36 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // 1. Diagnostic endpoints (Highest Priority)
+  // 1. Critical Diagnostics
   app.get("/niswah-gateway", (req, res) => {
-    res.send(`Niswah Gateway Test v2.6 - Status: Operational [${new Date().toISOString()}]`);
-  });
-
-  app.get("/ping", (req, res) => {
-    res.send(`Pong v2.6 - Express Server is Alive and Healthy`);
+    res.json({ 
+      status: "Operational", 
+      version: "v3.0", 
+      time: new Date().toISOString(),
+      mode: fs.existsSync(path.join(process.cwd(), "dist")) ? "production" : "development"
+    });
   });
 
   // 2. Middlewares
   app.use(express.json());
-
-  // 3. Logger
+  
   app.use((req, res, next) => {
-    console.log(`[v2.6-SRV] ${req.method} ${req.url}`);
+    console.log(`[v3.0-SRV] ${req.method} ${req.url}`);
     next();
   });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error(">>> [v2.6] CRITICAL: GEMINI_API_KEY IS NOT SET!");
-  } else {
-    console.log(">>> [v2.6] GEMINI_API_KEY LOADED");
-  }
-
-  // 4. AI Gateway
+  // 3. AI Gateway
   app.post("/niswah-gateway", async (req, res) => {
-    console.log(">>> [v2.6] AI Gateway Activity");
+    console.log(">>> [v3.0] AI GATEWAY POST RECEIVED");
     try {
       const { systemPrompt, messages, text, model: requestedModel } = req.body;
-      const key = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY;
 
-      if (!key) {
-        return res.status(500).json({ error: "No API Key on Server" });
+      if (!apiKey) {
+        return res.status(500).json({ error: "GEMINI_API_KEY is missing on server" });
       }
 
-      const genAI = new GoogleGenAI({ apiKey: key });
-      // We use numeric values derived from the HarmCategory/HarmBlockThreshold 
-      // internal mappings to avoid crashes with native TS type stripping in Node.
+      const genAI = new GoogleGenAI({ apiKey });
       const model = (genAI as any).getGenerativeModel({
         model: requestedModel || "gemini-1.5-flash",
         systemInstruction: systemPrompt,
@@ -69,33 +59,31 @@ async function startServer() {
         ]
       });
 
-      if (!result.response) {
-        throw new Error("Empty AI Response");
-      }
+      if (!result.response) throw new Error("AI provider returned no response");
 
-      const responseText = result.response.text();
-      res.json({ text: responseText });
+      res.json({ text: result.response.text() });
     } catch (error: any) {
-      console.error(">>> [v2.6] AI Request Fail:", error);
+      console.error(">>> [v3.0] AI Gateway Fail:", error);
       res.status(500).json({ 
-        error: String(error.message || "Unknown error"),
-        code: "GATEWAY_ERROR_V2_6"
+        error: String(error.message),
+        version: "v3.0"
       });
     }
   });
 
-  // 5. Static Files & Falling back to Vite
+  // 4. Static / Dev Middleware
   const distPath = path.join(process.cwd(), "dist");
   const isProd = fs.existsSync(distPath);
 
   if (isProd) {
-    console.log(">>> [v2.6] PRODUCTION MODE: Serving built assets");
+    console.log(">>> [v3.0] MODE: PRODUCTION (Serving dist)");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   } else {
-    console.log(">>> [v2.6] DEVELOPMENT MODE: Initializing Vite middleware");
+    console.log(">>> [v3.0] MODE: DEVELOPMENT (Dynamic Vite Import)");
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -103,12 +91,17 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
+  // Fallback 404 to prove Express is alive
+  app.use((req, res) => {
+    res.status(404).json({ error: "Route not found in Express v3.0", path: req.url });
+  });
+
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`>>> [v2.6] SERVER READY ON PORT ${PORT}`);
+    console.log(`>>> [v3.0] Niswah Express listening on port ${PORT}`);
   });
 }
 
 startServer().catch(err => {
-  console.error(">>> [v2.6] FATAL FAILURE:", err);
+  console.error(">>> [v3.0] CRITICAL BOOT ERROR:", err);
   process.exit(1);
 });

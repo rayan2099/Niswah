@@ -12,45 +12,38 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Global Request Logger
+  // 1. Diagnostics (before parsers)
+  app.get("/niswah-gateway", (req, res) => {
+    res.send(`Niswah Gateway Test v2.5 - Status: Active [${new Date().toISOString()}]`);
+  });
+
+  app.get("/ping", (req, res) => {
+    res.send(`Pong v2.5 - Server is running`);
+  });
+
+  // 2. Parsers
+  app.use(express.json());
+
+  // 3. Request Logger
   app.use((req, res, next) => {
-    console.log(`[v2.4-SRV] ${new Date().toISOString()} | ${req.method} ${req.url}`);
+    console.log(`[v2.5-SRV] ${req.method} ${req.url}`);
     next();
   });
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.error(">>> ERROR: GEMINI_API_KEY is NOT set in environment!");
-  } else {
-    console.log(">>> GEMINI_API_KEY detected.");
+    console.error(">>> [v2.5] ERROR: GEMINI_API_KEY IS MISSING!");
   }
 
-  app.use(express.json());
-
-  // Public Ping for Diagnostics
-  app.get("/ping", (req, res) => {
-    res.send(`Niswah Server v2.4 [${new Date().toISOString()}]`);
-  });
-
-  // Health check
-  app.get("/api/health", (req, res) => {
-    res.json({ 
-      status: "online", 
-      version: "v2.4",
-      hasKey: !!process.env.GEMINI_API_KEY,
-      nodeEnv: process.env.NODE_ENV
-    });
-  });
-
-  // API Gateway for Gemini (v2.4)
+  // 4. AI Gateway
   app.post("/niswah-gateway", async (req, res) => {
-    console.log(">>> niswah-gateway: AI request received");
+    console.log(">>> [v2.5] POST /niswah-gateway hit");
     try {
       const { systemPrompt, messages, text, model: requestedModel } = req.body;
       const apiKey = process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
-        return res.status(500).json({ error: "Missing API Key" });
+        return res.status(500).json({ error: "Missing API Key on Server" });
       }
 
       const genAI = new GoogleGenAI({ apiKey });
@@ -73,32 +66,32 @@ async function startServer() {
       });
 
       if (!result.response) {
-        throw new Error("Gemini returned empty response");
+        throw new Error("No response from AI engine");
       }
 
       const responseText = result.response.text();
       res.json({ text: responseText });
     } catch (error: any) {
-      console.error(">>> Gateway Fail:", error);
+      console.error(">>> [v2.5] Gateway Error:", error);
       res.status(500).json({ 
-        error: String(error.message || "Unknown error in gateway"),
-        code: "GATEWAY_FAIL"
+        error: String(error.message || "Internal AI Gateway Error"),
+        code: "V2_5_GATEWAY_FAIL"
       });
     }
   });
 
-  // Serve static files check
+  // 5. App Routes & Static Serving
   const distPath = path.join(process.cwd(), "dist");
-  const hasDist = fs.existsSync(distPath);
+  const isProd = process.env.NODE_ENV === "production" || fs.existsSync(distPath);
 
-  if (process.env.NODE_ENV === "production" || hasDist) {
-    console.log(">>> Mode: PRODUCTION (Serving dist)");
+  if (isProd) {
+    console.log(">>> [v2.5] Serving Production Assets");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   } else {
-    console.log(">>> Mode: DEVELOPMENT (Starting Vite)");
+    console.log(">>> [v2.5] Starting Development Proxy (Vite)");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -107,11 +100,11 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`>>> Niswah Server v2.4 live on port ${PORT}`);
+    console.log(`>>> [v2.5] NISWAH_GATEWAY ready on port ${PORT}`);
   });
 }
 
 startServer().catch(err => {
-  console.error("!!! GLOBAL BOOT ERROR:", err);
+  console.error(">>> [v2.5] FATAL STARTUP ERROR:", err);
   process.exit(1);
 });

@@ -194,7 +194,7 @@ export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
 
     try {
       const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
+      if (!apiKey || apiKey === 'undefined') throw new Error("GEMINI_API_KEY is not set or invalid");
       const ai = new GoogleGenAI({ apiKey });
       
       const systemPrompt = `You are an integrated AI module within the "Niswah" ecosystem. To ensure 100% system stability and prevent "Internal Server Errors," follow these execution rules strictly:
@@ -229,7 +229,7 @@ Current user context:
         parts: [{ text: m.text }]
       }));
 
-      // Robust History Filtering
+      // Robust History Filtering & Truncation
       const filteredHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
       let lastRole: string | null = null;
       for (const msg of chatHistory) {
@@ -238,13 +238,17 @@ Current user context:
           lastRole = msg.role;
         }
       }
+      
+      // Truncate to last 6 messages
+      const truncatedHistory = filteredHistory.slice(-6);
+      
       // Gemini requires first message to be from user
-      while (filteredHistory.length > 0 && filteredHistory[0].role !== 'user') {
-        filteredHistory.shift();
+      while (truncatedHistory.length > 0 && truncatedHistory[0].role !== 'user') {
+        truncatedHistory.shift();
       }
       // Ensure the last message in history is from model before appending new user prompt
-      if (filteredHistory.length > 0 && filteredHistory[filteredHistory.length - 1].role === 'user') {
-        filteredHistory.pop();
+      if (truncatedHistory.length > 0 && truncatedHistory[truncatedHistory.length - 1].role === 'user') {
+        truncatedHistory.pop();
       }
 
       const aiMsgId = (Date.now() + 1).toString();
@@ -258,25 +262,26 @@ Current user context:
         timestamp: Date.now()
       }]);
 
-      const responseStream = await retry(() => ai.models.generateContentStream({
-        model: "gemini-flash-latest",
-        contents: [
-          ...filteredHistory.slice(-6), // Truncate history to avoid payload limits
-          { role: 'user', parts: [{ text: text.trim() }] }
-        ],
-        config: {
-          systemInstruction: systemPrompt,
-          safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          ]
-        }
-      }));
+      const model = (ai as any).getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction: systemPrompt,
+        safetySettings: [
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ]
+      });
 
-      for await (const chunk of responseStream) {
-        const chunkText = chunk.text;
+      const response: any = await retry(() => model.generateContentStream({
+        contents: [
+          ...truncatedHistory,
+          { role: 'user', parts: [{ text: text.trim() }] }
+        ]
+      }) as any);
+
+      for await (const chunk of response.stream) {
+        const chunkText = typeof chunk.text === 'function' ? chunk.text() : (chunk.text || "");
         if (chunkText) {
           fullText += chunkText;
           setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: fullText } : m));

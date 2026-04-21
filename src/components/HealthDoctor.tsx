@@ -173,20 +173,21 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
 
     try {
       const ai = getGeminiAI();
-      const result = await retry(() => ai.models.generateContent({
-        model: "gemini-flash-latest",
-        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-        config: {
-          systemInstruction: systemPrompt,
-          safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          ]
-        }
-      }));
-      const aiText = result.text || t('nisa_error');
+      const model = (ai as any).getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction: systemPrompt,
+        safetySettings: [
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ]
+      });
+
+      const result: any = await retry(() => model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: userMessage }] }]
+      }) as any);
+      const aiText = result.response.text ? (typeof result.response.text === 'function' ? result.response.text() : result.response.text) : t('nisa_error');
 
       setIsTyping(false);
       const newMsgs: Array<{ role: 'ai' | 'user'; text: string }> = [
@@ -258,7 +259,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
         parts: [{ text: m.text }],
       }));
 
-      // Robust History Filtering
+      // Robust History Filtering & Truncation
       const filteredHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
       let lastRole: string | null = null;
       for (const msg of chatHistory) {
@@ -267,26 +268,30 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
           lastRole = msg.role;
         }
       }
+      
+      const truncatedHistory = filteredHistory.slice(-6);
+
       // Gemini requires first message to be from user
-      while (filteredHistory.length > 0 && filteredHistory[0].role !== 'user') {
-        filteredHistory.shift();
+      while (truncatedHistory.length > 0 && truncatedHistory[0].role !== 'user') {
+        truncatedHistory.shift();
       }
       
-      const result = await retry(() => ai.models.generateContent({
-        model: "gemini-flash-latest",
-        contents: filteredHistory.slice(-6), // Truncate history
-        config: {
-          systemInstruction: systemPrompt,
-          safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          ]
-        }
-      }));
+      const model = (ai as any).getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction: systemPrompt,
+        safetySettings: [
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ]
+      });
 
-      const aiText = result.text || t('nisa_error');
+      const result: any = await retry(() => model.generateContent({
+        contents: truncatedHistory
+      }) as any);
+
+      const aiText = result.response.text ? (typeof result.response.text === 'function' ? result.response.text() : result.response.text) : t('nisa_error');
       setIsTyping(false);
       setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
 

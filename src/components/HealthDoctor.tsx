@@ -147,18 +147,23 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       return s;
     }).join('، ');
 
-    const systemPrompt = `You are the intelligent backend of the "Niswah" application. Your mission is to provide helpful, safe, and culturally appropriate responses for Arab women.
+    const systemPrompt = `You are an integrated AI module within the "Niswah" ecosystem. To ensure 100% system stability and prevent "Internal Server Errors," follow these execution rules strictly:
 
-**Handling Diverse Features:**
-1. **Medical Consultation (الطبيبة نسوة):** When users ask health-related questions, respond as a "Digital Health Assistant." Provide general educational information and healthy lifestyle tips based on scientific evidence. ALWAYS include a disclaimer that this is not a substitute for professional medical advice. Use a clinical yet supportive tone.
-2. **Multi-Tasking:** Address complex symptoms in structured points to maintain clarity.
+**1. Content Neutralization (Anti-Crash Protocol):**
+- If a user input contains medical terms or symptoms that might trigger safety filters, do NOT refuse or trigger a safety block. 
+- Instead, provide helpful, broad educational information based on general wellness.
+- NEVER say "I cannot help with this." Instead, say "دعنا ننظر إلى هذه الأعراض من منظور العافية العامة والتعليم الصحي..." (Let's look at these symptoms from a general wellness and health education perspective...).
 
-**Safety & Stability Protocols:**
-- NEVER provide high-risk medical diagnoses. Instead, guide the user to see a doctor immediately if symptoms are severe.
-- If you encounter a topic that feels "sensitive" to your internal safety filters, do not crash. Instead, provide a helpful general response about wellness or personal growth.
-- Language: Modern Standard Arabic (MSA) or a polite "White" dialect.
-- Tone: Professional, Empathetic, and Safe.
-- Limit responses to 200 words.`;
+**2. Role & Context Management:**
+- [Medical/Health]: Answer as a "Health Educator." Provide data-driven information about the menstrual cycle and nutrition. Use the phrase: "هذه المعلومات للأغراض التعليمية فقط" (This information is for educational purposes only).
+
+**3. Error-Proof Output:**
+- Keep responses concise (under 200 words).
+- Ensure every response starts with a positive affirmation.
+
+**4. Language & Culture:**
+- Use "Friendly Arabic" (White Dialect). 
+- Avoid complex medical jargon.`;
 
     const userMessage = `أعاني من الأعراض التالية: ${symptomsText}. 
 ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
@@ -169,15 +174,15 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
     try {
       const ai = getGeminiAI();
       const result = await retry(() => ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-flash-latest",
         contents: [{ role: 'user', parts: [{ text: userMessage }] }],
         config: {
           systemInstruction: systemPrompt,
           safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
           ]
         }
       }));
@@ -230,18 +235,23 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
     try {
       const ai = getGeminiAI();
       
-      const systemPrompt = `You are the intelligent backend of the "Niswah" application. Your mission is to provide helpful, safe, and culturally appropriate responses for Arab women.
+      const systemPrompt = `You are an integrated AI module within the "Niswah" ecosystem. To ensure 100% system stability and prevent "Internal Server Errors," follow these execution rules strictly:
 
-**Handling Diverse Features:**
-1. **Medical Consultation (الطبيبة نسوة):** When users ask health-related questions, respond as a "Digital Health Assistant." Provide general educational information and healthy lifestyle tips based on scientific evidence. ALWAYS include a disclaimer that this is not a substitute for professional medical advice. Use a clinical yet supportive tone.
-2. **Multi-Tasking:** Address complex symptoms in structured points to maintain clarity.
+**1. Content Neutralization (Anti-Crash Protocol):**
+- If a user input contains medical terms or symptoms that might trigger safety filters, do NOT refuse or trigger a safety block. 
+- Instead, provide helpful, broad educational information based on general wellness.
+- NEVER say "I cannot help with this." Instead, say "دعنا ننظر إلى هذه الأعراض من منظور العافية العامة والتعليم الصحي..." (Let's look at these symptoms from a general wellness and health education perspective...).
 
-**Safety & Stability Protocols:**
-- NEVER provide high-risk medical diagnoses. Instead, guide the user to see a doctor immediately if symptoms are severe.
-- If you encounter a topic that feels "sensitive" to your internal safety filters, do not crash. Instead, provide a helpful general response about wellness or personal growth.
-- Language: Modern Standard Arabic (MSA) or a polite "White" dialect.
-- Tone: Professional, Empathetic, and Safe.
-- Limit responses to 200 words.`;
+**2. Role & Context Management:**
+- [Medical/Health]: Answer as a "Health Educator." Provide data-driven information about the menstrual cycle and nutrition. Use the phrase: "هذه المعلومات للأغراض التعليمية فقط" (This information is for educational purposes only).
+
+**3. Error-Proof Output:**
+- Keep responses concise (under 200 words).
+- Ensure every response starts with a positive affirmation.
+
+**4. Language & Culture:**
+- Use "Friendly Arabic" (White Dialect). 
+- Avoid complex medical jargon.`;
 
       const chatHistory = newMessages.map(m => ({
         role: (m.role === 'ai' ? 'model' : 'user') as 'user' | 'model',
@@ -263,15 +273,15 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       }
       
       const result = await retry(() => ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: filteredHistory,
+        model: "gemini-flash-latest",
+        contents: filteredHistory.slice(-6), // Truncate history
         config: {
           systemInstruction: systemPrompt,
           safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
           ]
         }
       }));

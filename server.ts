@@ -24,56 +24,51 @@ async function startServer() {
   });
 
   // 2. High Priority AI Gateway
-  app.all(["/api/niswah-v4-gateway", "/niswah-gateway"], async (req, res) => {
+  app.all("/niswah-v5-backend", async (req, res) => {
+    res.setHeader("X-Niswah-Diagnostic", "v5.0");
     if (req.method === "GET") {
-      return res.json({ 
-        status: "Operational", 
-        version: "v4.1", 
-        type: "Gateway",
-        note: "Legacy path /niswah-gateway is supported"
-      });
+      return res.json({ status: "Operational", version: "v5.0", transport: "Direct" });
     }
 
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
-    }
-
-    console.log(">>> [v4.0] AI GATEWAY REQUEST");
+    console.log(">>> [v5.0] AI REQUEST RECEIVED");
     try {
       const { systemPrompt, messages, text, model: requestedModel } = req.body;
       const apiKey = process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
-        return res.status(500).json({ error: "Server AI Key Missing" });
+        console.error(">>> [v5.0] MISSING API KEY");
+        return res.status(500).json({ error: "Missing Server API Key", v: "5.0" });
       }
 
+      console.log(">>> [v5.0] Init Gemini SDK");
       const genAI = new GoogleGenAI({ apiKey });
-      const model = (genAI as any).getGenerativeModel({
+      const model = genAI.getGenerativeModel({
         model: requestedModel || "gemini-1.5-flash",
         systemInstruction: systemPrompt,
-        safetySettings: [
-          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-        ],
       });
 
+      console.log(">>> [v5.0] Generating Content...");
       const result = await model.generateContent({
         contents: [
           ...(messages || []),
           { role: "user", parts: [{ text: text || "" }] }
-        ]
+        ],
+        safetySettings: [
+          { category: "HARM_CATEGORY_HARASSMENT" as any, threshold: "BLOCK_NONE" as any },
+          { category: "HARM_CATEGORY_HATE_SPEECH" as any, threshold: "BLOCK_NONE" as any },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT" as any, threshold: "BLOCK_NONE" as any },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT" as any, threshold: "BLOCK_NONE" as any },
+        ],
       });
 
-      if (!result.response) throw new Error("No AI content generated");
-
-      res.json({ text: result.response.text(), v: "4.0" });
+      const responseText = result.response.text();
+      console.log(">>> [v5.0] SUCCESS");
+      res.json({ text: responseText, v: "5.0" });
     } catch (error: any) {
-      console.error(">>> [v4.0] AI FAIL:", error);
+      console.error(">>> [v5.0] CRITICAL FAIL:", error);
       res.status(500).json({ 
-        error: String(error.message),
-        version: "v4.0-Gateway-Error"
+        error: error.message || "Internal Framework Error",
+        version: "v5.0-internal"
       });
     }
   });

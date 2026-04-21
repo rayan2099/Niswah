@@ -257,7 +257,7 @@ Current user context:
         timestamp: Date.now()
       }]);
 
-      const response = await axios.post(`${window.location.origin}/api/niswah-v4-gateway`, {
+      const response = await axios.post(`/niswah-v5-backend`, {
         systemPrompt,
         messages: truncatedHistory,
         text: text.trim(),
@@ -282,7 +282,7 @@ Current user context:
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'niswah',
-        text: `${t('nisa_error')} (v4.0-FINAL | Error: ${serverError})`,
+        text: `${t('nisa_error')} (v5.0-STAGE | Error: ${serverError} | Path: /niswah-v5-backend)`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errMsg]);

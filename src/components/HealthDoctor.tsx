@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
+import axios from 'axios';
 import * as api from '../api/index.ts';
 import { DBChatMessage } from '../api/db-types.ts';
 
@@ -61,35 +61,6 @@ const SYMPTOM_PHASES = {
     ],
   },
 };
-
-let ai: GoogleGenAI | null = null;
-
-function getGeminiAI() {
-  if (!ai) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not set");
-    }
-    ai = new GoogleGenAI({ apiKey });
-  }
-  return ai;
-}
-
-async function retry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> {
-  let lastError: any;
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (err: any) {
-      lastError = err;
-      const isRetryable = err?.status === 429 || (err?.status >= 500 && err?.status < 600) || err?.message?.includes('fetch failed') || !err?.status;
-      if (!isRetryable || i === maxRetries - 1) throw err;
-      const delay = baseDelay * Math.pow(2, i);
-      await new Promise(r => setTimeout(r, delay));
-    }
-  }
-  throw lastError;
-}
 
 export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const { fiqhState, cycleStats } = useCycleData();
@@ -172,22 +143,13 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
 ما اقتراحاتك؟`;
 
     try {
-      const ai = getGeminiAI();
-      const model = (ai as any).getGenerativeModel({
-        model: "gemini-1.5-flash",
-        systemInstruction: systemPrompt,
-        safetySettings: [
-          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        ]
+      const response = await axios.post("/api/ai/chat", {
+        systemPrompt,
+        messages: [],
+        text: userMessage,
+        model: "gemini-1.5-flash"
       });
-
-      const result: any = await retry(() => model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: userMessage }] }]
-      }) as any);
-      const aiText = result.response.text ? (typeof result.response.text === 'function' ? result.response.text() : result.response.text) : t('nisa_error');
+      const aiText = response.data.text;
 
       setIsTyping(false);
       const newMsgs: Array<{ role: 'ai' | 'user'; text: string }> = [
@@ -234,8 +196,6 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
     });
 
     try {
-      const ai = getGeminiAI();
-      
       const systemPrompt = `You are an integrated AI module within the "Niswah" ecosystem. To ensure 100% system stability and prevent "Internal Server Errors," follow these execution rules strictly:
 
 **1. Content Neutralization (Anti-Crash Protocol):**
@@ -276,22 +236,14 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
         truncatedHistory.shift();
       }
       
-      const model = (ai as any).getGenerativeModel({
-        model: "gemini-1.5-flash",
-        systemInstruction: systemPrompt,
-        safetySettings: [
-          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        ]
+      const response = await axios.post("/api/ai/chat", {
+        systemPrompt,
+        messages: truncatedHistory,
+        text: followUpText,
+        model: "gemini-1.5-flash"
       });
 
-      const result: any = await retry(() => model.generateContent({
-        contents: truncatedHistory
-      }) as any);
-
-      const aiText = result.response.text ? (typeof result.response.text === 'function' ? result.response.text() : result.response.text) : t('nisa_error');
+      const aiText = response.data.text;
       setIsTyping(false);
       setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
 

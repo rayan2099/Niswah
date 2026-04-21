@@ -24,9 +24,14 @@ async function startServer() {
   });
 
   // 2. High Priority AI Gateway
-  app.all("/api/niswah-v4-gateway", async (req, res) => {
+  app.all(["/api/niswah-v4-gateway", "/niswah-gateway"], async (req, res) => {
     if (req.method === "GET") {
-      return res.json({ status: "Operational", version: "v4.0", type: "Gateway" });
+      return res.json({ 
+        status: "Operational", 
+        version: "v4.1", 
+        type: "Gateway",
+        note: "Legacy path /niswah-gateway is supported"
+      });
     }
 
     if (req.method !== "POST") {

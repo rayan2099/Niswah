@@ -220,8 +220,8 @@ User's Madhhab: ${userMadhhab}`;
         timestamp: Date.now()
       }]);
 
-      // V6.0 RELIABLE FETCH
-      const response = await fetch("/api/chat", {
+      // V7.0 ULTRA RELIABLE
+      const response = await fetch(`${window.location.origin}/api/niswah-v7-final`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -254,7 +254,7 @@ User's Madhhab: ${userMadhhab}`;
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'interpreter',
-        text: `${t('nisa_error')} (v6.0-FINAL | Error: ${err.message})`,
+        text: `${t('nisa_error')} (v7.0-ULTRA | Error: ${err.message})`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errMsg]);

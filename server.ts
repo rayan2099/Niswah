@@ -10,35 +10,30 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = 3000; // FAST REQUIREMENT
 
   // 1. Core Security & Parsing
   app.use(cors());
   app.use(express.json());
   
-  // 2. Global Traffic Debugger (Logs EVERY request)
+  // 2. Heavy Logging
   app.use((req, res, next) => {
-    res.setHeader("X-Niswah-Backend", "v6.0-stable");
-    console.log(`[v6.0-TRAFFIC] ${req.method} ${req.url} (Origin: ${req.headers.origin})`);
+    console.log(`[V7.0-TRACE] ${req.method} ${req.url}`);
     next();
   });
 
-  // 3. Guaranteed Health Route
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "OK", version: "v6.0", timestamp: new Date().toISOString() });
-  });
+  // 3. THE FINAL GATEWAY
+  app.all("/api/niswah-v7-final", async (req, res) => {
+    if (req.method === "GET") {
+      return res.json({ status: "ALIVE", v: "7.0" });
+    }
 
-  // 4. THE AI GATEWAY (Absolute Priority)
-  app.post("/api/chat", async (req, res) => {
-    console.log(">>> [v6.0] AI_CHAT_POST_START");
+    console.log(">>> [v7.0] AI_CALL_START");
     try {
       const { systemPrompt, messages, text, model: requestedModel } = req.body;
       const apiKey = process.env.GEMINI_API_KEY;
 
-      if (!apiKey) {
-        console.error(">>> [v6.0] ERROR: No GEMINI_API_KEY found in process.env");
-        return res.status(500).json({ error: "Server Configuration Error: Key Missing" });
-      }
+      if (!apiKey) throw new Error("KEY_MISSING");
 
       const genAI = new GoogleGenAI({ apiKey });
       const model = genAI.getGenerativeModel({
@@ -46,7 +41,6 @@ async function startServer() {
         systemInstruction: systemPrompt,
       });
 
-      console.log(">>> [v6.0] Calling Gemini API...");
       const result = await model.generateContent({
         contents: [
           ...(messages || []),
@@ -60,18 +54,16 @@ async function startServer() {
         ],
       });
 
-      const aiResponse = result.response.text();
-      console.log(">>> [v6.0] AI_CHAT_SUCCESS");
-      res.json({ text: aiResponse, v: "6.0" });
+      res.json({ text: result.response.text(), v: "7.0" });
+      console.log(">>> [v7.0] AI_CALL_OK");
     } catch (error: any) {
-      console.error(">>> [v6.0] AI_CHAT_ERROR:", error);
-      res.status(500).json({ 
-        error: error.message || "An error occurred while processing your request.",
-        code: error.status || 500,
-        version: "v6.0-S"
-      });
+      console.error(">>> [v7.0] AI_CALL_ERR:", error);
+      res.status(500).json({ error: error.message, v: "7.0-ERR" });
     }
   });
+
+  // 4. Fallback Health
+  app.get("/api/health", (req, res) => res.json({ ok: true, version: "7.0" }));
 
   // 5. Frontend Delivery
   const distPath = path.join(process.cwd(), "dist");

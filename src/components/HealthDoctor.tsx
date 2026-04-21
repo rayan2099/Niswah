@@ -143,7 +143,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
 ما اقتراحاتك؟`;
 
     try {
-      const response = await fetch(`${window.location.origin}/api/niswah-v7-final`, {
+      const response = await fetch("/api/niswah-v8-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -155,10 +155,14 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        let errorHint = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorHint = errorData.error || errorHint;
+        } catch (e) { /* ignore JSON parse error */ }
+        throw new Error(errorHint);
       }
-
+      
       const data = await response.json();
       const aiText = data.text;
 
@@ -189,7 +193,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       setIsTyping(false);
       setMessages([
         { role: 'user', text: `أعاني من: ${symptomsText}${userNotes ? `\n\nملاحظات: ${userNotes}` : ''}` },
-        { role: 'ai', text: `عذراً، لم أتمكن من الاتصال. (v7.0-ULTRA | Error: ${err.message})` },
+        { role: 'ai', text: `عذراً، لم أتمكن من الاتصال. (v8.0-RESILIENT | Error: ${err.message})` },
       ]);
     }
   };
@@ -249,7 +253,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
         truncatedHistory.shift();
       }
       
-      const response = await fetch(`${window.location.origin}/api/niswah-v7-final`, {
+      const response = await fetch("/api/niswah-v8-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -261,8 +265,12 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        let errorHint = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorHint = errorData.error || errorHint;
+        } catch (e) { /* ignore JSON parse error */ }
+        throw new Error(errorHint);
       }
 
       const data = await response.json();
@@ -282,7 +290,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       const rawError = err.response?.data?.error || err.message || "Unknown error";
       const serverError = typeof rawError === 'object' ? JSON.stringify(rawError) : String(rawError);
       setIsTyping(false);
-      setMessages(prev => [...prev, { role: 'ai', text: `عذراً، حدث خطأ في الاتصال. (v7.0-ULTRA | Error: ${err.message})` }]);
+      setMessages(prev => [...prev, { role: 'ai', text: `عذراً، حدث خطأ في الاتصال. (v8.0-RESILIENT | Error: ${err.message})` }]);
     }
   };
 

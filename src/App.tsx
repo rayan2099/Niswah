@@ -101,6 +101,35 @@ const LoadingSpinner = () => {
   );
 };
 
+const BackendStatus = () => {
+  const [status, setStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const res = await fetch('/api/v8-ping');
+        if (res.ok) setStatus('online');
+        else setStatus('offline');
+      } catch (e) {
+        setStatus('offline');
+      }
+    };
+    check();
+    const interval = setInterval(check, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1 bg-white/80 backdrop-blur-sm rounded-full border border-gray-100 shadow-sm text-[10px] font-medium">
+      <div className={`w-1.5 h-1.5 rounded-full ${
+        status === 'online' ? 'bg-green-500 animate-pulse' : 
+        status === 'offline' ? 'bg-red-500' : 'bg-amber-500'
+      }`} />
+      <span className="text-gray-500">v8.0 {status}</span>
+    </div>
+  );
+};
+
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import { AuthScreen } from './components/Auth';
@@ -235,6 +264,11 @@ function AppContent() {
 
   return (
     <div className="relative min-h-screen bg-[#FDFCFB]">
+      {/* Backend Status Diagnostic */}
+      <div className="fixed bottom-2 left-2 z-[999] opacity-20 hover:opacity-100 transition-opacity">
+        <BackendStatus />
+      </div>
+      
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}

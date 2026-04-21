@@ -257,8 +257,8 @@ Current user context:
         timestamp: Date.now()
       }]);
 
-      // V7.0 ULTRA RELIABLE
-      const response = await fetch(`${window.location.origin}/api/niswah-v7-final`, {
+      // V8.0 RESILIENT FETCH
+      const response = await fetch("/api/niswah-v8-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -270,8 +270,12 @@ Current user context:
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        let errorHint = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorHint = errorData.error || errorHint;
+        } catch (e) { /* ignore JSON parse error */ }
+        throw new Error(errorHint);
       }
 
       const data = await response.json();
@@ -291,7 +295,7 @@ Current user context:
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'niswah',
-        text: `${t('nisa_error')} (v7.0-ULTRA | Error: ${err.message})`,
+        text: `${t('nisa_error')} (v8.0-RESILIENT | Error: ${err.message})`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errMsg]);

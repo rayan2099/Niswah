@@ -11,7 +11,23 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error("CRITICAL ERROR: GEMINI_API_KEY is not defined in the environment!");
+  } else {
+    console.log("GEMINI_API_KEY is defined. Server ready to proxy AI requests.");
+  }
+
   app.use(express.json());
+
+  // Health check
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      hasKey: !!process.env.GEMINI_API_KEY,
+      env: process.env.NODE_ENV
+    });
+  });
 
   // API Route for Gemini
   app.post("/api/ai/chat", async (req, res) => {
@@ -20,7 +36,8 @@ async function startServer() {
       const apiKey = process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
-        return res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
+        console.error("AI Error: GEMINI_API_KEY is missing");
+        return res.status(500).json({ error: "Missing GEMINI_API_KEY on server." });
       }
 
       const genAI = new GoogleGenAI({ apiKey });
@@ -35,8 +52,6 @@ async function startServer() {
         ],
       });
 
-      // We'll use non-streaming for the first pass to ensure absolute stability, 
-      // or we can implement streaming with SSE if needed. For now, let's go for stable JSON.
       const result = await model.generateContent({
         contents: [
           ...messages,
@@ -44,11 +59,18 @@ async function startServer() {
         ]
       });
 
+      if (!result.response) {
+        throw new Error("No response from Gemini API");
+      }
+
       const responseText = result.response.text();
       res.json({ text: responseText });
     } catch (error: any) {
       console.error("Server AI Error:", error);
-      res.status(500).json({ error: error.message || "Failed to generate content" });
+      res.status(500).json({ 
+        error: error.message || "Failed to generate content",
+        details: error.stack?.split('\n')[0]
+      });
     }
   });
 

@@ -238,12 +238,13 @@ User's Madhhab: ${userMadhhab}`;
         timestamp: new Date().toISOString()
       });
 
-    } catch (err) {
+    } catch (err: any) {
       console.error("Dream Interpreter Error:", err);
+      const serverError = err.response?.data?.error || err.message;
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'interpreter',
-        text: t('nisa_error'),
+        text: `${t('nisa_error')} (Error: ${serverError})`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errMsg]);

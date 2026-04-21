@@ -171,12 +171,13 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
         text: newMsgs[1].text,
         timestamp: new Date().toISOString()
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Gemini Error:", err);
+      const serverError = err.response?.data?.error || err.message;
       setIsTyping(false);
       setMessages([
-        { role: 'user', text: `أعاني من: ${symptomsText}` },
-        { role: 'ai', text: 'عذراً، لم أتمكن من الاتصال. تأكدي من الإنترنت وحاولي مرة أخرى.' },
+        { role: 'user', text: `أعاني من: ${symptomsText}${userNotes ? `\n\nملاحظات: ${userNotes}` : ''}` },
+        { role: 'ai', text: `عذراً، لم أتمكن من الاتصال. (Error: ${serverError})` },
       ]);
     }
   };
@@ -254,10 +255,11 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
         text: aiText,
         timestamp: new Date().toISOString()
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Gemini Error:", err);
+      const serverError = err.response?.data?.error || err.message;
       setIsTyping(false);
-      setMessages(prev => [...prev, { role: 'ai', text: 'عذراً، حدث خطأ في الاتصال.' }]);
+      setMessages(prev => [...prev, { role: 'ai', text: `عذراً، حدث خطأ في الاتصال. (Error: ${serverError})` }]);
     }
   };
 

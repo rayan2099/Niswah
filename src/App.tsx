@@ -102,30 +102,39 @@ const LoadingSpinner = () => {
 };
 
 const BackendStatus = () => {
-  const [status, setStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [status, setStatus] = useState<string>('checking');
   
   useEffect(() => {
     const check = async () => {
       try {
-        const res = await fetch('/api/v8-ping');
-        if (res.ok) setStatus('online');
-        else setStatus('offline');
-      } catch (e) {
-        setStatus('offline');
+        const t = Date.now();
+        const res = await fetch(`/v8-root-ping?t=${t}`);
+        if (res.ok) {
+          setStatus('online');
+        } else {
+          // If root fails, try /api
+          const res2 = await fetch(`/api/v8-ping?t=${t}`);
+          if (res2.ok) setStatus('online-api');
+          else setStatus(`err-${res.status}`);
+          console.error(`Backend Check Failed: Root HTTP ${res.status}, API HTTP ${res2.status}`);
+        }
+      } catch (e: any) {
+        setStatus('fail');
+        console.error("Backend Connection Error (v8.0):", e);
       }
     };
     check();
-    const interval = setInterval(check, 30000);
+    const interval = setInterval(check, 10000);
     return () => clearInterval(interval);
   }, []);
 
+  const color = status.startsWith('online') ? 'bg-green-500 animate-pulse' : 
+                status === 'checking' ? 'bg-amber-500' : 'bg-red-500';
+
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1 bg-white/80 backdrop-blur-sm rounded-full border border-gray-100 shadow-sm text-[10px] font-medium">
-      <div className={`w-1.5 h-1.5 rounded-full ${
-        status === 'online' ? 'bg-green-500 animate-pulse' : 
-        status === 'offline' ? 'bg-red-500' : 'bg-amber-500'
-      }`} />
-      <span className="text-gray-500">v8.0 {status}</span>
+    <div className="fixed bottom-2 left-2 z-[999] opacity-40 hover:opacity-100 transition-opacity flex items-center gap-1.5 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-full border border-gray-100 shadow-md text-[9px] font-bold">
+      <div className={`w-1.5 h-1.5 rounded-full ${color}`} />
+      <span className="text-gray-600 uppercase tracking-tighter">v8.0 {status}</span>
     </div>
   );
 };
@@ -265,9 +274,7 @@ function AppContent() {
   return (
     <div className="relative min-h-screen bg-[#FDFCFB]">
       {/* Backend Status Diagnostic */}
-      <div className="fixed bottom-2 left-2 z-[999] opacity-20 hover:opacity-100 transition-opacity">
-        <BackendStatus />
-      </div>
+      <BackendStatus />
       
       <AnimatePresence mode="wait">
         <motion.div

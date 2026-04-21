@@ -20,6 +20,11 @@ async function startServer() {
     next();
   });
 
+  // Root level ping (Bypasses /api prefix just in case)
+  app.get("/v8-root-ping", (req, res) => {
+    res.json({ status: "ROOT_ALIVE", v: "8.0" });
+  });
+
   // 2. Health & Ping
   app.get("/api/v8-ping", (req, res) => {
     res.json({ 
@@ -99,8 +104,16 @@ async function startServer() {
   });
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`>>> [v8.0] SERVER RUNNING ON PORT ${PORT}`);
+    console.log(`>>> [v8.1] SERVER RUNNING ON PORT ${PORT}`);
   });
 }
+
+process.on("uncaughtException", (err) => {
+  console.error(">>> [FATAL] Uncaught Exception:", err);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error(">>> [FATAL] Unhandled Rejection at:", promise, "reason:", reason);
+});
 
 startServer();

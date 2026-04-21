@@ -143,13 +143,24 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
 ما اقتراحاتك؟`;
 
     try {
-      const response = await axios.post(`/niswah-v5-backend`, {
-        systemPrompt,
-        messages: [],
-        text: userMessage,
-        model: "gemini-1.5-flash"
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemPrompt,
+          messages: [],
+          text: userMessage,
+          model: "gemini-1.5-flash"
+        })
       });
-      const aiText = response.data.text;
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      const aiText = data.text;
 
       setIsTyping(false);
       const newMsgs: Array<{ role: 'ai' | 'user'; text: string }> = [
@@ -178,7 +189,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       setIsTyping(false);
       setMessages([
         { role: 'user', text: `أعاني من: ${symptomsText}${userNotes ? `\n\nملاحظات: ${userNotes}` : ''}` },
-        { role: 'ai', text: `عذراً، لم أتمكن من الاتصال. (v5.0-STAGE | Error: ${serverError} | Path: /niswah-v5-backend)` },
+        { role: 'ai', text: `عذراً، لم أتمكن من الاتصال. (v6.0-FINAL | Error: ${err.message})` },
       ]);
     }
   };
@@ -238,14 +249,24 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
         truncatedHistory.shift();
       }
       
-      const response = await axios.post(`/niswah-v5-backend`, {
-        systemPrompt,
-        messages: truncatedHistory,
-        text: followUpText,
-        model: "gemini-1.5-flash"
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemPrompt,
+          messages: truncatedHistory,
+          text: followUpText,
+          model: "gemini-1.5-flash"
+        })
       });
 
-      const aiText = response.data.text;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      const aiText = data.text;
       setIsTyping(false);
       setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
 
@@ -261,7 +282,7 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
       const rawError = err.response?.data?.error || err.message || "Unknown error";
       const serverError = typeof rawError === 'object' ? JSON.stringify(rawError) : String(rawError);
       setIsTyping(false);
-      setMessages(prev => [...prev, { role: 'ai', text: `عذراً، حدث خطأ في الاتصال. (v5.0-STAGE | Error: ${serverError} | Path: /niswah-v5-backend)` }]);
+      setMessages(prev => [...prev, { role: 'ai', text: `عذراً، حدث خطأ في الاتصال. (v6.0-FINAL | Error: ${err.message})` }]);
     }
   };
 

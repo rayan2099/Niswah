@@ -257,14 +257,25 @@ Current user context:
         timestamp: Date.now()
       }]);
 
-      const response = await axios.post(`/niswah-v5-backend`, {
-        systemPrompt,
-        messages: truncatedHistory,
-        text: text.trim(),
-        model: "gemini-1.5-flash"
+      // V6.0 RELIABLE FETCH
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemPrompt,
+          messages: truncatedHistory,
+          text: text.trim(),
+          model: "gemini-1.5-flash"
+        })
       });
 
-      const fullText = response.data.text;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      const fullText = data.text;
       setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: fullText } : m));
 
       // Save AI response
@@ -277,12 +288,10 @@ Current user context:
 
     } catch (err: any) {
       console.error("Niswah AI Error:", err);
-      const rawError = err.response?.data?.error || err.message || "Unknown error";
-      const serverError = typeof rawError === 'object' ? JSON.stringify(rawError) : String(rawError);
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'niswah',
-        text: `${t('nisa_error')} (v5.0-STAGE | Error: ${serverError} | Path: /niswah-v5-backend)`,
+        text: `${t('nisa_error')} (v6.0-FINAL | Error: ${err.message})`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errMsg]);

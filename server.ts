@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 
@@ -11,41 +12,45 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Request logger middleware
+  // Global Request Logger
   app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    console.log(`[v2.4-SRV] ${new Date().toISOString()} | ${req.method} ${req.url}`);
     next();
   });
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.error("CRITICAL ERROR: GEMINI_API_KEY is not defined!");
+    console.error(">>> ERROR: GEMINI_API_KEY is NOT set in environment!");
   } else {
-    console.log("GEMINI_API_KEY is detected.");
+    console.log(">>> GEMINI_API_KEY detected.");
   }
 
   app.use(express.json());
 
+  // Public Ping for Diagnostics
+  app.get("/ping", (req, res) => {
+    res.send(`Niswah Server v2.4 [${new Date().toISOString()}]`);
+  });
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ 
-      status: "ok", 
+      status: "online", 
+      version: "v2.4",
       hasKey: !!process.env.GEMINI_API_KEY,
-      nodeEnv: process.env.NODE_ENV || "not set",
-      version: "v2.1-Server"
+      nodeEnv: process.env.NODE_ENV
     });
   });
 
-  // API Route for Gemini (v2.3)
-  app.post("/gen-ai-proxy", async (req, res) => {
-    console.log(">>> gen-ai-proxy hit");
+  // API Gateway for Gemini (v2.4)
+  app.post("/niswah-gateway", async (req, res) => {
+    console.log(">>> niswah-gateway: AI request received");
     try {
       const { systemPrompt, messages, text, model: requestedModel } = req.body;
       const apiKey = process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
-        console.error("Server Error: No GEMINI_API_KEY");
-        return res.status(500).json({ error: "No API Key" });
+        return res.status(500).json({ error: "Missing API Key" });
       }
 
       const genAI = new GoogleGenAI({ apiKey });
@@ -68,40 +73,32 @@ async function startServer() {
       });
 
       if (!result.response) {
-        throw new Error("Empty response from Gemini");
+        throw new Error("Gemini returned empty response");
       }
 
       const responseText = result.response.text();
-      console.log(">>> AI success");
       res.json({ text: responseText });
     } catch (error: any) {
-      console.error("AI Proxy Error:", error);
+      console.error(">>> Gateway Fail:", error);
       res.status(500).json({ 
-        error: String(error.message || "Internal Proxy Fail"),
-        code: "AI_PROXY_ERROR"
+        error: String(error.message || "Unknown error in gateway"),
+        code: "GATEWAY_FAIL"
       });
     }
   });
 
-  // Serve static files check dist
+  // Serve static files check
   const distPath = path.join(process.cwd(), "dist");
-  const hasDist = await (async () => {
-    try {
-      await path.join(distPath, "index.html");
-      return true;
-    } catch {
-      return false;
-    }
-  })();
+  const hasDist = fs.existsSync(distPath);
 
   if (process.env.NODE_ENV === "production" || hasDist) {
-    console.log(">>> Serving from DIST folder");
+    console.log(">>> Mode: PRODUCTION (Serving dist)");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   } else {
-    console.log(">>> Starting VITE dev middleware");
+    console.log(">>> Mode: DEVELOPMENT (Starting Vite)");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -110,11 +107,11 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`>>> Niswah Server v2.3 listening on 0.0.0.0:${PORT}`);
+    console.log(`>>> Niswah Server v2.4 live on port ${PORT}`);
   });
 }
 
 startServer().catch(err => {
-  console.error("GLOBAL SERVER CRASH:", err);
+  console.error("!!! GLOBAL BOOT ERROR:", err);
   process.exit(1);
 });

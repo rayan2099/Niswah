@@ -257,7 +257,7 @@ Current user context:
         timestamp: Date.now()
       }]);
 
-      const response = await axios.post("/gen-ai-proxy", {
+      const response = await axios.post("/niswah-gateway", {
         systemPrompt,
         messages: truncatedHistory,
         text: text.trim(),

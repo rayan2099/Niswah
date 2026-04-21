@@ -306,7 +306,7 @@ Current user context:
                   <Sparkles className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-serif font-bold text-emerald-900">Niswah AI</h2>
+                  <h2 className="text-lg font-serif font-bold text-emerald-900">Niswah AI <span className="text-[10px] opacity-30">v2.0-BS</span></h2>
                   <div className="flex items-center space-x-1">
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                     <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">{t('online_status')}</span>

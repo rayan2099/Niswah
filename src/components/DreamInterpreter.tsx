@@ -220,7 +220,7 @@ User's Madhhab: ${userMadhhab}`;
         timestamp: Date.now()
       }]);
 
-      const response = await axios.post(`${window.location.origin}/niswah-gateway`, {
+      const response = await axios.post(`${window.location.origin}/api/niswah-v4-gateway`, {
         systemPrompt,
         messages: truncatedHistory,
         text: text.trim(),
@@ -245,7 +245,7 @@ User's Madhhab: ${userMadhhab}`;
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'interpreter',
-        text: `${t('nisa_error')} (v3.0-ABS | Error: ${serverError})`,
+        text: `${t('nisa_error')} (v4.0-FINAL | Error: ${serverError})`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errMsg]);

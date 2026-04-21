@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import cors from "cors";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
 
@@ -11,33 +12,34 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // 1. Critical Diagnostics
-  app.get("/niswah-gateway", (req, res) => {
-    res.json({ 
-      status: "Operational", 
-      version: "v3.0", 
-      time: new Date().toISOString(),
-      mode: fs.existsSync(path.join(process.cwd(), "dist")) ? "production" : "development"
-    });
-  });
-
-  // 2. Middlewares
+  // 1. Core Config
+  app.use(cors());
   app.use(express.json());
   
+  // Custom response header to identify our server
   app.use((req, res, next) => {
-    console.log(`[v3.0-SRV] ${req.method} ${req.url}`);
+    res.setHeader("X-Niswah-Version", "v4.0");
+    console.log(`[v4.0-SRV] ${req.method} ${req.url}`);
     next();
   });
 
-  // 3. AI Gateway
-  app.post("/niswah-gateway", async (req, res) => {
-    console.log(">>> [v3.0] AI GATEWAY POST RECEIVED");
+  // 2. High Priority AI Gateway
+  app.all("/api/niswah-v4-gateway", async (req, res) => {
+    if (req.method === "GET") {
+      return res.json({ status: "Operational", version: "v4.0", type: "Gateway" });
+    }
+
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Method not allowed" });
+    }
+
+    console.log(">>> [v4.0] AI GATEWAY REQUEST");
     try {
       const { systemPrompt, messages, text, model: requestedModel } = req.body;
       const apiKey = process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
-        return res.status(500).json({ error: "GEMINI_API_KEY is missing on server" });
+        return res.status(500).json({ error: "Server AI Key Missing" });
       }
 
       const genAI = new GoogleGenAI({ apiKey });
@@ -59,30 +61,30 @@ async function startServer() {
         ]
       });
 
-      if (!result.response) throw new Error("AI provider returned no response");
+      if (!result.response) throw new Error("No AI content generated");
 
-      res.json({ text: result.response.text() });
+      res.json({ text: result.response.text(), v: "4.0" });
     } catch (error: any) {
-      console.error(">>> [v3.0] AI Gateway Fail:", error);
+      console.error(">>> [v4.0] AI FAIL:", error);
       res.status(500).json({ 
         error: String(error.message),
-        version: "v3.0"
+        version: "v4.0-Gateway-Error"
       });
     }
   });
 
-  // 4. Static / Dev Middleware
+  // 3. Static / Development Serving
   const distPath = path.join(process.cwd(), "dist");
   const isProd = fs.existsSync(distPath);
 
   if (isProd) {
-    console.log(">>> [v3.0] MODE: PRODUCTION (Serving dist)");
+    console.log(">>> [v4.0] Serving static from dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   } else {
-    console.log(">>> [v3.0] MODE: DEVELOPMENT (Dynamic Vite Import)");
+    console.log(">>> [v4.0] Dynamic Vite middleware");
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -91,17 +93,21 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  // Fallback 404 to prove Express is alive
+  // Final 404 Catch (PROVES IT IS OUR EXPRESS SERVER)
   app.use((req, res) => {
-    res.status(404).json({ error: "Route not found in Express v3.0", path: req.url });
+    res.status(404).json({ 
+      error: "NISWAH_V4_NOT_FOUND", 
+      path: req.url,
+      timestamp: new Date().toISOString()
+    });
   });
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`>>> [v3.0] Niswah Express listening on port ${PORT}`);
+    console.log(`>>> [v4.0] Niswah Server Running on Port ${PORT}`);
   });
 }
 
 startServer().catch(err => {
-  console.error(">>> [v3.0] CRITICAL BOOT ERROR:", err);
+  console.error(">>> [v4.0] BOOT FAILED:", err);
   process.exit(1);
 });

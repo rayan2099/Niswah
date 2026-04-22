@@ -103,44 +103,6 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     setSelectedSymptoms(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const callAI = async (
-    systemPrompt: string,
-    userMessage: string,
-    history: Array<{ role: 'user' | 'assistant'; content: string }> = []
-  ): Promise<string> => {
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) {
-      throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
-    }
-
-    try {
-      const ai = new GoogleGenAI({ apiKey: key });
-      
-      const contents = [
-        ...history.map(m => ({
-          role: (m.role === 'assistant' ? 'model' : 'user') as 'user' | 'model',
-          parts: [{ text: m.content }]
-        })),
-        { role: 'user' as const, parts: [{ text: userMessage }] }
-      ];
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents,
-        config: {
-          systemInstruction: systemPrompt,
-          temperature: 0.7,
-          maxOutputTokens: 1024,
-        }
-      });
-
-      return response.text || '';
-    } catch (err: any) {
-      console.error("Gemini AI API Error (HealthDoctor):", err);
-      throw new Error(`Gemini AI Error: ${err.message}`);
-    }
-  };
-
   const handleAnalyze = async () => {
     const activeSymptoms = Object.keys(selectedSymptoms).filter(k => selectedSymptoms[k]);
     if (activeSymptoms.length === 0) return;
@@ -155,50 +117,82 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 ردودك موجزة وعملية ومنظمة بنقاط واضحة. لا تتجاوزي 250 كلمة.
 دائماً أشيري متى يجب مراجعة الطبيب.`;
 
+    const symptomsText = activeSymptoms.map(s => {
+      for (const phase of Object.values(SYMPTOM_PHASES)) {
+        const found = phase.symptoms.find(sym => sym.key === s);
+        if (found) return found.label;
+      }
+      return s;
+    }).join('، ');
+    
+    const userMessage = `أعاني من الأعراض التالية: ${symptomsText}. ${userNotes ? `ملاحظات: ${userNotes}` : ''}`;
+    const userTextDisplay = `أعاني من: ${symptomsText}${userNotes ? `\n\nملاحظات: ${userNotes}` : ''}`;
+
+    const key = process.env.GEMINI_API_KEY;
+    
+    // Set initial user message
+    setMessages([{ role: 'user', text: userTextDisplay }]);
+
+    // Add placeholder AI message
+    const aiMsgId = (Date.now() + 1).toString();
+    setMessages(prev => [...prev, { role: 'ai', text: "" }]);
+
     try {
-      const symptomsText = activeSymptoms.map(s => {
-        for (const phase of Object.values(SYMPTOM_PHASES)) {
-          const found = phase.symptoms.find(sym => sym.key === s);
-          if (found) return found.label;
+      if (!key) throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
+      const ai = new GoogleGenAI({ apiKey: key });
+
+      const streamResponse = await ai.models.generateContentStream({
+        model: "gemini-3-flash-preview",
+        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.7,
         }
-        return s;
-      }).join('، ');
-      
-      const userMessage = `أعاني من الأعراض التالية: ${symptomsText}. ${userNotes ? `ملاحظات: ${userNotes}` : ''}`;
-      
-      const aiText = await callAI(systemPrompt, userMessage, []);
+      });
+
+      let accumulatedText = "";
+      for await (const chunk of streamResponse) {
+        const chunkText = chunk.text;
+        if (chunkText) {
+          accumulatedText += chunkText;
+          setMessages(prev => {
+            const copy = [...prev];
+            copy[copy.length - 1] = { ...copy[copy.length - 1], text: accumulatedText };
+            return copy;
+          });
+        }
+      }
       
       setIsTyping(false);
-      const newMsgs: Array<{ role: 'ai' | 'user'; text: string }> = [
-        { role: 'user', text: `أعاني من: ${symptomsText}${userNotes ? `\n\nملاحظات: ${userNotes}` : ''}` },
-        { role: 'ai', text: aiText },
-      ];
-      setMessages(newMsgs);
 
       // Save to history
       api.saveChatMessage({
         chat_type: 'doctor',
         role: 'user',
-        text: newMsgs[0].text,
+        text: userTextDisplay,
         timestamp: new Date().toISOString()
       });
       api.saveChatMessage({
         chat_type: 'doctor',
         role: 'model',
-        text: newMsgs[1].text,
+        text: accumulatedText,
         timestamp: new Date().toISOString()
       });
     } catch (err: any) {
       setError('عذراً، حدث خطأ. تحققي من الاتصال وحاولي مرة أخرى.');
       console.error('HealthDoctor error:', err.message);
       setIsTyping(false);
+      setMessages(prev => {
+        const copy = [...prev];
+        copy[copy.length - 1] = { ...copy[copy.length - 1], text: `عذراً، حدث خطأ في الاتصال. (${err.message})` };
+        return copy;
+      });
     }
   };
 
   const handleFollowUp = async (followUpText: string) => {
     const userMsg = { role: 'user' as const, text: followUpText };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    setMessages(prev => [...prev, userMsg]);
     setIsTyping(true);
 
     const systemPrompt = `أنتِ "الطبيبة نسوة" — مساعدة صحية متخصصة في صحة المرأة والدورة الشهرية.
@@ -207,36 +201,69 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 ردودك موجزة وعملية ومنظمة بنقاط واضحة. لا تتجاوزي 250 كلمة.
 دائماً أشيري متى يجب مراجعة الطبيب.`;
 
-    // Save user message
-    api.saveChatMessage({
-      chat_type: 'doctor',
-      role: 'user',
-      text: followUpText,
-      timestamp: new Date().toISOString()
-    });
+    // Add placeholder AI message
+    setMessages(prev => [...prev, { role: 'ai', text: "" }]);
 
     try {
+      const key = process.env.GEMINI_API_KEY;
+      if (!key) throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
+      
+      const ai = new GoogleGenAI({ apiKey: key });
       const history = messages.map(m => ({
-        role: (m.role === 'ai' ? 'assistant' : 'user') as 'user' | 'assistant',
-        content: m.text,
+        role: (m.role === 'ai' ? 'model' : 'user') as 'user' | 'model',
+        parts: [{ text: m.text }]
       }));
       
-      const aiText = await callAI(systemPrompt, followUpText, history);
+      const streamResponse = await ai.models.generateContentStream({
+        model: "gemini-3-flash-preview",
+        contents: [
+          ...history,
+          { role: 'user', parts: [{ text: followUpText }] }
+        ],
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.7,
+        }
+      });
+
+      let accumulatedText = "";
+      for await (const chunk of streamResponse) {
+        const chunkText = chunk.text;
+        if (chunkText) {
+          accumulatedText += chunkText;
+          setMessages(prev => {
+            const copy = [...prev];
+            copy[copy.length - 1] = { ...copy[copy.length - 1], text: accumulatedText };
+            return copy;
+          });
+        }
+      }
       
       setIsTyping(false);
-      setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
+
+      // Save user message
+      api.saveChatMessage({
+        chat_type: 'doctor',
+        role: 'user',
+        text: followUpText,
+        timestamp: new Date().toISOString()
+      });
 
       // Save AI response
       api.saveChatMessage({
         chat_type: 'doctor',
         role: 'model',
-        text: aiText,
+        text: accumulatedText,
         timestamp: new Date().toISOString()
       });
     } catch (err: any) {
-      console.error("Anthropic Error:", err);
+      console.error("HealthDoctor Error:", err);
       setIsTyping(false);
-      setMessages(prev => [...prev, { role: 'ai', text: `عذراً، حدث خطأ في الاتصال. (${err.message})` }]);
+      setMessages(prev => {
+        const copy = [...prev];
+        copy[copy.length - 1] = { ...copy[copy.length - 1], text: `عذراً، حدث خطأ في الاتصال. (${err.message})` };
+        return copy;
+      });
     }
   };
 

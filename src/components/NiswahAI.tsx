@@ -170,44 +170,6 @@ export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
     }
   };
 
-  const callAI = async (
-    systemPrompt: string,
-    userMessage: string,
-    history: Array<{ role: 'user' | 'assistant'; content: string }> = []
-  ): Promise<string> => {
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) {
-      throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
-    }
-
-    try {
-      const ai = new GoogleGenAI({ apiKey: key });
-      
-      const contents = [
-        ...history.map(m => ({
-          role: (m.role === 'assistant' ? 'model' : 'user') as 'user' | 'model',
-          parts: [{ text: m.content }]
-        })),
-        { role: 'user' as const, parts: [{ text: userMessage }] }
-      ];
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents,
-        config: {
-          systemInstruction: systemPrompt,
-          temperature: 0.7,
-          maxOutputTokens: 1024,
-        }
-      });
-
-      return response.text || '';
-    } catch (err: any) {
-      console.error("Gemini AI API Error:", err);
-      throw new Error(`Gemini AI Error: ${err.message}`);
-    }
-  };
-
   const handleSend = async (text: string = inputText) => {
     if (!text.trim()) return;
 
@@ -242,43 +204,64 @@ Current user context:
 - Conditions: ${(userContext.conditions || []).join(', ')}
 - Pregnant: ${userContext.pregnant}`;
 
+    const key = process.env.GEMINI_API_KEY;
+    const aiMsgId = (Date.now() + 1).toString();
+    
+    // Add placeholder AI message
+    setMessages(prev => [...prev, {
+      id: aiMsgId,
+      role: 'niswah',
+      text: "",
+      timestamp: Date.now()
+    }]);
+
     try {
+      if (!key) throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
+      
+      const ai = new GoogleGenAI({ apiKey: key });
       const history = messages.map(m => ({
-        role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-        content: m.text,
+        role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
+        parts: [{ text: m.text }]
       }));
 
-      const aiMsgId = (Date.now() + 1).toString();
-      setMessages(prev => [...prev, {
-        id: aiMsgId,
-        role: 'niswah',
-        text: "...",
-        timestamp: Date.now()
-      }]);
+      const streamResponse = await ai.models.generateContentStream({
+        model: "gemini-3-flash-preview",
+        contents: [
+          ...history,
+          { role: 'user', parts: [{ text: text.trim() }] }
+        ],
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.7,
+        }
+      });
 
-      const aiText = await callAI(systemPrompt, text.trim(), history);
+      let accumulatedText = "";
+      for await (const chunk of streamResponse) {
+        const chunkText = chunk.text;
+        if (chunkText) {
+          accumulatedText += chunkText;
+          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: accumulatedText } : m));
+        }
+      }
       
-      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: aiText } : m));
+      setIsTyping(false);
 
-      // Save AI response
+      // Save AI response once complete
       api.saveChatMessage({
         chat_type: 'niswah',
         role: 'model',
-        text: aiText,
+        text: accumulatedText,
         timestamp: new Date().toISOString()
       });
 
     } catch (err: any) {
       console.error("Niswah AI Error:", err);
-      const errMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'niswah',
-        text: `عذراً، حدث خطأ في الاتصال. (${err.message})`,
-        timestamp: Date.now()
-      };
-      setMessages(prev => [...prev, errMsg]);
-    } finally {
       setIsTyping(false);
+      setMessages(prev => prev.map(m => m.id === aiMsgId 
+        ? { ...m, text: `عذراً، حدث خطأ في الاتصال. (${err.message})` } 
+        : m
+      ));
     }
   };
 

@@ -94,18 +94,34 @@ const INITIAL_DATA: OnboardingData = {
 
 // --- COMPONENTS ---
 
+const NiswahToggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) => (
+  <button
+    role="switch"
+    aria-checked={value}
+    onClick={() => onChange(!value)}
+    className={`relative inline-flex h-[31px] w-[51px] flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
+      value ? 'bg-[#34C759]' : 'bg-[#E5E5EA]'
+    }`}
+  >
+    <span className={`inline-block h-[27px] w-[27px] transform rounded-full bg-white shadow-md transition-transform duration-200 ${
+      value ? 'translate-x-[20px]' : 'translate-x-0'
+    }`} />
+  </button>
+);
+
 const ProgressBar = ({ current, total }: { current: number; total: number }) => {
-  const progress = (current / total) * 100;
-  const { isRTL } = useTranslation();
   return (
-    <div className="fixed top-0 left-0 right-0 h-1.5 bg-black/5 z-50">
-      <motion.div 
-        className="h-full bg-rose-300"
-        initial={{ width: 0 }}
-        animate={{ width: `${progress}%` }}
-        style={{ transformOrigin: isRTL ? 'right' : 'left' }}
-        transition={{ type: 'spring', stiffness: 50, damping: 20 }}
-      />
+    <div className="fixed top-12 left-0 right-0 flex justify-center gap-2 z-50">
+      {Array.from({ length: total }).map((_, i) => (
+        <div
+          key={i}
+          className={`h-1.5 rounded-full transition-all ${
+            i + 1 === current ? 'w-6 bg-rose-500' : 
+            i + 1 < current ? 'w-1.5 bg-rose-300' : 
+            'w-1.5 bg-gray-200'
+          }`}
+        />
+      ))}
     </div>
   );
 };
@@ -158,37 +174,42 @@ const Screen2Language = ({ data, update, onNext }: { data: OnboardingData; updat
   };
 
   return (
-    <div className="w-full space-y-8">
-      <h2 className="text-3xl font-serif font-bold text-center">{t('choose_language')}</h2>
-      <div className="grid grid-cols-2 gap-4">
-        {languages.map((lang) => (
-          <motion.button
-            key={lang.code}
-            whileTap={{ scale: 1.04 }}
-            onClick={() => handleSelect(lang.code)}
-            className={cn(
-              "p-6 rounded-2xl border-2 transition-all flex flex-col items-center justify-center space-y-2 relative",
-              data.language === lang.code 
-                ? "border-rose-300 bg-rose-50 text-rose-800 shadow-sm" 
-                : "border-black/5 bg-white text-gray-400 hover:border-rose-100"
-            )}
-          >
-            <span className="text-lg font-bold">{lang.native}</span>
-            <span className="text-xs opacity-60">{lang.label}</span>
-            {data.language === lang.code && (
-              <motion.div layoutId="lang-check" className={cn("absolute top-2", isRTL ? "left-2" : "right-2")}>
-                <Check className="w-4 h-4 text-rose-400" />
-              </motion.div>
-            )}
-          </motion.button>
-        ))}
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1">
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('choose_language')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8">{t('language_desc' as any) || 'اختر اللغة المناسبة لكِ'}</p>
+        
+        <div className="grid grid-cols-2 gap-4">
+          {languages.map((lang) => (
+            <motion.button
+              key={lang.code}
+              whileTap={{ scale: 1.04 }}
+              onClick={() => handleSelect(lang.code)}
+              className={cn(
+                "p-6 rounded-2xl border-2 transition-all flex flex-col items-center justify-center space-y-2 relative",
+                data.language === lang.code 
+                  ? "border-rose-300 bg-rose-50 text-rose-800 shadow-sm" 
+                  : "border-black/5 bg-white text-gray-400 hover:border-rose-100"
+              )}
+            >
+              <span className="text-lg font-bold">{lang.native}</span>
+              <span className="text-xs opacity-60">{lang.label}</span>
+              {data.language === lang.code && (
+                <motion.div layoutId="lang-check" className={cn("absolute top-2", isRTL ? "left-2" : "right-2")}>
+                  <Check className="w-4 h-4 text-rose-400" />
+                </motion.div>
+              )}
+            </motion.button>
+          ))}
+        </div>
       </div>
+      
       <button 
         onClick={onNext}
-        className="w-full py-4 bg-rose-400 text-white rounded-2xl font-bold shadow-lg shadow-rose-100 flex items-center justify-center space-x-2"
+        className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
       >
-        <span>{t('continue')}</span>
-        <ChevronRight className={cn("w-5 h-5", isRTL && "rotate-180")} />
+        <span>استمرار</span>
+        <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
       </button>
     </div>
   );
@@ -205,50 +226,50 @@ const Screen3Madhhab = ({ data, update, onNext }: { data: OnboardingData; update
   ];
 
   return (
-    <div className="w-full space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-serif font-bold">{t('madhhab_question')}</h2>
-        <p className="text-sm text-gray-500">{t('madhhab_desc')}</p>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4">
-        {madhhabs.map((m) => (
-          <motion.button
-            key={m.id}
-            whileTap={{ scale: 1.04 }}
-            onClick={() => update({ madhhab: m.id })}
-            className={cn(
-              "p-5 rounded-2xl border-2 transition-all text-left flex flex-col justify-between h-32",
-              data.madhhab === m.id 
-                ? "border-rose-300 bg-rose-50 shadow-sm" 
-                : "border-black/5 bg-white hover:border-rose-100"
-            )}
-          >
-            <span className={cn("text-lg font-bold", data.madhhab === m.id ? "text-rose-800" : "text-gray-700")}>{m.label}</span>
-            <span className="text-[10px] leading-tight text-gray-400 uppercase tracking-wider font-semibold">{m.rule}</span>
-          </motion.button>
-        ))}
-      </div>
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1">
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('madhhab_question')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8">{t('madhhab_desc')}</p>
+        
+        <div className="grid grid-cols-2 gap-4">
+          {madhhabs.map((m) => (
+            <motion.button
+              key={m.id}
+              whileTap={{ scale: 1.04 }}
+              onClick={() => update({ madhhab: m.id })}
+              className={cn(
+                "p-5 rounded-2xl border-2 transition-all text-left flex flex-col justify-between h-32",
+                data.madhhab === m.id 
+                  ? "border-rose-300 bg-rose-50 shadow-sm" 
+                  : "border-black/5 bg-white hover:border-rose-100"
+              )}
+            >
+              <span className={cn("text-lg font-bold", data.madhhab === m.id ? "text-rose-800" : "text-gray-700")}>{m.label}</span>
+              <span className="text-[10px] leading-tight text-gray-400 uppercase tracking-wider font-semibold">{m.rule}</span>
+            </motion.button>
+          ))}
+        </div>
 
-      <button 
-        onClick={() => setShowInfo(true)}
-        className="w-full flex items-center justify-center text-rose-400 text-sm font-medium hover:underline"
-      >
-        <Info className={cn("w-4 h-4", isRTL ? "ml-2" : "mr-2")} /> {t('not_sure_madhhab')}
-      </button>
+        <button 
+          onClick={() => setShowInfo(true)}
+          className="w-full flex items-center justify-center text-rose-400 text-sm font-medium hover:underline mt-6"
+        >
+          <Info className={cn("w-4 h-4", isRTL ? "ml-2" : "mr-2")} /> {t('not_sure_madhhab')}
+        </button>
+      </div>
 
       <button 
         disabled={!data.madhhab}
         onClick={onNext}
         className={cn(
-          "w-full py-4 rounded-2xl font-bold flex items-center justify-center transition-all space-x-2",
+          "w-full py-4 rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center",
           data.madhhab 
-            ? "bg-rose-400 text-white shadow-lg shadow-rose-100" 
+            ? "bg-rose-500 text-white shadow-lg shadow-rose-100" 
             : "bg-gray-100 text-gray-400 cursor-not-allowed"
         )}
       >
-        <span>{t('continue')}</span>
-        <ChevronRight className={cn("w-5 h-5", isRTL && "rotate-180")} />
+        <span>استمرار</span>
+        <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
       </button>
 
       <AnimatePresence>
@@ -287,62 +308,72 @@ const Screen3Madhhab = ({ data, update, onNext }: { data: OnboardingData; update
 };
 
 const Screen4Goals = ({ data, update, onNext }: { data: OnboardingData; update: (d: Partial<OnboardingData>) => void; onNext: () => void }) => {
-  const { t, isRTL } = useTranslation();
-  const goals = [
-    t('goal_track_cycle'),
-    t('goal_understand_fiqh'),
-    t('goal_get_pregnant'),
-    t('goal_postpartum'),
-    t('goal_irregular_bleeding'),
-    t('goal_spiritual_wellness'),
-    t('goal_general_health')
+  const { t } = useTranslation();
+  const [validationMsg, setValidationMsg] = useState('');
+
+  const GOALS = [
+    { id: 'track_cycle', labelAr: 'تتبع دورتي الشهرية' },
+    { id: 'fiqh', labelAr: 'فهم التزاماتي الفقهية (الصلاة، الصيام)' },
+    { id: 'nifas', labelAr: 'تتبع فترة النفاس' },
+    { id: 'pregnancy', labelAr: 'التخطيط للحمل' },
+    { id: 'istihadah', labelAr: 'إدارة النزيف غير المنتظم' },
+    { id: 'health', labelAr: 'مراقبة الصحة العامة' },
+    { id: 'spiritual', labelAr: 'الصحة النفسية والروحية' },
   ];
 
-  const toggleGoal = (goal: string) => {
-    const next = data.goal_flags.includes(goal)
-      ? data.goal_flags.filter(g => g !== goal)
-      : [...data.goal_flags, goal];
+  const toggleGoal = (id: string) => {
+    const next = data.goal_flags.includes(id)
+      ? data.goal_flags.filter(g => g !== id)
+      : [...data.goal_flags, id];
     update({ goal_flags: next });
+    if (next.length > 0) setValidationMsg('');
+  };
+
+  const handleContinue = () => {
+    if (data.goal_flags.length === 0) {
+      setValidationMsg('يرجى اختيار خيار واحد على الأقل للمتابعة');
+      return;
+    }
+    onNext();
   };
 
   return (
-    <div className="w-full space-y-8">
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-serif font-bold">{t('goals_question')}</h2>
-        <p className="text-sm text-gray-500">{t('select_all_apply')}</p>
+    <div className="w-full flex flex-col h-full">
+      <div className="flex-1">
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('goals_question')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8">{t('select_all_apply')}</p>
+
+        <div className="flex flex-wrap gap-3 justify-center mt-8" dir="rtl">
+          {GOALS.map(goal => (
+            <motion.button
+              key={goal.id}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => toggleGoal(goal.id)}
+              className={cn(
+                "px-4 py-3 rounded-full text-sm font-medium transition-all border-2",
+                data.goal_flags.includes(goal.id)
+                  ? 'bg-rose-50 border-rose-400 text-rose-700'
+                  : 'bg-white border-gray-200 text-gray-700'
+              )}
+            >
+              {goal.labelAr}
+            </motion.button>
+          ))}
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 justify-center">
-        {goals.map((goal) => (
-          <motion.button
-            key={goal}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => toggleGoal(goal)}
-            className={cn(
-              "px-5 py-3 rounded-full border-2 transition-all text-sm font-medium",
-              data.goal_flags.includes(goal)
-                ? "border-rose-300 bg-rose-300 text-white shadow-md"
-                : "border-black/5 bg-white text-gray-600 hover:border-rose-100"
-            )}
-          >
-            {goal}
-          </motion.button>
-        ))}
-      </div>
-
-      <button 
-        disabled={data.goal_flags.length === 0}
-        onClick={onNext}
-        className={cn(
-          "w-full py-4 rounded-2xl font-bold flex items-center justify-center transition-all space-x-2",
-          data.goal_flags.length > 0
-            ? "bg-rose-400 text-white shadow-lg shadow-rose-100" 
-            : "bg-gray-100 text-gray-400 cursor-not-allowed"
+      <div className="mt-8">
+        <button
+          onClick={handleContinue}
+          className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
+        >
+          <span>استمرار</span>
+          <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
+        </button>
+        {validationMsg && (
+          <p className="text-center text-sm text-rose-500 mt-2">{validationMsg}</p>
         )}
-      >
-        <span>{t('continue')}</span>
-        <ChevronRight className={cn("w-5 h-5", isRTL && "rotate-180")} />
-      </button>
+      </div>
     </div>
   );
 };
@@ -354,6 +385,32 @@ const ScreenLocation = ({ data, update, onNext }: { data: OnboardingData; update
   const [isFocused, setIsFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
+
+  const handleCitySelect = async (city: any) => {
+    update({
+      location: {
+        city: city.nameEn || city.name,
+        country: city.countryEn || city.country,
+        cityAr: city.name,
+        countryAr: city.country,
+        lat: city.lat,
+        lon: city.lon || city.lng
+      }
+    });
+
+    // Save immediately as requested
+    try {
+      await api.updateUser({
+        location_lat: city.lat,
+        location_lng: city.lon || city.lng,
+        location_name: city.name,
+      });
+    } catch (err) {
+      console.error("Failed to save location immediately", err);
+    }
+    
+    onNext();
+  };
 
   useEffect(() => {
     const searchCities = async () => {
@@ -433,17 +490,14 @@ const ScreenLocation = ({ data, update, onNext }: { data: OnboardingData; update
             const city = result.address.city || result.address.town || result.address.village || result.address.state;
             const country = result.address.country;
             
-            update({
-              location: {
-                city: city,
-                country: country,
-                cityAr: city,
-                countryAr: country,
-                lat: latitude,
-                lon: longitude
-              }
+            await handleCitySelect({
+              name: city,
+              nameEn: city,
+              country: country,
+              countryEn: country,
+              lat: latitude,
+              lon: longitude
             });
-            onNext();
           }
         } catch (error) {
           console.error("Reverse geocoding error:", error);
@@ -460,122 +514,108 @@ const ScreenLocation = ({ data, update, onNext }: { data: OnboardingData; update
     );
   };
 
-  const handleSelect = (city: any) => {
-    update({
-      location: {
-        city: city.nameEn || city.name,
-        country: city.countryEn || city.country,
-        cityAr: city.name,
-        countryAr: city.country,
-        lat: city.lat,
-        lon: city.lon
-      }
-    });
-    onNext();
-  };
-
   return (
-    <div className="w-full space-y-8">
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-serif font-bold">{t('location_title')}</h2>
-        <p className="text-sm text-gray-500">{t('location_desc')}</p>
-      </div>
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1">
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('location_title')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8">{t('location_desc')}</p>
 
-      <div className="space-y-4 relative">
-        <button
-          onClick={handleDetectLocation}
-          disabled={isDetecting}
-          className="w-full py-4 bg-rose-50 text-rose-600 rounded-2xl font-bold flex items-center justify-center space-x-2 hover:bg-rose-100 transition-all"
-        >
-          {isDetecting ? (
-            <div className="w-5 h-5 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Navigation className="w-5 h-5" />
-          )}
-          <span>{isDetecting ? t('detecting' as any) : t('use_current_location' as any)}</span>
-        </button>
+        <div className="space-y-4 relative">
+          <button
+            onClick={handleDetectLocation}
+            disabled={isDetecting}
+            className="w-full py-4 bg-rose-50 text-rose-600 rounded-2xl font-bold flex items-center justify-center space-x-2 hover:bg-rose-100 transition-all"
+          >
+            {isDetecting ? (
+              <div className="w-5 h-5 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Navigation className="w-5 h-5" />
+            )}
+            <span>{isDetecting ? t('detecting' as any) : t('use_current_location' as any)}</span>
+          </button>
 
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
-          <input 
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => setIsFocused(true)}
-            placeholder={t('enter_city_name')}
-            className="w-full pl-12 pr-4 py-4 bg-white border-2 border-black/5 rounded-2xl text-sm focus:border-rose-300 outline-none transition-all text-right"
-            dir="rtl"
-          />
-          {isLoading && (
-            <div className="absolute right-12 top-1/2 -translate-y-1/2">
-              <div className="w-4 h-4 border-2 border-rose-300 border-t-transparent rounded-full animate-spin" />
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
+            <input 
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              placeholder={t('enter_city_name')}
+              className="w-full pl-12 pr-4 py-4 bg-white border-2 border-black/5 rounded-2xl text-sm focus:border-rose-300 outline-none transition-all text-right"
+              dir="rtl"
+            />
+            {isLoading && (
+              <div className="absolute right-12 top-1/2 -translate-y-1/2">
+                <div className="w-4 h-4 border-2 border-rose-300 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+            {query && (
+              <button 
+                onClick={() => setQuery('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full"
+              >
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            )}
+          </div>
+
+          <AnimatePresence>
+            {isFocused && query.trim().length >= 2 && !isLoading && suggestions.length === 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute z-50 left-0 right-0 top-full mt-2 bg-white rounded-2xl border border-black/5 shadow-xl p-4 text-center text-gray-500 text-sm"
+              >
+                {t('no_results')}
+              </motion.div>
+            )}
+
+            {isFocused && suggestions.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute z-50 left-0 right-0 top-full mt-2 bg-white rounded-2xl border border-black/5 shadow-xl overflow-hidden"
+              >
+                {suggestions.map((city, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleCitySelect(city)}
+                    className="w-full p-4 hover:bg-gray-50 flex items-center justify-between border-b border-gray-50 last:border-0 text-right"
+                    dir="rtl"
+                  >
+                    <div className="flex flex-col items-start">
+                      <span className="text-sm font-bold text-gray-800">{city.name}</span>
+                      <span className="text-[10px] text-gray-400">{city.country}</span>
+                    </div>
+                    <MapPin className="w-4 h-4 text-gray-300" />
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Popular Cities Quick Select */}
+          {!query && (
+            <div className="space-y-3 pt-4">
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('popular_cities' as any)}</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {popularCities.slice(0, 6).map((city, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleCitySelect(city)}
+                    className="p-3 bg-white border border-black/5 rounded-xl text-xs font-bold text-gray-700 hover:border-rose-200 hover:bg-rose-50 transition-all text-right"
+                    dir="rtl"
+                  >
+                    {city.name}
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
-          {query && (
-            <button 
-              onClick={() => setQuery('')}
-              className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full"
-            >
-              <X className="w-4 h-4 text-gray-400" />
-            </button>
           )}
         </div>
-
-        <AnimatePresence>
-          {isFocused && query.trim().length >= 2 && !isLoading && suggestions.length === 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="absolute z-50 left-0 right-0 top-full mt-2 bg-white rounded-2xl border border-black/5 shadow-xl p-4 text-center text-gray-500 text-sm"
-            >
-              {t('no_results')}
-            </motion.div>
-          )}
-
-          {isFocused && suggestions.length > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="absolute z-50 left-0 right-0 top-full mt-2 bg-white rounded-2xl border border-black/5 shadow-xl overflow-hidden"
-            >
-              {suggestions.map((city, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSelect(city)}
-                  className="w-full p-4 hover:bg-gray-50 flex items-center justify-between border-b border-gray-50 last:border-0 text-right"
-                  dir="rtl"
-                >
-                  <div className="flex flex-col items-start">
-                    <span className="text-sm font-bold text-gray-800">{city.name}</span>
-                    <span className="text-[10px] text-gray-400">{city.country}</span>
-                  </div>
-                  <MapPin className="w-4 h-4 text-gray-300" />
-                </button>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Popular Cities Quick Select */}
-        {!query && (
-          <div className="space-y-3 pt-4">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('popular_cities' as any)}</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {popularCities.slice(0, 6).map((city, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSelect(city)}
-                  className="p-3 bg-white border border-black/5 rounded-xl text-xs font-bold text-gray-700 hover:border-rose-200 hover:bg-rose-50 transition-all text-right"
-                  dir="rtl"
-                >
-                  {city.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       <button 
@@ -591,10 +631,20 @@ const ScreenLocation = ({ data, update, onNext }: { data: OnboardingData; update
 const Screen5LastPeriod = ({ data, update, onNext }: { data: OnboardingData; update: (d: Partial<OnboardingData>) => void; onNext: () => void }) => {
   const { t, isRTL } = useTranslation();
   const [selectedDate, setSelectedDate] = useState<Date | null>(data.last_period_date ? new Date(data.last_period_date) : null);
+  const [validationMsg, setValidationMsg] = useState('');
 
   const handleSelect = (date: Date) => {
     setSelectedDate(date);
     update({ last_period_date: date.toISOString() });
+    setValidationMsg('');
+  };
+
+  const handleContinue = () => {
+    if (!selectedDate) {
+      setValidationMsg('يرجى اختيار تاريخ لبدء المتابعة');
+      return;
+    }
+    onNext();
   };
 
   const handleNotSure = () => {
@@ -608,49 +658,51 @@ const Screen5LastPeriod = ({ data, update, onNext }: { data: OnboardingData; upd
     : [t('sun'), t('mon'), t('tue'), t('wed'), t('thu'), t('fri'), t('sat')];
 
   return (
-    <div className="w-full space-y-8">
-      <h2 className="text-3xl font-serif font-bold text-center">{t('last_period_question')}</h2>
-      
-      <div className="bg-white rounded-3xl p-6 shadow-xl shadow-black/5 border border-black/5">
-        <div className="grid grid-cols-7 gap-2 text-center mb-4">
-          {weekDays.map(d => (
-            <span key={d} className="text-[10px] font-bold text-gray-300 uppercase">{d}</span>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-2">
-          {Array.from({ length: 31 }).map((_, i) => {
-            const date = subDays(new Date(), 30 - i);
-            const isSelected = selectedDate && format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
-            const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-            
-            return (
-              <button
-                key={i}
-                onClick={() => handleSelect(date)}
-                className={cn(
-                  "aspect-square rounded-full text-sm font-bold flex items-center justify-center transition-all",
-                  isSelected ? "bg-rose-300 text-white" : isToday ? "text-rose-400 ring-1 ring-rose-400" : "text-gray-700 hover:bg-rose-50"
-                )}
-              >
-                {date.getDate()}
-              </button>
-            );
-          })}
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1">
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('last_period_question')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8">{t('last_period_desc' as any) || 'متى بدأت دورتك الشهرية الأخيرة؟'}</p>
+        
+        <div className="bg-white rounded-3xl p-6 shadow-xl shadow-black/5 border border-black/5">
+          <div className="grid grid-cols-7 gap-2 text-center mb-4">
+            {weekDays.map(d => (
+              <span key={d} className="text-[10px] font-bold text-gray-300 uppercase">{d}</span>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {Array.from({ length: 31 }).map((_, i) => {
+              const date = subDays(new Date(), 30 - i);
+              const isSelected = selectedDate && format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+              const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+              
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleSelect(date)}
+                  className={cn(
+                    "aspect-square rounded-full text-sm font-bold flex items-center justify-center transition-all",
+                    isSelected ? "bg-rose-300 text-white" : isToday ? "text-rose-400 ring-1 ring-rose-400" : "text-gray-700 hover:bg-rose-50"
+                  )}
+                >
+                  {date.getDate()}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       <div className="space-y-4">
         <button 
-          disabled={!selectedDate}
-          onClick={onNext}
-          className={cn(
-            "w-full py-4 rounded-2xl font-bold flex items-center justify-center transition-all space-x-2",
-            selectedDate ? "bg-rose-400 text-white shadow-lg shadow-rose-100" : "bg-gray-100 text-gray-400 cursor-not-allowed"
-          )}
+          onClick={handleContinue}
+          className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
         >
-          <span>{t('continue')}</span>
-          <ChevronRight className={cn("w-5 h-5", isRTL && "rotate-180")} />
+          <span>استمرار</span>
+          <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
         </button>
+        {validationMsg && (
+          <p className="text-center text-sm text-rose-500 mt-2">{validationMsg}</p>
+        )}
         <button 
           onClick={handleNotSure}
           className="w-full text-center text-gray-400 text-sm font-medium hover:text-rose-400"
@@ -665,44 +717,44 @@ const Screen5LastPeriod = ({ data, update, onNext }: { data: OnboardingData; upd
 const Screen6CycleLength = ({ data, update, onNext }: { data: OnboardingData; update: (d: Partial<OnboardingData>) => void; onNext: () => void }) => {
   const { t, isRTL } = useTranslation();
   return (
-    <div className="w-full space-y-12">
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-serif font-bold">{t('cycle_length_question')}</h2>
-        <p className="text-sm text-gray-500">{t('cycle_length_desc')}</p>
-      </div>
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1">
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('cycle_length_question')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8">{t('cycle_length_desc')}</p>
 
-      <div className="flex flex-col items-center space-y-8">
-        <motion.div 
-          key={data.avg_cycle_length}
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="text-7xl font-serif font-bold text-rose-400"
-        >
-          {data.avg_cycle_length} <span className="text-2xl text-rose-800/40">{t('days')}</span>
-        </motion.div>
+        <div className="flex flex-col items-center space-y-8 mt-12">
+          <motion.div 
+            key={data.avg_cycle_length}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="text-7xl font-serif font-bold text-rose-400"
+          >
+            {data.avg_cycle_length} <span className="text-2xl text-rose-800/40">{t('days')}</span>
+          </motion.div>
 
-        <input 
-          type="range" 
-          min="21" 
-          max="40" 
-          value={data.avg_cycle_length}
-          onChange={(e) => update({ avg_cycle_length: parseInt(e.target.value) })}
-          className="w-full h-2 bg-rose-50 rounded-lg appearance-none cursor-pointer accent-rose-400"
-        />
-        
-        <div className="flex justify-between w-full text-xs font-bold text-gray-300 uppercase tracking-widest">
-          <span>21 {t('days')}</span>
-          <span>40 {t('days')}</span>
+          <input 
+            type="range" 
+            min="21" 
+            max="40" 
+            value={data.avg_cycle_length}
+            onChange={(e) => update({ avg_cycle_length: parseInt(e.target.value) })}
+            className="w-full h-2 bg-rose-50 rounded-lg appearance-none cursor-pointer accent-rose-400"
+          />
+          
+          <div className="flex justify-between w-full text-xs font-bold text-gray-300 uppercase tracking-widest">
+            <span>21 {t('days')}</span>
+            <span>40 {t('days')}</span>
+          </div>
         </div>
       </div>
 
       <div className="space-y-4">
         <button 
           onClick={onNext}
-          className="w-full py-4 bg-rose-400 text-white rounded-2xl font-bold shadow-lg shadow-rose-100 flex items-center justify-center space-x-2"
+          className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
         >
-          <span>{t('continue')}</span>
-          <ChevronRight className={cn("w-5 h-5", isRTL && "rotate-180")} />
+          <span>استمرار</span>
+          <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
         </button>
         <button 
           onClick={() => { update({ avg_cycle_length: 28 }); onNext(); }}
@@ -720,42 +772,45 @@ const Screen7PeriodDuration = ({ data, update, onNext }: { data: OnboardingData;
   const maxDays = data.madhhab === 'HANAFI' ? 10 : 15;
   
   return (
-    <div className="w-full space-y-12">
-      <h2 className="text-3xl font-serif font-bold text-center">{t('period_duration_question')}</h2>
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1">
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('period_duration_question')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8">{t('period_duration_desc' as any) || 'كم يوماً تستمر دورتك الشهرية عادةً؟'}</p>
 
-      <div className="flex flex-col items-center space-y-8">
-        <motion.div 
-          key={data.avg_haid_duration}
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="text-7xl font-serif font-bold text-rose-400"
-        >
-          {data.avg_haid_duration} <span className="text-2xl text-rose-800/40">{t('days')}</span>
-        </motion.div>
+        <div className="flex flex-col items-center space-y-8 mt-12">
+          <motion.div 
+            key={data.avg_haid_duration}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="text-7xl font-serif font-bold text-rose-400"
+          >
+            {data.avg_haid_duration} <span className="text-2xl text-rose-800/40">{t('days')}</span>
+          </motion.div>
 
-        <input 
-          type="range" 
-          min="2" 
-          max={maxDays} 
-          value={data.avg_haid_duration}
-          onChange={(e) => update({ avg_haid_duration: parseInt(e.target.value) })}
-          className="w-full h-2 bg-rose-50 rounded-lg appearance-none cursor-pointer accent-rose-400"
-        />
-        
-        <div className="text-center">
-          <p className="text-xs font-bold text-rose-800/40 uppercase tracking-widest">
-            {data.madhhab === 'HANAFI' ? t('hanafi_max_10') : t('other_max_15')}
-          </p>
+          <input 
+            type="range" 
+            min="2" 
+            max={maxDays} 
+            value={data.avg_haid_duration}
+            onChange={(e) => update({ avg_haid_duration: parseInt(e.target.value) })}
+            className="w-full h-2 bg-rose-50 rounded-lg appearance-none cursor-pointer accent-rose-400"
+          />
+          
+          <div className="text-center">
+            <p className="text-xs font-bold text-rose-800/40 uppercase tracking-widest">
+              {data.madhhab === 'HANAFI' ? t('hanafi_max_10') : t('other_max_15')}
+            </p>
+          </div>
         </div>
       </div>
 
       <div className="space-y-4">
         <button 
           onClick={onNext}
-          className="w-full py-4 bg-rose-400 text-white rounded-2xl font-bold shadow-lg shadow-rose-100 flex items-center justify-center space-x-2"
+          className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
         >
-          <span>{t('continue')}</span>
-          <ChevronRight className={cn("w-5 h-5", isRTL && "rotate-180")} />
+          <span>استمرار</span>
+          <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
         </button>
         <button 
           onClick={() => { update({ avg_haid_duration: 5 }); onNext(); }}
@@ -770,6 +825,7 @@ const Screen7PeriodDuration = ({ data, update, onNext }: { data: OnboardingData;
 
 const Screen8Conditions = ({ data, update, onNext }: { data: OnboardingData; update: (d: Partial<OnboardingData>) => void; onNext: () => void }) => {
   const { t, isRTL } = useTranslation();
+  const [validationMsg, setValidationMsg] = useState('');
   const conditions = [
     t('cond_pcos'),
     t('cond_endo'),
@@ -780,6 +836,7 @@ const Screen8Conditions = ({ data, update, onNext }: { data: OnboardingData; upd
   ];
 
   const toggleCondition = (c: string) => {
+    setValidationMsg('');
     if (c === t('cond_none') || c === t('cond_prefer_not_to_say')) {
       update({ conditions: [c] });
     } else {
@@ -789,107 +846,101 @@ const Screen8Conditions = ({ data, update, onNext }: { data: OnboardingData; upd
     }
   };
 
+  const handleContinue = () => {
+    if (data.conditions.length === 0) {
+      setValidationMsg('يرجى اختيار خيار واحد على الأقل للمتابعة');
+      return;
+    }
+    onNext();
+  };
+
   return (
-    <div className="w-full space-y-8">
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-serif font-bold">{t('conditions_question')}</h2>
-        <p className="text-sm text-gray-500">{t('conditions_desc')}</p>
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1">
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('conditions_question')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8">{t('conditions_desc')}</p>
+
+        <div className="flex flex-wrap gap-3 justify-center mt-8" dir="rtl">
+          {conditions.map((c) => (
+            <motion.button
+              key={c}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => toggleCondition(c)}
+              className={cn(
+                "px-5 py-3 rounded-full border-2 transition-all text-sm font-medium",
+                data.conditions.includes(c)
+                  ? 'bg-rose-50 border-rose-400 text-rose-700'
+                  : 'bg-white border-gray-200 text-gray-700'
+              )}
+            >
+              {c}
+            </motion.button>
+          ))}
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 justify-center">
-        {conditions.map((c) => (
-          <motion.button
-            key={c}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => toggleCondition(c)}
-            className={cn(
-              "px-5 py-3 rounded-full border-2 transition-all text-sm font-medium",
-              data.conditions.includes(c)
-                ? "border-rose-300 bg-rose-300 text-white shadow-md"
-                : "border-black/5 bg-white text-gray-600 hover:border-rose-100"
-            )}
-          >
-            {c}
-          </motion.button>
-        ))}
-      </div>
-
-      <button 
-        disabled={data.conditions.length === 0}
-        onClick={onNext}
-        className={cn(
-          "w-full py-4 rounded-2xl font-bold flex items-center justify-center transition-all space-x-2",
-          data.conditions.length > 0 ? "bg-rose-400 text-white shadow-lg shadow-rose-100" : "bg-gray-100 text-gray-400 cursor-not-allowed"
+      <div className="mt-8">
+        <button 
+          onClick={handleContinue}
+          className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
+        >
+          <span>استمرار</span>
+          <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
+        </button>
+        {validationMsg && (
+          <p className="text-center text-sm text-rose-500 mt-2">{validationMsg}</p>
         )}
-      >
-        <span>{t('continue')}</span>
-        <ChevronRight className={cn("w-5 h-5", isRTL && "rotate-180")} />
-      </button>
+      </div>
     </div>
   );
 };
 
 const Screen9Privacy = ({ data, update, onNext }: { data: OnboardingData; update: (d: Partial<OnboardingData>) => void; onNext: () => void }) => {
-  const { t, isRTL } = useTranslation();
+  const { t } = useTranslation();
+  
   return (
-    <div className="w-full space-y-6">
-      <h2 className="text-3xl font-serif font-bold text-center">{t('privacy_title')}</h2>
+    <div className="flex flex-col h-full w-full">
+      <div className="flex-1">
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('privacy_title')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-10">{t('privacy_desc')}</p>
 
-      <div className="space-y-3">
-        {[
-          { id: 'biometric', label: t('face_id_touch_id'), icon: ShieldCheck },
-          { id: 'pin', label: t('pin_code'), icon: Lock },
-          { id: 'skip', label: t('skip_for_now'), icon: ChevronRight },
-        ].map((opt) => (
-          <motion.button
-            key={opt.id}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => update({ privacy_setup: { ...data.privacy_setup, method: opt.id as any } })}
-            className={cn(
-              "w-full p-5 rounded-2xl border-2 flex items-center justify-between transition-all",
-              data.privacy_setup.method === opt.id ? "border-rose-300 bg-rose-50" : "border-black/5 bg-white"
-            )}
-          >
-            <div className={cn("flex items-center", isRTL ? "space-x-reverse space-x-4" : "space-x-4")}>
-              <opt.icon className={cn("w-6 h-6", data.privacy_setup.method === opt.id ? "text-rose-400" : "text-gray-400", isRTL && opt.id === 'skip' && "rotate-180")} />
-              <span className="font-bold">{opt.label}</span>
-            </div>
-            {data.privacy_setup.method === opt.id && <Check className="w-5 h-5 text-rose-400" />}
-          </motion.button>
-        ))}
-      </div>
-
-      <div className="p-6 rounded-3xl bg-rose-800 text-white space-y-4">
-        <div className={cn("flex items-center justify-between", isRTL && "flex-row-reverse")}>
-          <div className={cn("flex items-center", isRTL ? "space-x-reverse space-x-3" : "space-x-3")}>
-            <Zap className="w-6 h-6 text-rose-300" />
-            <span className="font-bold">{t('anonymous_mode')}</span>
-          </div>
-          <button 
-            onClick={() => update({ privacy_setup: { ...data.privacy_setup, anonymous_mode: !data.privacy_setup.anonymous_mode } })}
-            className={cn(
-              "w-12 h-6 rounded-full transition-all relative",
-              data.privacy_setup.anonymous_mode ? "bg-rose-300" : "bg-rose-700"
-            )}
-          >
-            <motion.div 
-              animate={{ x: data.privacy_setup.anonymous_mode ? (isRTL ? -24 : 24) : (isRTL ? -4 : 4) }}
-              className="absolute top-1 w-4 h-4 bg-white rounded-full"
-              style={{ [isRTL ? 'right' : 'left']: 0 }}
+        {/* Anonymous mode — the only option */}
+        <div className="bg-rose-50 border border-rose-100 rounded-2xl p-5">
+          <div className="flex items-center justify-between">
+            <NiswahToggle 
+              value={data.privacy_setup.anonymous_mode} 
+              onChange={(v) => update({ privacy_setup: { ...data.privacy_setup, anonymous_mode: v } })} 
             />
-          </button>
+            <div className="text-right">
+              <div className="font-bold text-gray-800">{t('anonymous_mode')}</div>
+              <div className="text-sm text-gray-500 mt-1">{t('anonymous_mode_desc')}</div>
+            </div>
+          </div>
         </div>
-        <p className="text-xs text-rose-50/60 leading-relaxed">
-          {t('anonymous_mode_desc')}
-        </p>
+
+        {/* Privacy assurance cards */}
+        <div className="mt-6 space-y-3">
+          {[
+            { icon: '🔒', title: 'تشفير كامل', sub: 'بياناتك محمية بأعلى معايير الأمان' },
+            { icon: '🚫', title: 'لا إعلانات', sub: 'لا نبيع بياناتك ولا نشاركها' },
+            { icon: '🗑️', title: 'حذف فوري', sub: 'يمكنك حذف كل بياناتك في أي وقت' },
+          ].map(item => (
+            <div key={item.title} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl flex-row-reverse">
+              <span style={{ fontSize: '16px' }}>{item.icon}</span>
+              <div className="text-right">
+                <div className="text-sm font-bold text-gray-700">{item.title}</div>
+                <div className="text-xs text-gray-400">{item.sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <button 
+      <button
         onClick={onNext}
-        className="w-full py-4 bg-rose-400 text-white rounded-2xl font-bold shadow-lg shadow-rose-100 flex items-center justify-center space-x-2"
+        className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform"
       >
-        <span>{t('continue')}</span>
-        <ChevronRight className={cn("w-5 h-5", isRTL && "rotate-180")} />
+        استمرار
       </button>
     </div>
   );
@@ -911,51 +962,48 @@ const Screen10Notifications = ({ data, update, onNext }: { data: OnboardingData;
   };
 
   const enableAll = () => {
-    const all = Object.keys(data.notification_prefs).reduce((acc, key) => ({ ...acc, [key]: true }), {});
-    update({ notification_prefs: all as any });
+    const allArr = options.map(o => o.id);
+    const allPrefs = { ...data.notification_prefs };
+    allArr.forEach(id => { allPrefs[id] = true; });
+    update({ notification_prefs: allPrefs });
     onNext();
   };
 
   return (
-    <div className="w-full space-y-6">
-      <h2 className="text-3xl font-serif font-bold text-center">{t('notifications_title')}</h2>
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1">
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('notifications_title')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8">{t('notifications_desc')}</p>
 
-      <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-        {options.map((opt) => (
-          <div key={opt.id} className={cn("flex items-center justify-between p-2", isRTL && "flex-row-reverse")}>
-            <div className={cn("flex-1", isRTL ? "text-right" : "text-left")}>
-              <p className="font-bold text-sm">{opt.label}</p>
-              <p className="text-[10px] text-gray-400">{opt.sub}</p>
-            </div>
-            <button 
-              onClick={() => toggle(opt.id)}
-              className={cn(
-                "w-10 h-5 rounded-full transition-all relative",
-                data.notification_prefs[opt.id] ? "bg-rose-300" : "bg-gray-200"
-              )}
-            >
-              <motion.div 
-                animate={{ x: data.notification_prefs[opt.id] ? (isRTL ? -20 : 20) : (isRTL ? -4 : 4) }}
-                className="absolute top-1 w-3 h-3 bg-white rounded-full"
-                style={{ [isRTL ? 'right' : 'left']: 0 }}
+        <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+          {options.map((opt) => (
+            <div key={opt.id} className={cn("flex items-center justify-between p-2", isRTL && "flex-row-reverse")}>
+              <div className={cn("flex-1", isRTL ? "text-right" : "text-left")}>
+                <p className="font-bold text-sm text-gray-800">{opt.label}</p>
+                <p className="text-[10px] text-gray-400">{opt.sub}</p>
+              </div>
+              <NiswahToggle 
+                value={data.notification_prefs[opt.id]} 
+                onChange={() => toggle(opt.id)} 
               />
-            </button>
-          </div>
-        ))}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-4 pt-4">
         <button 
           onClick={enableAll}
-          className="w-full py-4 bg-rose-400 text-white rounded-2xl font-bold shadow-lg shadow-rose-100"
+          className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold shadow-lg shadow-rose-100 active:scale-95 transition-transform"
         >
           {t('enable_recommended')}
         </button>
         <button 
           onClick={onNext}
-          className="w-full text-center text-gray-400 text-sm font-medium hover:text-rose-400"
+          className="w-full py-4 text-gray-400 text-sm font-medium hover:text-rose-400 flex items-center justify-center"
         >
-          {t('choose_own')}
+          <span>{t('choose_own')}</span>
+          <ChevronRight className="ml-1 w-4 h-4 rtl:rotate-180" />
         </button>
       </div>
     </div>
@@ -1026,7 +1074,11 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
 
   const nextStep = () => {
     setDirection(1);
-    setStep(s => Math.min(s + 1, 12));
+    if (step === 11) {
+      complete();
+    } else {
+      setStep(s => Math.min(s + 1, 11));
+    }
   };
 
   const prevStep = () => {
@@ -1090,7 +1142,7 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
 
   return (
     <div className="fixed inset-0 bg-[#FDFCFB] flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
-      {step > 1 && <ProgressBar current={step} total={12} />}
+      {step > 1 && step < 12 && <ProgressBar current={step} total={11} />}
       
       {step > 2 && step < 12 && (
         <button 
@@ -1117,17 +1169,27 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
           {step === 1 && <Screen1Splash onNext={nextStep} />}
           {step === 2 && <Screen2Language data={data} update={updateData} onNext={nextStep} />}
           {step === 3 && <Screen3Madhhab data={data} update={updateData} onNext={nextStep} />}
-          {step === 4 && <Screen4Goals data={data} update={updateData} onNext={nextStep} />}
-          {step === 5 && <ScreenLocation data={data} update={updateData} onNext={nextStep} />}
+          {step === 4 && <Screen6CycleLength data={data} update={updateData} onNext={nextStep} />}
+          {step === 5 && <Screen7PeriodDuration data={data} update={updateData} onNext={nextStep} />}
           {step === 6 && <Screen5LastPeriod data={data} update={updateData} onNext={nextStep} />}
-          {step === 7 && <Screen6CycleLength data={data} update={updateData} onNext={nextStep} />}
-          {step === 8 && <Screen7PeriodDuration data={data} update={updateData} onNext={nextStep} />}
-          {step === 9 && <Screen8Conditions data={data} update={updateData} onNext={nextStep} />}
-          {step === 10 && <Screen9Privacy data={data} update={updateData} onNext={nextStep} />}
-          {step === 11 && <Screen10Notifications data={data} update={updateData} onNext={nextStep} />}
-          {step === 12 && <Screen11Welcome onComplete={complete} isCompleting={isCompleting} />}
+          {step === 7 && <Screen4Goals data={data} update={updateData} onNext={nextStep} />}
+          {step === 8 && <Screen8Conditions data={data} update={updateData} onNext={nextStep} />}
+          {step === 9 && <ScreenLocation data={data} update={updateData} onNext={nextStep} />}
+          {step === 10 && <Screen10Notifications data={data} update={updateData} onNext={nextStep} />}
+          {step === 11 && <Screen9Privacy data={data} update={updateData} onNext={nextStep} />}
         </motion.div>
       </AnimatePresence>
+      
+      {isCompleting && (
+        <div className="fixed inset-0 z-[100] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center space-y-4">
+          <motion.div 
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+            className="w-10 h-10 border-4 border-rose-500 border-t-transparent rounded-full"
+          />
+          <p className="text-xs font-bold text-rose-900 uppercase tracking-widest animate-pulse">جاري التحضير...</p>
+        </div>
+      )}
     </div>
   );
 };

@@ -134,11 +134,19 @@ async function retry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000):
 
 export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
   const { t } = useTranslation();
+  const [step, setStep] = useState<'start' | 'chat'>('start');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isContextExpanded, setIsContextExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const categories = [
+    { id: 'fiqh', label: t('category_fiqh'), icon: Sparkles, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { id: 'health', label: t('category_health'), icon: Info, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { id: 'personal', label: t('sister'), icon: MessageSquare, color: 'text-purple-600', bg: 'bg-purple-50' },
+  ];
 
   const quickPrompts = [
     t('prompt_haid_activities'),
@@ -155,23 +163,32 @@ export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
   useEffect(() => {
     if (isOpen) {
       loadHistory();
+    } else {
+      setStep('start');
     }
   }, [isOpen]);
 
   const loadHistory = async () => {
-    const { data: history } = await api.getChatHistory('niswah');
-    if (history && history.length > 0) {
-      setMessages(history.map(m => ({
-        id: m.id,
-        role: m.role === 'model' ? 'niswah' : 'user',
-        text: m.text,
-        timestamp: new Date(m.timestamp).getTime()
-      })));
+    setIsHistoryLoading(true);
+    try {
+      const { data: history } = await api.getChatHistory('niswah');
+      if (history && history.length > 0) {
+        setMessages(history.map(m => ({
+          id: m.id,
+          role: m.role === 'model' ? 'niswah' : 'user',
+          text: m.text,
+          timestamp: new Date(m.timestamp).getTime()
+        })));
+      }
+    } finally {
+      setIsHistoryLoading(false);
     }
   };
 
-  const handleSend = async (text: string = inputText) => {
+  const handleSend = async (text: string = inputText, isQuick = false) => {
     if (!text.trim()) return;
+    
+    if (step === 'start') setStep('chat');
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -279,7 +296,10 @@ Current user context:
           {/* Header */}
           <header className="p-6 flex items-center justify-between border-b border-black/5 bg-white/80 backdrop-blur-md sticky top-0 z-10">
             <div className="flex items-center space-x-4">
-              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <button 
+                onClick={step === 'chat' ? () => setStep('start') : onClose} 
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
                 <ArrowLeft className="w-6 h-6 text-emerald-900" />
               </button>
               <div className="flex items-center space-x-3">
@@ -287,7 +307,7 @@ Current user context:
                   <Sparkles className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-serif font-bold text-emerald-900">Niswah AI <span className="text-[10px] opacity-30">v11.1-GEMINI</span></h2>
+                  <h2 className="text-lg font-serif font-bold text-emerald-900">Niswah AI <span className="text-[10px] opacity-30">v11.2</span></h2>
                   <div className="flex items-center space-x-1">
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                     <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">{t('online_status')}</span>
@@ -345,28 +365,72 @@ Current user context:
             ref={scrollRef}
             className="flex-1 overflow-y-auto p-6 no-scrollbar"
           >
-            {messages.length === 0 && (
+            {step === 'start' ? (
               <div className="h-full flex flex-col items-center justify-center space-y-8 text-center px-4">
                 <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center">
-                  <MessageSquare className="w-10 h-10 text-emerald-200" />
+                  <motion.div
+                    animate={{ rotate: [0, 10, -10, 0] }}
+                    transition={{ repeat: Infinity, duration: 4 }}
+                  >
+                    <Sparkles className="w-10 h-10 text-emerald-600" />
+                  </motion.div>
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-xl font-serif font-bold text-emerald-900">{t('nisa_greeting')}</h3>
                   <p className="text-sm text-gray-400 max-w-[240px]">{t('nisa_intro')}</p>
                 </div>
-                <div className="flex flex-col space-y-3 w-full max-w-[280px]">
-                  {quickPrompts.map(p => (
-                    <QuickPrompt key={p} text={p} onClick={() => handleSend(p)} />
+
+                <div className="grid grid-cols-3 gap-3 w-full max-w-[320px]">
+                  {categories.map(cat => (
+                    <motion.button
+                      key={cat.id}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setStep('chat')}
+                      className="flex flex-col items-center space-y-2 p-3 bg-white rounded-2xl border border-black/5 shadow-sm"
+                    >
+                      <div className={cn("p-2 rounded-xl", cat.bg)}>
+                        <cat.icon className={cn("w-5 h-5", cat.color)} />
+                      </div>
+                      <span className="text-[8px] font-bold text-gray-900 uppercase tracking-widest">{cat.label}</span>
+                    </motion.button>
                   ))}
                 </div>
+
+                <div className="flex flex-col space-y-2 w-full max-w-[280px]">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">{t('suggested_questions') || 'أسئلة مقترحة'}</p>
+                  {quickPrompts.map(p => (
+                    <QuickPrompt key={p} text={p} onClick={() => handleSend(p, true)} />
+                  ))}
+                  
+                  {messages.length > 0 && (
+                    <button 
+                      onClick={() => setStep('chat')}
+                      className="mt-4 text-[10px] font-bold text-emerald-600 uppercase tracking-widest flex items-center justify-center space-x-2"
+                    >
+                      <MessageSquare className="w-3 h-3" />
+                      <span>{t('view_history') || 'عرض سجل المحادثة'}</span>
+                    </button>
+                  )}
+                </div>
               </div>
+            ) : (
+              <>
+                {isHistoryLoading && (
+                  <div className="flex justify-center p-4">
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full" />
+                  </div>
+                )}
+                {messages.length === 0 && !isHistoryLoading && (
+                  <div className="text-center p-12 text-gray-400 text-sm italic">
+                    {t('no_messages_yet') || 'ابدئي بسؤال رفيقتك نسوة...'}
+                  </div>
+                )}
+                {messages.map(m => (
+                  <MessageBubble key={m.id} message={m} />
+                ))}
+                {isTyping && <TypingIndicator />}
+              </>
             )}
-            
-            {messages.map(m => (
-              <MessageBubble key={m.id} message={m} />
-            ))}
-            
-            {isTyping && <TypingIndicator />}
           </div>
 
           {/* Input Bar */}

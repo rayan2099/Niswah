@@ -89,13 +89,16 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   }, [isOpen]);
 
   const loadHistory = async () => {
-    const { data: history } = await api.getChatHistory('doctor');
-    if (history && history.length > 0) {
-      setStep('chat');
-      setMessages(history.map(m => ({
-        role: m.role === 'model' ? 'ai' : 'user',
-        text: m.text
-      })));
+    try {
+      const { data: history } = await api.getChatHistory('doctor');
+      if (history && history.length > 0) {
+        setMessages(history.map(m => ({
+          role: m.role === 'model' ? 'ai' : 'user',
+          text: m.text
+        })));
+      }
+    } catch (err) {
+      console.error("HealthDoctor loadHistory error:", err);
     }
   };
 
@@ -292,7 +295,12 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-black/5">
-          <button onClick={onClose} className="text-gray-400 text-sm">{isRTL ? 'إغلاق' : 'Close'}</button>
+          <button 
+            onClick={step === 'chat' ? () => setStep('select') : onClose} 
+            className="text-gray-400 text-sm"
+          >
+            {step === 'chat' ? (isRTL ? 'رجوع' : 'Back') : (isRTL ? 'إغلاق' : 'Close')}
+          </button>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-rose-100 border-2 border-rose-400 flex items-center justify-center text-sm font-bold text-rose-600">د</div>
             <div className={isRTL ? 'text-right' : 'text-left'}>

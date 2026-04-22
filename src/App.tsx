@@ -101,6 +101,17 @@ const LoadingSpinner = () => {
   );
 };
 
+const LoadingOverlay = () => (
+  <div className="fixed inset-0 z-[500] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center space-y-4">
+    <motion.div 
+      animate={{ rotate: 360 }}
+      transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+      className="w-10 h-10 border-4 border-rose-500 border-t-transparent rounded-full"
+    />
+    <p className="text-xs font-bold text-rose-900 uppercase tracking-widest animate-pulse">جاري التحميل...</p>
+  </div>
+);
+
 
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
@@ -300,7 +311,7 @@ function AppContent() {
       </nav>
 
       {/* Niswah AI Chat Interface */}
-      <Suspense fallback={null}>
+      <Suspense fallback={<LoadingOverlay />}>
         <NiswahAI 
           isOpen={isAIChatOpen} 
           onClose={() => setIsAIChatOpen(false)} 
@@ -316,7 +327,7 @@ function AppContent() {
       </Suspense>
 
       {/* Dream Interpreter */}
-      <Suspense fallback={null}>
+      <Suspense fallback={<LoadingOverlay />}>
         <DreamInterpreter 
           isOpen={isDreamInterpreterOpen} 
           onClose={() => setIsDreamInterpreterOpen(false)} 

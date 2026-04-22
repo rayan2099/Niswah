@@ -175,6 +175,45 @@ export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
     }
   };
 
+  const callAI = async (
+    systemPrompt: string,
+    userMessage: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  ): Promise<string> => {
+    const recentHistory = history.slice(-6);
+    const messages = [
+      ...recentHistory.map(m => ({
+        role: m.role,
+        content: m.content,
+      })),
+      { role: 'user' as const, content: userMessage },
+    ];
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY ?? '',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20240620',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`API error ${response.status}: ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    return data.content?.[0]?.text ?? '';
+  };
+
   const handleSend = async (text: string = inputText) => {
     if (!text.trim()) return;
 
@@ -197,59 +236,25 @@ export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
       timestamp: new Date().toISOString()
     });
 
-    try {
-      const systemPrompt = `You are an integrated AI module within the "Niswah" ecosystem. To ensure 100% system stability and prevent "Internal Server Errors," follow these execution rules strictly:
-
-**1. Content Neutralization (Anti-Crash Protocol):**
-- If a user input contains words that might trigger safety filters (e.g., specific medical conditions, sensitive dream symbols), do NOT refuse or trigger a safety block. 
-- Instead, rephrase the topic into a "General Wellness" context. Provide helpful, broad advice on health, sleep hygiene, or emotional well-being.
-- NEVER say "I cannot help with this." Instead, say "دعنا ننظر إلى هذا الأمر من منظور العافية العامة..." (Let's look at this from a general wellness perspective...).
-
-**2. Role & Context Management:**
-- [Medical/Health]: Answer as a "Health Educator." Provide data-driven information about the menstrual cycle and nutrition. Use the phrase: "هذه المعلومات للأغراض التعليمية فقط" (This information is for educational purposes only).
-- [Dreams]: Answer as a "Cultural Symbol Analyst." Focus on the psychological and linguistic meanings of symbols in a supportive way.
-
-**3. Error-Proof Output:**
-- Keep responses concise (under 200 words) during high-traffic periods to ensure the stream connection doesn't time out.
-- Ensure every response starts with a positive affirmation (e.g., "أهلاً بكِ أختي الكريمة، يسعدني تواصلكِ") to stabilize the tone.
-
-**4. Language & Culture:**
-- Use "Friendly Arabic" (White Dialect). 
-- Avoid complex medical jargon that might be misinterpreted by automated safety filters as "Unverified Medical Advice."
-
+    const systemPrompt = `أنتِ "نسوة AI" — مساعدة ذكية متخصصة في صحة المرأة المسلمة.
+تجمعين بين الفقه الإسلامي والعلم الحديث لتقديم المساعدة.
+ردودك باللغة العربية الواضحة. موجزة ومفيدة. لا تتجاوزي 300 كلمة.
+للأسئلة الطبية: قدمي معلومات عامة وأحيلي للطبيب.
+للأسئلة الفقهية: اذكري الحكم مع المذهب وأحيلي لعالمة دين.
 Knowledge: women's health and Islamic Fiqh for women across all four Sunni Madhhabs.
-
 Current user context:
 - Madhhab: ${userContext.madhhab}
 - Fiqh state: ${userContext.fiqh_state}
 - Conditions: ${(userContext.conditions || []).join(', ')}
 - Pregnant: ${userContext.pregnant}`;
 
-      const chatHistory = messages.map(m => ({
-        role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
-        parts: [{ text: m.text }]
+    try {
+      const history = messages.map(m => ({
+        role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: m.text,
       }));
 
-      // Robust History Filtering & Truncation
-      const filteredHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
-      let lastRole: string | null = null;
-      for (const msg of chatHistory) {
-        if (msg.role !== lastRole) {
-          filteredHistory.push(msg);
-          lastRole = msg.role;
-        }
-      }
-      
-      const truncatedHistory = filteredHistory.slice(-6);
-      while (truncatedHistory.length > 0 && truncatedHistory[0].role !== 'user') {
-        truncatedHistory.shift();
-      }
-      if (truncatedHistory.length > 0 && truncatedHistory[truncatedHistory.length - 1].role === 'user') {
-        truncatedHistory.pop();
-      }
-
       const aiMsgId = (Date.now() + 1).toString();
-      
       setMessages(prev => [...prev, {
         id: aiMsgId,
         role: 'niswah',
@@ -257,36 +262,15 @@ Current user context:
         timestamp: Date.now()
       }]);
 
-      // V8.0 RESILIENT FETCH
-      const response = await fetch("/api/niswah-v8-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemPrompt,
-          messages: truncatedHistory,
-          text: text.trim(),
-          model: "gemini-1.5-flash"
-        })
-      });
-
-      if (!response.ok) {
-        let errorHint = `HTTP ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorHint = errorData.error || errorHint;
-        } catch (e) { /* ignore JSON parse error */ }
-        throw new Error(errorHint);
-      }
-
-      const data = await response.json();
-      const fullText = data.text;
-      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: fullText } : m));
+      const aiText = await callAI(systemPrompt, text.trim(), history);
+      
+      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: aiText } : m));
 
       // Save AI response
       api.saveChatMessage({
         chat_type: 'niswah',
         role: 'model',
-        text: fullText,
+        text: aiText,
         timestamp: new Date().toISOString()
       });
 
@@ -295,7 +279,7 @@ Current user context:
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'niswah',
-        text: `${t('nisa_error')} (v8.0-RESILIENT | Error: ${err.message})`,
+        text: `عذراً، حدث خطأ في الاتصال. (${err.message})`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errMsg]);

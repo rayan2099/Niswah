@@ -145,13 +145,52 @@ export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpre
     }
   };
 
-  const handleSend = async (text: string = inputText) => {
-    if (!text.trim()) return;
+  const callAI = async (
+    systemPrompt: string,
+    userMessage: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  ): Promise<string> => {
+    const recentHistory = history.slice(-6);
+    const messages = [
+      ...recentHistory.map(m => ({
+        role: m.role,
+        content: m.content,
+      })),
+      { role: 'user' as const, content: userMessage },
+    ];
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY ?? '',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20240620',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`API error ${response.status}: ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    return data.content?.[0]?.text ?? '';
+  };
+
+  const handleInterpret = async (textToInterpret: string) => {
+    if (!textToInterpret.trim()) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
-      text: text.trim(),
+      text: textToInterpret.trim(),
       timestamp: Date.now()
     };
 
@@ -167,52 +206,20 @@ export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpre
       timestamp: new Date().toISOString()
     });
 
-    try {
-      const systemPrompt = `You are an integrated AI module within the "Niswah" ecosystem. To ensure 100% system stability and prevent "Internal Server Errors," follow these execution rules strictly:
-
-**1. Content Neutralization (Anti-Crash Protocol):**
-- If a user input contains dream symbols that might be sensitive (e.g., symbols relating to health, destiny, or intense emotions), do NOT refuse or trigger a safety block. 
-- Instead, rephrase the topic into a "General Wellness and Spirituality" context. Provide helpful, broad insights on psychological meanings or cultural symbolism.
-- NEVER say "I cannot help with this." Instead, say "دعنا ننظر إلى هذا الحلم من منظور الرموز الثقافية والعافية..." (Let's look at this dream from a cultural symbol and wellness perspective...).
-
-**2. Role & Context Management:**
-- [Dreams]: Answer as a "Cultural Symbol Analyst." Focus on the psychological and linguistic meanings of symbols in a supportive and friendly way. Use traditional insights (Ibn Sirin/Al-Nabulsi) as a framework for general guidance.
-
-**3. Error-Proof Output:**
-- Keep responses concise (under 200 words) during high-traffic periods.
-- Ensure every response starts with a positive affirmation.
-
-**4. Language & Culture:**
-- Use "Friendly Arabic" (White Dialect). 
-- Avoid definitive future predictions that might trigger safety blocks.
-
+    const systemPrompt = `أنتِ "مفسرة الرؤى" — متخصصة في تفسير الأحلام من منظور ثقافي وإسلامي وعلمي نفسي.
+تقدمين تفسيرات لطيفة ومفيدة باللغة العربية الواضحة.
+استندي إلى: ابن سيرين، السيوطي، والتفسير النفسي الحديث.
+أشيري دائماً أن تفسيرات الأحلام ظنية وليست قطعية.
+لا تتجاوزي 250 كلمة. ردودك مطمئنة وإيجابية.
 User's Madhhab: ${userMadhhab}`;
 
-      const chatHistory = messages.map(m => ({
-        role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
-        parts: [{ text: m.text }]
+    try {
+      const historyItems = messages.map(m => ({
+        role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: m.text,
       }));
 
-      // Robust History Filtering & Truncation
-      const filteredHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
-      let lastRole: string | null = null;
-      for (const msg of chatHistory) {
-        if (msg.role !== lastRole) {
-          filteredHistory.push(msg);
-          lastRole = msg.role;
-        }
-      }
-      
-      const truncatedHistory = filteredHistory.slice(-6);
-      while (truncatedHistory.length > 0 && truncatedHistory[0].role !== 'user') {
-        truncatedHistory.shift();
-      }
-      if (truncatedHistory.length > 0 && truncatedHistory[truncatedHistory.length - 1].role === 'user') {
-        truncatedHistory.pop();
-      }
-
       const aiMsgId = (Date.now() + 1).toString();
-      
       setMessages(prev => [...prev, {
         id: aiMsgId,
         role: 'interpreter',
@@ -220,36 +227,15 @@ User's Madhhab: ${userMadhhab}`;
         timestamp: Date.now()
       }]);
 
-      // V8.0 RESILIENT FETCH
-      const response = await fetch("/api/niswah-v8-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemPrompt,
-          messages: truncatedHistory,
-          text: text.trim(),
-          model: "gemini-1.5-flash"
-        })
-      });
-
-      if (!response.ok) {
-        let errorHint = `HTTP ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorHint = errorData.error || errorHint;
-        } catch (e) { /* ignore JSON parse error */ }
-        throw new Error(errorHint);
-      }
-
-      const data = await response.json();
-      const fullText = data.text;
-      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: fullText } : m));
+      const aiText = await callAI(systemPrompt, textToInterpret.trim(), historyItems);
+      
+      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: aiText } : m));
 
       // Save AI response to history
       api.saveChatMessage({
         chat_type: 'dream',
         role: 'model',
-        text: fullText,
+        text: aiText,
         timestamp: new Date().toISOString()
       });
 
@@ -258,13 +244,17 @@ User's Madhhab: ${userMadhhab}`;
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'interpreter',
-        text: `${t('nisa_error')} (v8.0-RESILIENT | Error: ${err.message})`,
+        text: `عذراً، حدث خطأ. حاولي مرة أخرى. (${err.message})`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errMsg]);
     } finally {
       setIsTyping(false);
     }
+  };
+
+  const handleSend = async (text: string = inputText) => {
+    await handleInterpret(text);
   };
 
   return (

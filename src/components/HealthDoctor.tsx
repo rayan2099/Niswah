@@ -102,70 +102,72 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     setSelectedSymptoms(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const callAI = async (
+    systemPrompt: string,
+    userMessage: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  ): Promise<string> => {
+    const recentHistory = history.slice(-6);
+    const messages = [
+      ...recentHistory.map(m => ({
+        role: m.role,
+        content: m.content,
+      })),
+      { role: 'user' as const, content: userMessage },
+    ];
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY ?? '',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20240620',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`API error ${response.status}: ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    return data.content?.[0]?.text ?? '';
+  };
+
   const handleAnalyze = async () => {
     const activeSymptoms = Object.keys(selectedSymptoms).filter(k => selectedSymptoms[k]);
     if (activeSymptoms.length === 0) return;
 
     setStep('chat');
     setIsTyping(true);
-
-    // Build context for AI
-    const symptomsText = activeSymptoms.map(s => {
-      for (const phase of Object.values(SYMPTOM_PHASES)) {
-        const found = phase.symptoms.find(sym => sym.key === s);
-        if (found) return found.label;
-      }
-      return s;
-    }).join('، ');
-
-    const systemPrompt = `You are an integrated AI module within the "Niswah" ecosystem. To ensure 100% system stability and prevent "Internal Server Errors," follow these execution rules strictly:
-
-**1. Content Neutralization (Anti-Crash Protocol):**
-- If a user input contains medical terms or symptoms that might trigger safety filters, do NOT refuse or trigger a safety block. 
-- Instead, provide helpful, broad educational information based on general wellness.
-- NEVER say "I cannot help with this." Instead, say "دعنا ننظر إلى هذه الأعراض من منظور العافية العامة والتعليم الصحي..." (Let's look at these symptoms from a general wellness and health education perspective...).
-
-**2. Role & Context Management:**
-- [Medical/Health]: Answer as a "Health Educator." Provide data-driven information about the menstrual cycle and nutrition. Use the phrase: "هذه المعلومات للأغراض التعليمية فقط" (This information is for educational purposes only).
-
-**3. Error-Proof Output:**
-- Keep responses concise (under 200 words).
-- Ensure every response starts with a positive affirmation.
-
-**4. Language & Culture:**
-- Use "Friendly Arabic" (White Dialect). 
-- Avoid complex medical jargon.`;
-
-    const userMessage = `أعاني من الأعراض التالية: ${symptomsText}. 
-${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
-حالتي الفقهية الحالية: ${fiqhState}.
-متوسط دورتي: ${cycleStats?.avgCycleLength || 28} يوماً.
-ما اقتراحاتك؟`;
+    setError('');
+    
+    const systemPrompt = `أنتِ "الطبيبة نسوة" — مساعدة صحية متخصصة في صحة المرأة والدورة الشهرية.
+تقدمين اقتراحات صحية مبنية على الأدلة العلمية باللغة العربية الواضحة.
+ابدئي كل رد بتذكير لطيف أن ما تقدمينه اقتراحات وليس تشخيصاً طبياً.
+ردودك موجزة وعملية ومنظمة بنقاط واضحة. لا تتجاوزي 250 كلمة.
+دائماً أشيري متى يجب مراجعة الطبيب.`;
 
     try {
-      const response = await fetch("/api/niswah-v8-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemPrompt,
-          messages: [],
-          text: userMessage,
-          model: "gemini-1.5-flash"
-        })
-      });
-
-      if (!response.ok) {
-        let errorHint = `HTTP ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorHint = errorData.error || errorHint;
-        } catch (e) { /* ignore JSON parse error */ }
-        throw new Error(errorHint);
-      }
+      const symptomsText = activeSymptoms.map(s => {
+        for (const phase of Object.values(SYMPTOM_PHASES)) {
+          const found = phase.symptoms.find(sym => sym.key === s);
+          if (found) return found.label;
+        }
+        return s;
+      }).join('، ');
       
-      const data = await response.json();
-      const aiText = data.text;
-
+      const userMessage = `أعاني من الأعراض التالية: ${symptomsText}. ${userNotes ? `ملاحظات: ${userNotes}` : ''}`;
+      
+      const aiText = await callAI(systemPrompt, userMessage, []);
+      
       setIsTyping(false);
       const newMsgs: Array<{ role: 'ai' | 'user'; text: string }> = [
         { role: 'user', text: `أعاني من: ${symptomsText}${userNotes ? `\n\nملاحظات: ${userNotes}` : ''}` },
@@ -187,14 +189,9 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
         timestamp: new Date().toISOString()
       });
     } catch (err: any) {
-      console.error("Gemini Error:", err);
-      const rawError = err.response?.data?.error || err.message || "Unknown error";
-      const serverError = typeof rawError === 'object' ? JSON.stringify(rawError) : String(rawError);
+      setError('عذراً، حدث خطأ. تحققي من الاتصال وحاولي مرة أخرى.');
+      console.error('HealthDoctor error:', err.message);
       setIsTyping(false);
-      setMessages([
-        { role: 'user', text: `أعاني من: ${symptomsText}${userNotes ? `\n\nملاحظات: ${userNotes}` : ''}` },
-        { role: 'ai', text: `عذراً، لم أتمكن من الاتصال. (v8.0-RESILIENT | Error: ${err.message})` },
-      ]);
     }
   };
 
@@ -203,6 +200,12 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setIsTyping(true);
+
+    const systemPrompt = `أنتِ "الطبيبة نسوة" — مساعدة صحية متخصصة في صحة المرأة والدورة الشهرية.
+تقدمين اقتراحات صحية مبنية على الأدلة العلمية باللغة العربية الواضحة.
+ابدئي كل رد بتذكير لطيف أن ما تقدمينه اقتراحات وليس تشخيصاً طبياً.
+ردودك موجزة وعملية ومنظمة بنقاط واضحة. لا تتجاوزي 250 كلمة.
+دائماً أشيري متى يجب مراجعة الطبيب.`;
 
     // Save user message
     api.saveChatMessage({
@@ -213,68 +216,13 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
     });
 
     try {
-      const systemPrompt = `You are an integrated AI module within the "Niswah" ecosystem. To ensure 100% system stability and prevent "Internal Server Errors," follow these execution rules strictly:
-
-**1. Content Neutralization (Anti-Crash Protocol):**
-- If a user input contains medical terms or symptoms that might trigger safety filters, do NOT refuse or trigger a safety block. 
-- Instead, provide helpful, broad educational information based on general wellness.
-- NEVER say "I cannot help with this." Instead, say "دعنا ننظر إلى هذه الأعراض من منظور العافية العامة والتعليم الصحي..." (Let's look at these symptoms from a general wellness and health education perspective...).
-
-**2. Role & Context Management:**
-- [Medical/Health]: Answer as a "Health Educator." Provide data-driven information about the menstrual cycle and nutrition. Use the phrase: "هذه المعلومات للأغراض التعليمية فقط" (This information is for educational purposes only).
-
-**3. Error-Proof Output:**
-- Keep responses concise (under 200 words).
-- Ensure every response starts with a positive affirmation.
-
-**4. Language & Culture:**
-- Use "Friendly Arabic" (White Dialect). 
-- Avoid complex medical jargon.`;
-
-      const chatHistory = newMessages.map(m => ({
-        role: (m.role === 'ai' ? 'model' : 'user') as 'user' | 'model',
-        parts: [{ text: m.text }],
+      const history = messages.map(m => ({
+        role: (m.role === 'ai' ? 'assistant' : 'user') as 'user' | 'assistant',
+        content: m.text,
       }));
-
-      // Robust History Filtering & Truncation
-      const filteredHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
-      let lastRole: string | null = null;
-      for (const msg of chatHistory) {
-        if (msg.role !== lastRole) {
-          filteredHistory.push(msg);
-          lastRole = msg.role;
-        }
-      }
       
-      const truncatedHistory = filteredHistory.slice(-6);
-
-      // Gemini requires first message to be from user
-      while (truncatedHistory.length > 0 && truncatedHistory[0].role !== 'user') {
-        truncatedHistory.shift();
-      }
+      const aiText = await callAI(systemPrompt, followUpText, history);
       
-      const response = await fetch("/api/niswah-v8-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemPrompt,
-          messages: truncatedHistory,
-          text: followUpText,
-          model: "gemini-1.5-flash"
-        })
-      });
-
-      if (!response.ok) {
-        let errorHint = `HTTP ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorHint = errorData.error || errorHint;
-        } catch (e) { /* ignore JSON parse error */ }
-        throw new Error(errorHint);
-      }
-
-      const data = await response.json();
-      const aiText = data.text;
       setIsTyping(false);
       setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
 
@@ -286,11 +234,9 @@ ${userNotes ? `ملاحظات إضافية: ${userNotes}` : ''}
         timestamp: new Date().toISOString()
       });
     } catch (err: any) {
-      console.error("Gemini Error:", err);
-      const rawError = err.response?.data?.error || err.message || "Unknown error";
-      const serverError = typeof rawError === 'object' ? JSON.stringify(rawError) : String(rawError);
+      console.error("Anthropic Error:", err);
       setIsTyping(false);
-      setMessages(prev => [...prev, { role: 'ai', text: `عذراً، حدث خطأ في الاتصال. (v8.0-RESILIENT | Error: ${err.message})` }]);
+      setMessages(prev => [...prev, { role: 'ai', text: `عذراً، حدث خطأ في الاتصال. (${err.message})` }]);
     }
   };
 

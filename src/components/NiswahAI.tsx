@@ -175,8 +175,13 @@ export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
     userMessage: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }> = []
   ): Promise<string> => {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
+    }
+
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: key });
       
       const contents = [
         ...history.map(m => ({

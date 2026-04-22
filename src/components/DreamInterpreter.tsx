@@ -272,7 +272,7 @@ User's Madhhab: ${userMadhhab}`;
                   <Moon className="w-5 h-5 text-indigo-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-serif font-bold text-indigo-900">{t('dream_interpretation')} <span className="text-[10px] opacity-30">v2.0-BS</span></h2>
+                  <h2 className="text-lg font-serif font-bold text-indigo-900">{t('dream_interpretation')} <span className="text-[10px] opacity-30">v11.1-GEMINI</span></h2>
                   <div className={cn("flex items-center space-x-1", isRTL && "space-x-reverse")}>
                     <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
                     <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">{t('online_status')}</span>

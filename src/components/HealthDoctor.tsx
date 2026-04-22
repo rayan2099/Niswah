@@ -71,6 +71,7 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   const [messages, setMessages] = useState<Array<{ role: 'ai' | 'user'; text: string }>>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -258,7 +259,7 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-rose-100 border-2 border-rose-400 flex items-center justify-center text-sm font-bold text-rose-600">د</div>
             <div className={isRTL ? 'text-right' : 'text-left'}>
-              <div className="text-sm font-bold">الطبيبة نسوة <span className="text-[10px] opacity-20">v2.0-BS</span></div>
+              <div className="text-sm font-bold">الطبيبة نسوة <span className="text-[10px] opacity-20">v11.1-GEMINI</span></div>
               <div className="text-xs text-emerald-600">مساعدة صحية ذكية</div>
             </div>
           </div>

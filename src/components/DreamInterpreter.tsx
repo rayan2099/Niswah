@@ -16,7 +16,7 @@ import {
   ArrowLeft,
   Info
 } from 'lucide-react';
-import axios from 'axios';
+import { GoogleGenAI } from "@google/genai";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Madhhab } from '../logic/types.ts';
@@ -150,38 +150,32 @@ export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpre
     userMessage: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }> = []
   ): Promise<string> => {
-    const recentHistory = history.slice(-6);
-    const messages = [
-      ...recentHistory.map(m => ({
-        role: m.role,
-        content: m.content,
-      })),
-      { role: 'user' as const, content: userMessage },
-    ];
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const contents = [
+        ...history.map(m => ({
+          role: (m.role === 'assistant' ? 'model' : 'user') as 'user' | 'model',
+          parts: [{ text: m.content }]
+        })),
+        { role: 'user' as const, parts: [{ text: userMessage }] }
+      ];
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY ?? '',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20240620',
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages,
-      }),
-    });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents,
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.7,
+          maxOutputTokens: 1024,
+        }
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`API error ${response.status}: ${JSON.stringify(errorData)}`);
+      return response.text || '';
+    } catch (err: any) {
+      console.error("Gemini AI API Error (DreamInterpreter):", err);
+      throw new Error(`Gemini AI Error: ${err.message}`);
     }
-
-    const data = await response.json();
-    return data.content?.[0]?.text ?? '';
   };
 
   const handleInterpret = async (textToInterpret: string) => {

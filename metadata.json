@@ -1,6 +1,6 @@
 {
-  "name": "Niswah v9 | نسوة",
-  "description": "Niswah: Empowering Muslim women with Fiqh-aligned health tracking. (v9.0-SURGE-FINAL)",
-  "version": "9.0.0",
+  "name": "Niswah v11 | نسوة",
+  "description": "Niswah: Empowering Muslim women with Fiqh-aligned health tracking. (v11.0-GEMINI-DIRECT)",
+  "version": "11.0.0",
   "requestFramePermissions": ["geolocation"]
 }

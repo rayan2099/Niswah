@@ -189,7 +189,7 @@ User's Madhhab: ${userMadhhab}`;
       if (!key) throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
       
       const ai = new GoogleGenAI({ apiKey: key });
-      const historyItems = messages.map(m => ({
+      const currentHistory = messages.map(m => ({
         role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
         parts: [{ text: m.text }]
       }));
@@ -197,12 +197,13 @@ User's Madhhab: ${userMadhhab}`;
       const streamResponse = await ai.models.generateContentStream({
         model: "gemini-3-flash-preview",
         contents: [
-          ...historyItems,
+          ...currentHistory,
           { role: 'user', parts: [{ text: textToInterpret.trim() }] }
         ],
         config: {
           systemInstruction: systemPrompt,
           temperature: 0.7,
+          maxOutputTokens: 2048,
         }
       });
 

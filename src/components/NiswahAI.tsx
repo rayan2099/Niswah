@@ -219,7 +219,7 @@ Current user context:
       if (!key) throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
       
       const ai = new GoogleGenAI({ apiKey: key });
-      const history = messages.map(m => ({
+      const currentHistory = messages.map(m => ({
         role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
         parts: [{ text: m.text }]
       }));
@@ -227,12 +227,13 @@ Current user context:
       const streamResponse = await ai.models.generateContentStream({
         model: "gemini-3-flash-preview",
         contents: [
-          ...history,
+          ...currentHistory,
           { role: 'user', parts: [{ text: text.trim() }] }
         ],
         config: {
           systemInstruction: systemPrompt,
           temperature: 0.7,
+          maxOutputTokens: 2048,
         }
       });
 

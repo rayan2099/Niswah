@@ -134,7 +134,6 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     setMessages([{ role: 'user', text: userTextDisplay }]);
 
     // Add placeholder AI message
-    const aiMsgId = (Date.now() + 1).toString();
     setMessages(prev => [...prev, { role: 'ai', text: "" }]);
 
     try {
@@ -147,6 +146,7 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         config: {
           systemInstruction: systemPrompt,
           temperature: 0.7,
+          maxOutputTokens: 2048,
         }
       });
 
@@ -157,7 +157,9 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           accumulatedText += chunkText;
           setMessages(prev => {
             const copy = [...prev];
-            copy[copy.length - 1] = { ...copy[copy.length - 1], text: accumulatedText };
+            if (copy.length > 0) {
+              copy[copy.length - 1] = { ...copy[copy.length - 1], text: accumulatedText };
+            }
             return copy;
           });
         }
@@ -209,7 +211,7 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       if (!key) throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
       
       const ai = new GoogleGenAI({ apiKey: key });
-      const history = messages.map(m => ({
+      const currentHistory = messages.map(m => ({
         role: (m.role === 'ai' ? 'model' : 'user') as 'user' | 'model',
         parts: [{ text: m.text }]
       }));
@@ -217,12 +219,13 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       const streamResponse = await ai.models.generateContentStream({
         model: "gemini-3-flash-preview",
         contents: [
-          ...history,
+          ...currentHistory,
           { role: 'user', parts: [{ text: followUpText }] }
         ],
         config: {
           systemInstruction: systemPrompt,
           temperature: 0.7,
+          maxOutputTokens: 2048,
         }
       });
 
@@ -233,7 +236,9 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           accumulatedText += chunkText;
           setMessages(prev => {
             const copy = [...prev];
-            copy[copy.length - 1] = { ...copy[copy.length - 1], text: accumulatedText };
+            if (copy.length > 0) {
+              copy[copy.length - 1] = { ...copy[copy.length - 1], text: accumulatedText };
+            }
             return copy;
           });
         }

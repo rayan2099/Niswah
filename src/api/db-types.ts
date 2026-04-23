@@ -31,6 +31,8 @@ export interface DBUser {
   prayerCountryAr?: string;
   prayerLat?: number;
   prayerLon?: number;
+  location_lat?: number;
+  location_lng?: number;
   location_name?: string;
   manual_prayer_offsets?: Record<string, number>;
   created_at: string;

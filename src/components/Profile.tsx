@@ -598,13 +598,19 @@ export const Profile = ({ }: ProfileProps) => {
             currentCountry={user?.prayerCountry}
             currentCityAr={user?.prayerCityAr}
             onSelect={async (city) => {
+              const lat = typeof city.lat === 'string' ? parseFloat(city.lat) : city.lat;
+              const lon = typeof city.lon === 'string' ? parseFloat(city.lon) : (typeof city.lng === 'string' ? parseFloat(city.lng) : city.lng);
+              
               await handleUpdateUser({
                 prayerCity: city.nameEn || city.name,
                 prayerCountry: city.countryEn || city.country,
                 prayerCityAr: city.name,
                 prayerCountryAr: city.country,
-                prayerLat: typeof city.lat === 'string' ? parseFloat(city.lat) : city.lat,
-                prayerLon: typeof city.lon === 'string' ? parseFloat(city.lon) : city.lon
+                prayerLat: lat,
+                prayerLon: lon,
+                location_lat: lat,
+                location_lng: lon,
+                location_name: city.name
               });
             }}
           />

@@ -74,7 +74,7 @@ const MessageBubble = ({ message }: { message: Message }) => {
           </div>
         )}
         <div className={cn(
-          "p-4 rounded-[24px] text-sm leading-relaxed shadow-sm",
+          "p-4 rounded-[24px] text-sm leading-relaxed shadow-sm whitespace-pre-wrap",
           isUser 
             ? "bg-emerald-600 text-white rounded-br-none" 
             : "bg-white text-emerald-900 border border-black/5 rounded-bl-none"
@@ -385,7 +385,10 @@ Current user context:
                     <motion.button
                       key={cat.id}
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => setStep('chat')}
+                      onClick={() => {
+                        setStep('chat');
+                        handleSend(cat.label, true);
+                      }}
                       className="flex flex-col items-center space-y-2 p-3 bg-white rounded-2xl border border-black/5 shadow-sm"
                     >
                       <div className={cn("p-2 rounded-xl", cat.bg)}>

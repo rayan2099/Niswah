@@ -400,10 +400,19 @@ const ScreenLocation = ({ data, update, onNext }: { data: OnboardingData; update
 
     // Save immediately as requested
     try {
+      const lat = typeof city.lat === 'string' ? parseFloat(city.lat) : city.lat;
+      const lon = typeof city.lon === 'string' ? parseFloat(city.lon) : (typeof city.lng === 'string' ? parseFloat(city.lng) : city.lng);
+      
       await api.updateUser({
-        location_lat: city.lat,
-        location_lng: city.lon || city.lng,
+        prayerLat: lat,
+        prayerLon: lon,
+        location_lat: lat,
+        location_lng: lon,
         location_name: city.name,
+        prayerCity: city.nameEn || city.name,
+        prayerCountry: city.countryEn || city.country,
+        prayerCityAr: city.name,
+        prayerCountryAr: city.country
       });
     } catch (err) {
       console.error("Failed to save location immediately", err);

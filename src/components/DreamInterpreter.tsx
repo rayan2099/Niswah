@@ -66,7 +66,7 @@ const MessageBubble = ({ message }: { message: Message }) => {
           </div>
         )}
         <div className={cn(
-          "p-4 rounded-[24px] text-sm leading-relaxed shadow-sm",
+          "p-4 rounded-[24px] text-sm leading-relaxed shadow-sm whitespace-pre-wrap",
           isUser 
             ? "bg-indigo-600 text-white rounded-br-none" 
             : "bg-white text-indigo-900 border border-black/5 rounded-bl-none"

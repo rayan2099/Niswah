@@ -1116,6 +1116,9 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
         prayerCountryAr: data.location.countryAr,
         prayerLat: data.location.lat,
         prayerLon: data.location.lon,
+        location_lat: data.location.lat,
+        location_lng: data.location.lon,
+        location_name: data.location.city,
         manual_prayer_offsets: { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 }
       });
 

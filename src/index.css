@@ -14,9 +14,17 @@
 @layer base {
   body {
     @apply bg-brand-bg text-slate-900;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-synthesis: none;
   }
   
   [dir="rtl"] {
     @apply font-arabic;
+  }
+
+  [dir="rtl"] * {
+    letter-spacing: 0 !important;
   }
 }

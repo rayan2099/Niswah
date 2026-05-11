@@ -4,8 +4,6 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   GoogleAuthProvider,
   OAuthProvider,
   sendPasswordResetEmail,
@@ -58,23 +56,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     }
     return () => clearTimeout(timeout);
   }, [loading]);
-
-  React.useEffect(() => {
-    const checkRedirect = async () => {
-      try {
-        console.log("Auth: Checking for redirect result...");
-        const result = await getRedirectResult(auth);
-        if (result) {
-          console.log("Auth: Redirect Sign-in Success:", result.user.uid);
-          await onSuccess();
-        }
-      } catch (err: any) {
-        console.error("Auth Error (Redirect):", err);
-        setError(getErrorMessage(err.code));
-      }
-    };
-    checkRedirect();
-  }, [onSuccess]);
 
   const getErrorMessage = (code: string): string => {
     const errors: Record<string, string> = {
@@ -178,18 +159,11 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         await onSuccess();
       } catch (popupErr: any) {
         console.warn("Auth: Google Popup Error:", popupErr.code, popupErr.message);
-        const messages: Record<string, string> = {
-          'auth/popup-closed-by-user': 'أُغلقت النافذة قبل الإتمام — حاولي مرة أخرى',
-          'auth/popup-blocked': 'المتصفح منع النافذة المنبثقة — اسمحي للنوافذ المنبثقة وأعيدي المحاولة',
-          'auth/cancelled-popup-request': 'طلب مُلغى — حاولي مرة أخرى',
-          'auth/network-request-failed': 'تحققي من الاتصال بالإنترنت',
-        };
         
         if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request' || popupErr.code === 'auth/popup-closed-by-user') {
-          console.warn("Auth: Popup issue, falling back to Redirect...");
-          await signInWithRedirect(auth, provider);
+          setError('تم منع نافذة تسجيل الدخول المنبثقة. يرجى السماح بالنوافذ المنبثقة في إعدادات المتصفح، أو استخدامه في متصفح مستقل (Safari/Chrome)، أو المتابعة بالبريد الإلكتروني.');
         } else {
-          setError(messages[popupErr.code] || `خطأ في تسجيل الدخول: ${popupErr.message}`);
+          setError(getErrorMessage(popupErr.code));
         }
       }
     } catch (err: any) {
@@ -221,10 +195,9 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
       } catch (popupErr: any) {
         console.warn("Auth: Apple Popup Error:", popupErr.code, popupErr.message);
         if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request' || popupErr.code === 'auth/popup-closed-by-user') {
-          console.warn("Auth: Popup issue, falling back to Redirect...");
-          await signInWithRedirect(auth, provider);
+          setError('تم منع نافذة تسجيل الدخول. يرجى المتابعة باستخدام البريد الإلكتروني أو فتح الموقع في متصفح خارجي (سفاري/كروم)');
         } else {
-          throw popupErr;
+          setError(getErrorMessage(popupErr.code));
         }
       }
     } catch (err: any) {

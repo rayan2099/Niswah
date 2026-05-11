@@ -177,11 +177,11 @@ const Screen2Language = ({ data, update, onNext }: { data: OnboardingData; updat
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-center mb-2">
-          {data.language === 'ar' ? 'اختر اللغة' : 'Choose Language'}
+        <h1 className="text-3xl font-bold text-gray-900 text-center mb-2 leading-tight">
+          {t('choose_language')}
         </h1>
-        <p className="text-sm text-gray-400 text-center mb-8">
-          {data.language === 'ar' ? 'اختر اللغة المناسبة لكِ' : 'Select your preferred language'}
+        <p className="text-sm text-gray-400 text-center mb-8 leading-relaxed">
+          {t('language_desc' as any) || (data.language === 'ar' ? 'اختر اللغة المناسبة لكِ' : 'Select your preferred language')}
         </p>
         
         <div className="grid grid-cols-2 gap-4">
@@ -213,7 +213,7 @@ const Screen2Language = ({ data, update, onNext }: { data: OnboardingData; updat
         onClick={onNext}
         className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
       >
-        <span>استمرار</span>
+        <span>{t('continue')}</span>
         <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
       </button>
     </div>
@@ -233,8 +233,8 @@ const Screen3Madhhab = ({ data, update, onNext }: { data: OnboardingData; update
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('madhhab_question')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8">{t('madhhab_desc')}</p>
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('madhhab_question')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('madhhab_desc')}</p>
         
         <div className="grid grid-cols-2 gap-4">
           {madhhabs.map((m) => (
@@ -273,7 +273,7 @@ const Screen3Madhhab = ({ data, update, onNext }: { data: OnboardingData; update
             : "bg-gray-100 text-gray-400 cursor-not-allowed"
         )}
       >
-        <span>استمرار</span>
+        <span>{t('continue')}</span>
         <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
       </button>
 
@@ -336,7 +336,7 @@ const Screen4Goals = ({ data, update, onNext }: { data: OnboardingData; update: 
 
   const handleContinue = () => {
     if (data.goal_flags.length === 0) {
-      setValidationMsg('يرجى اختيار خيار واحد على الأقل للمتابعة');
+      setValidationMsg(t('error_select_at_least_one' as any));
       return;
     }
     onNext();
@@ -345,8 +345,8 @@ const Screen4Goals = ({ data, update, onNext }: { data: OnboardingData; update: 
   return (
     <div className="w-full flex flex-col h-full">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('goals_question')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8">{t('select_all_apply')}</p>
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('goals_question')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('select_all_apply')}</p>
 
         <div className="flex flex-wrap gap-3 justify-center mt-8" dir="rtl">
           {GOALS.map(goal => (
@@ -372,7 +372,7 @@ const Screen4Goals = ({ data, update, onNext }: { data: OnboardingData; update: 
           onClick={handleContinue}
           className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
         >
-          <span>استمرار</span>
+          <span>{t('continue')}</span>
           <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
         </button>
         {validationMsg && (
@@ -531,8 +531,8 @@ const ScreenLocation = ({ data, update, onNext }: { data: OnboardingData; update
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('location_title')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8">{t('location_desc')}</p>
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('location_title')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('location_desc')}</p>
 
         <div className="space-y-4 relative">
           <button
@@ -655,7 +655,7 @@ const Screen5LastPeriod = ({ data, update, onNext }: { data: OnboardingData; upd
 
   const handleContinue = () => {
     if (!selectedDate) {
-      setValidationMsg('يرجى اختيار تاريخ لبدء المتابعة');
+      setValidationMsg(t('error_select_date' as any));
       return;
     }
     onNext();
@@ -674,8 +674,8 @@ const Screen5LastPeriod = ({ data, update, onNext }: { data: OnboardingData; upd
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('last_period_question')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8">{t('last_period_desc' as any) || 'متى بدأت دورتك الشهرية الأخيرة؟'}</p>
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('last_period_question')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('last_period_desc')}</p>
         
         <div className="bg-white rounded-3xl p-6 shadow-xl shadow-black/5 border border-black/5">
           <div className="grid grid-cols-7 gap-2 text-center mb-4">
@@ -711,7 +711,7 @@ const Screen5LastPeriod = ({ data, update, onNext }: { data: OnboardingData; upd
           onClick={handleContinue}
           className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
         >
-          <span>استمرار</span>
+          <span>{t('continue')}</span>
           <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
         </button>
         {validationMsg && (
@@ -733,8 +733,8 @@ const Screen6CycleLength = ({ data, update, onNext }: { data: OnboardingData; up
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('cycle_length_question')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8">{t('cycle_length_desc')}</p>
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('cycle_length_question')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('cycle_length_desc')}</p>
 
         <div className="flex flex-col items-center space-y-8 mt-12">
           <motion.div 
@@ -767,7 +767,7 @@ const Screen6CycleLength = ({ data, update, onNext }: { data: OnboardingData; up
           onClick={onNext}
           className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
         >
-          <span>استمرار</span>
+          <span>{t('continue')}</span>
           <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
         </button>
         <button 
@@ -788,8 +788,8 @@ const Screen7PeriodDuration = ({ data, update, onNext }: { data: OnboardingData;
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('period_duration_question')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8">{t('period_duration_desc' as any) || 'كم يوماً تستمر دورتك الشهرية عادةً؟'}</p>
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('period_duration_question')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('period_duration_desc')}</p>
 
         <div className="flex flex-col items-center space-y-8 mt-12">
           <motion.div 
@@ -823,7 +823,7 @@ const Screen7PeriodDuration = ({ data, update, onNext }: { data: OnboardingData;
           onClick={onNext}
           className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
         >
-          <span>استمرار</span>
+          <span>{t('continue')}</span>
           <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
         </button>
         <button 
@@ -862,7 +862,7 @@ const Screen8Conditions = ({ data, update, onNext }: { data: OnboardingData; upd
 
   const handleContinue = () => {
     if (data.conditions.length === 0) {
-      setValidationMsg('يرجى اختيار خيار واحد على الأقل للمتابعة');
+      setValidationMsg(t('error_select_at_least_one' as any));
       return;
     }
     onNext();
@@ -871,8 +871,8 @@ const Screen8Conditions = ({ data, update, onNext }: { data: OnboardingData; upd
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('conditions_question')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8">{t('conditions_desc')}</p>
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('conditions_question')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('conditions_desc')}</p>
 
         <div className="flex flex-wrap gap-3 justify-center mt-8" dir="rtl">
           {conditions.map((c) => (
@@ -898,7 +898,7 @@ const Screen8Conditions = ({ data, update, onNext }: { data: OnboardingData; upd
           onClick={handleContinue}
           className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
         >
-          <span>استمرار</span>
+          <span>{t('continue')}</span>
           <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />
         </button>
         {validationMsg && (
@@ -915,8 +915,8 @@ const Screen9Privacy = ({ data, update, onNext }: { data: OnboardingData; update
   return (
     <div className="flex flex-col h-full w-full">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('privacy_title')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-10">{t('privacy_desc')}</p>
+        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('privacy_title')}</h1>
+        <p className="text-sm text-gray-400 text-right mb-10 leading-relaxed">{t('privacy_desc')}</p>
 
         {/* Anonymous mode — the only option */}
         <div className="bg-rose-50 border border-rose-100 rounded-2xl p-5">
@@ -935,13 +935,13 @@ const Screen9Privacy = ({ data, update, onNext }: { data: OnboardingData; update
         {/* Privacy assurance cards */}
         <div className="mt-6 space-y-3">
           {[
-            { icon: '🔒', title: 'تشفير كامل', sub: 'بياناتك محمية بأعلى معايير الأمان' },
-            { icon: '🚫', title: 'لا إعلانات', sub: 'لا نبيع بياناتك ولا نشاركها' },
-            { icon: '🗑️', title: 'حذف فوري', sub: 'يمكنك حذف كل بياناتك في أي وقت' },
+            { icon: '🔒', title: t('privacy_assurance_1_title' as any), sub: t('privacy_assurance_1_sub' as any) },
+            { icon: '🚫', title: t('privacy_assurance_2_title' as any), sub: t('privacy_assurance_2_sub' as any) },
+            { icon: '🗑️', title: t('privacy_assurance_3_title' as any), sub: t('privacy_assurance_3_sub' as any) },
           ].map(item => (
-            <div key={item.title} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl flex-row-reverse">
+            <div key={item.title} className={cn("flex items-center gap-3 p-3 bg-gray-50 rounded-xl", isRTL ? "flex-row-reverse" : "")}>
               <span style={{ fontSize: '16px' }}>{item.icon}</span>
-              <div className="text-right">
+              <div className={isRTL ? "text-right" : "text-left"}>
                 <div className="text-sm font-bold text-gray-700">{item.title}</div>
                 <div className="text-xs text-gray-400">{item.sub}</div>
               </div>
@@ -954,7 +954,7 @@ const Screen9Privacy = ({ data, update, onNext }: { data: OnboardingData; update
         onClick={onNext}
         className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform"
       >
-        استمرار
+        {t('continue')}
       </button>
     </div>
   );
@@ -1039,7 +1039,7 @@ const Screen11Welcome = ({ onComplete, isCompleting }: { onComplete: () => void;
       </div>
 
       <div className="bg-rose-50 rounded-[32px] p-6 border border-rose-100 space-y-4">
-        <h3 className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">{t('included_features')}</h3>
+          <h3 className="text-[10px] font-bold text-rose-400 uppercase">{t('included_features')}</h3>
         <div className="grid grid-cols-2 gap-3">
           {[
             { icon: Sparkles, label: t('feat_nisa_ai') },
@@ -1104,7 +1104,7 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
   const complete = async () => {
     try {
       setIsCompleting(true);
-      // Save to Supabase
+      // Save to Database (tries Firestore + local backup)
       const { data: savedUser, error: userError } = await api.upsertUser({
         madhhab: data.madhhab as Madhhab,
         language: data.language,
@@ -1127,7 +1127,9 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
         manual_prayer_offsets: { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 }
       });
 
-      if (userError) {
+      // If we have any user data at all (even just local), we can try to proceed
+      // but if there's a critical error (like auth issue), we should know
+      if (userError && !savedUser) {
         throw new Error(userError);
       }
 
@@ -1139,19 +1141,28 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
         });
         if (entryError) {
           console.error("Failed to log cycle entry", entryError);
+          // Don't throw for entries, user is saved at least
         }
       }
+      
       if (savedUser) {
+        // Even if there was a syncing error, if we have local data we can finish
+        if (userError) {
+          console.warn("User data saved locally but server sync failed:", userError);
+          // Show a subtle toast or just log it
+        }
         onFinish(savedUser);
       } else {
-        // Fallback if savedUser is null for some reason but no error was thrown
-        const { data: freshUser } = await api.getUser();
-        if (freshUser) onFinish(freshUser);
-        else window.location.reload();
+        throw new Error("No user data available after save attempt.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save onboarding data", err);
-      alert(t('error_saving_profile') || "Failed to save your profile. Please check your internet connection and try again.");
+      const isNetwork = err?.message?.includes('offline') || err?.message?.includes('network');
+      const errorMsg = isNetwork 
+        ? t('error_saving_profile') 
+        : `${t('error_saving_profile')}\n\n(Error: ${err?.message?.substring(0, 50)}...)`;
+        
+      alert(errorMsg);
     } finally {
       setIsCompleting(false);
     }
@@ -1204,7 +1215,7 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
             transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
             className="w-10 h-10 border-4 border-rose-500 border-t-transparent rounded-full"
           />
-          <p className="text-xs font-bold text-rose-900 uppercase tracking-widest animate-pulse">جاري التحضير...</p>
+          <p className="text-xs font-bold text-rose-900 uppercase animate-pulse">{t('preparing_app' as any)}</p>
         </div>
       )}
     </div>

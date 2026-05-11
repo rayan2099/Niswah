@@ -110,12 +110,11 @@ function cleanObject<T extends object>(obj: T): T {
 
 export async function getUser(): Promise<ApiResponse<DBUser>> {
   const user = auth.currentUser;
+  const localUserStr = localStorage.getItem('niswah_local_user');
+  const localUser = localUserStr ? JSON.parse(localUserStr) as DBUser : null;
+
   if (!user) {
-    const localUser = localStorage.getItem('niswah_local_user');
-    if (localUser) {
-      return { data: JSON.parse(localUser), error: null };
-    }
-    return { data: null, error: 'Not authenticated' };
+    return { data: localUser, error: null };
   }
 
   const path = `users/${user.uid}`;
@@ -124,10 +123,17 @@ export async function getUser(): Promise<ApiResponse<DBUser>> {
     if (userDoc.exists()) {
       const data = userDoc.data() as DBUser;
       data.premium_status = true; // Freemium for now
+      // Update local storage with fresh data from server
+      localStorage.setItem('niswah_local_user', JSON.stringify(data));
       return { data, error: null };
     }
-    return { data: null, error: null };
+    // If authenticated but no doc, maybe we have local data from a failed previous onboarding?
+    return { data: localUser, error: null };
   } catch (error) {
+    console.warn("Firestore getUser failed, falling back to local storage:", error);
+    if (localUser) {
+      return { data: localUser, error: null };
+    }
     handleFirestoreError(error, OperationType.GET, path);
     return { data: null, error: error instanceof Error ? error.message : String(error) };
   }
@@ -154,35 +160,33 @@ export async function upsertUser(updates: Partial<DBUser>): Promise<ApiResponse<
     created_at: new Date().toISOString()
   };
 
+  const userData: DBUser = {
+    ...defaults,
+    ...cleanObject(updates),
+    id: user?.uid || 'demo-user-id',
+    email_hash: hashEmail(user?.email || 'anonymous'),
+    updated_at: new Date().toISOString()
+  } as DBUser;
+
+  // Always save to localStorage as a first step/backup
+  localStorage.setItem('niswah_local_user', JSON.stringify(userData));
+
   if (!user) {
-    console.warn("Not authenticated, using local storage fallback for upsertUser");
-    const localUser: DBUser = {
-      ...defaults,
-      ...updates,
-      id: 'demo-user-id',
-      email_hash: 'demo-hash',
-      updated_at: new Date().toISOString()
-    } as DBUser;
-    localStorage.setItem('niswah_local_user', JSON.stringify(localUser));
-    return { data: localUser, error: null };
+    console.warn("Not authenticated, using local storage backup for upsertUser");
+    return { data: userData, error: null };
   }
 
   const path = `users/${user.uid}`;
   try {
-    const userData: DBUser = {
-      ...defaults,
-      ...cleanObject(updates),
-      id: user.uid,
-      email_hash: hashEmail(user.email || ''),
-      updated_at: new Date().toISOString()
-    } as DBUser;
-
     await setDoc(doc(db, path), userData, { merge: true });
     userData.premium_status = true; // Freemium for now
     return { data: userData, error: null };
   } catch (error) {
+    console.error("Firestore upsertUser failed:", error);
+    // Even if firestore fails, we have it in localStorage now.
+    // We throw so the UI can decide whether to show an error or proceed with local data.
     handleFirestoreError(error, OperationType.WRITE, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
+    return { data: userData, error: error instanceof Error ? error.message : String(error) };
   }
 }
 

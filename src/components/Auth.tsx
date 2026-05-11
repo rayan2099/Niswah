@@ -275,25 +275,13 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
           <div className="w-full flex flex-col gap-3">
             
             {/* Consent — required for ALL auth methods */}
-            <div className="flex items-start gap-2 w-full mb-2" dir="rtl">
-              <input
-                type="checkbox"
-                id="consent-checkbox"
-                checked={agreed}
-                onChange={e => { setAgreed(e.target.checked); setError(''); }}
-                className="mt-1 w-4 h-4 accent-rose-500 flex-shrink-0"
-              />
-              <label htmlFor="consent-checkbox" className="text-xs text-gray-500 text-right leading-relaxed">
-                أوافق على{' '}
-                <button type="button" onClick={() => setShowPrivacy(true)} className="text-rose-500 underline">
-                  سياسة الخصوصية
-                </button>
-                {' '}و{' '}
-                <button type="button" onClick={() => setShowTerms(true)} className="text-rose-500 underline">
-                  شروط الاستخدام
-                </button>
-              </label>
-            </div>
+            <ConsentCheckbox 
+              agreed={agreed} 
+              setAgreed={setAgreed} 
+              setError={setError} 
+              onPrivacy={() => setShowPrivacy(true)} 
+              onTerms={() => setShowTerms(true)} 
+            />
 
             {error && (
               <motion.div 
@@ -602,6 +590,14 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               </div>
             )}
 
+            <ConsentCheckbox 
+              agreed={agreed} 
+              setAgreed={setAgreed} 
+              setError={setError} 
+              onPrivacy={() => setShowPrivacy(true)} 
+              onTerms={() => setShowTerms(true)} 
+            />
+
             <button
               type="submit"
               disabled={loading}
@@ -697,6 +693,34 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     </div>
   );
 };
+
+const ConsentCheckbox = ({ agreed, setAgreed, setError, onPrivacy, onTerms }: { 
+  agreed: boolean; 
+  setAgreed: (v: boolean) => void; 
+  setError: (v: string) => void;
+  onPrivacy: () => void;
+  onTerms: () => void;
+}) => (
+  <div className="flex items-start gap-2 w-full mb-2" dir="rtl">
+    <input
+      type="checkbox"
+      id="consent-checkbox"
+      checked={agreed}
+      onChange={e => { setAgreed(e.target.checked); setError(''); }}
+      className="mt-1 w-4 h-4 accent-rose-500 flex-shrink-0"
+    />
+    <label htmlFor="consent-checkbox" className="text-xs text-gray-500 text-right leading-relaxed">
+      أوافق على{' '}
+      <button type="button" onClick={onPrivacy} className="text-rose-500 underline">
+        سياسة الخصوصية
+      </button>
+      {' '}و{' '}
+      <button type="button" onClick={onTerms} className="text-rose-500 underline">
+        شروط الاستخدام
+      </button>
+    </label>
+  </div>
+);
 
 const LegalModal = ({ title, children, onClose }: { title: string, children: React.ReactNode, onClose: () => void }) => (
   <motion.div

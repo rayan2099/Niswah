@@ -111,7 +111,7 @@ const NiswahToggle = ({ value, onChange }: { value: boolean; onChange: (v: boole
 
 const ProgressBar = ({ current, total }: { current: number; total: number }) => {
   return (
-    <div className="fixed top-12 left-0 right-0 flex justify-center gap-2 z-50">
+    <div className="fixed bottom-10 left-0 right-0 flex justify-center gap-2 z-50">
       {Array.from({ length: total }).map((_, i) => (
         <div
           key={i}
@@ -676,7 +676,7 @@ const Screen5LastPeriod = ({ data, update, onNext }: { data: OnboardingData; upd
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
         <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('last_period_question')}</h1>
-        <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('last_period_desc')}</p>
+        <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('last_period_hint' as any)}</p>
         
         <div className="bg-white rounded-3xl p-6 shadow-xl shadow-black/5 border border-black/5">
           <div className="grid grid-cols-7 gap-2 text-center mb-4">
@@ -734,8 +734,8 @@ const Screen6CycleLength = ({ data, update, onNext }: { data: OnboardingData; up
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('cycle_length_question')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('cycle_length_desc')}</p>
+        <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('cycle_length_question')}</h1>
+        <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('cycle_length_desc')}</p>
 
         <div className="flex flex-col items-center space-y-8 mt-12">
           <motion.div 
@@ -789,8 +789,8 @@ const Screen7PeriodDuration = ({ data, update, onNext }: { data: OnboardingData;
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('period_duration_question')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('period_duration_desc')}</p>
+        <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('period_duration_question')}</h1>
+        <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('period_duration_desc')}</p>
 
         <div className="flex flex-col items-center space-y-8 mt-12">
           <motion.div 
@@ -1187,7 +1187,7 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
           animate={{ x: 0, opacity: 1, scale: 1 }}
           exit={{ x: direction > 0 ? (isRTL ? 100 : -100) : (isRTL ? -100 : 100), opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto h-full"
+          className="flex-1 flex flex-col items-center justify-start pt-24 p-6 w-full max-w-md mx-auto h-full"
         >
           {step === 1 && <Screen2Language data={data} update={updateData} onNext={nextStep} />}
           {step === 2 && <Screen1Splash onNext={nextStep} />}

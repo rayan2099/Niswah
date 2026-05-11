@@ -171,13 +171,18 @@ const Screen2Language = ({ data, update, onNext }: { data: OnboardingData; updat
   const handleSelect = (code: Language) => {
     update({ language: code });
     setLanguage(code);
+    setTimeout(onNext, 400); // Small delay for feedback before auto-proceeding
   };
 
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('choose_language')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8">{t('language_desc' as any) || 'اختر اللغة المناسبة لكِ'}</p>
+        <h1 className="text-3xl font-bold text-gray-900 text-center mb-2">
+          {data.language === 'ar' ? 'اختر اللغة' : 'Choose Language'}
+        </h1>
+        <p className="text-sm text-gray-400 text-center mb-8">
+          {data.language === 'ar' ? 'اختر اللغة المناسبة لكِ' : 'Select your preferred language'}
+        </p>
         
         <div className="grid grid-cols-2 gap-4">
           {languages.map((lang) => (
@@ -1154,9 +1159,9 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
 
   return (
     <div className="fixed inset-0 bg-[#FDFCFB] flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
-      {step > 1 && step < 12 && <ProgressBar current={step} total={11} />}
+      {step > 2 && step < 12 && <ProgressBar current={step - 2} total={9} />}
       
-      {step > 2 && step < 12 && (
+      {step > 3 && step < 12 && (
         <button 
           onClick={prevStep}
           className={cn(
@@ -1178,8 +1183,8 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
           transition={{ duration: 0.35, ease: 'easeOut' }}
           className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto h-full"
         >
-          {step === 1 && <Screen1Splash onNext={nextStep} />}
-          {step === 2 && <Screen2Language data={data} update={updateData} onNext={nextStep} />}
+          {step === 1 && <Screen2Language data={data} update={updateData} onNext={nextStep} />}
+          {step === 2 && <Screen1Splash onNext={nextStep} />}
           {step === 3 && <Screen3Madhhab data={data} update={updateData} onNext={nextStep} />}
           {step === 4 && <Screen6CycleLength data={data} update={updateData} onNext={nextStep} />}
           {step === 5 && <Screen7PeriodDuration data={data} update={updateData} onNext={nextStep} />}

@@ -112,21 +112,27 @@ export function calculateCycleStats(entries: any[], user?: User): CycleStats {
   }
 
   const getTimestamp = (entry: any) => {
-    if (entry.time_logged && entry.time_logged.includes('T')) {
+    if (!entry) return 0;
+    if (entry.time_logged && typeof entry.time_logged === 'string' && entry.time_logged.includes('T')) {
       try {
         const t = new Date(entry.time_logged).getTime();
         if (!isNaN(t)) return t;
       } catch (e) {}
     }
     
-    const time = entry.time_logged || '00:00:00';
-    try {
-      const parts = time.split(':');
-      const formattedTime = parts.length === 2 ? `${time}:00` : (parts.length === 3 ? time : '00:00:00');
-      const t = new Date(`${entry.date}T${formattedTime}`).getTime();
-      if (!isNaN(t)) return t;
-    } catch (e) {}
-    return new Date(entry.date).getTime();
+    if (entry.date) {
+      const time = entry.time_logged || '00:00:00';
+      try {
+        const parts = time.split(':');
+        const formattedTime = parts.length === 2 ? `${time}:00` : (parts.length === 3 ? time : '00:00:00');
+        const t = new Date(`${entry.date}T${formattedTime}`).getTime();
+        if (!isNaN(t)) return t;
+      } catch (e) {}
+      
+      const dt = new Date(entry.date).getTime();
+      if (!isNaN(dt)) return dt;
+    }
+    return 0;
   };
 
   const sortedEntries = [...actualEntries].sort((a, b) => getTimestamp(a) - getTimestamp(b));
@@ -135,12 +141,17 @@ export function calculateCycleStats(entries: any[], user?: User): CycleStats {
   for (let i = 0; i < sortedEntries.length; i++) {
     if (sortedEntries[i].fiqh_state === 'HAID') {
       if (i === 0 || sortedEntries[i - 1].fiqh_state !== 'HAID') {
-        lastPeriodStart = new Date(sortedEntries[i].date);
+        try {
+          const d = new Date(sortedEntries[i].date);
+          if (!isNaN(d.getTime())) {
+            lastPeriodStart = d;
+          }
+        } catch (e) {}
       }
     }
   }
 
-  if (!lastPeriodStart) {
+  if (!lastPeriodStart || isNaN(lastPeriodStart.getTime())) {
     return { 
       currentDay: 1, 
       daysUntilNext: Math.round(cycleLength) - 1, 

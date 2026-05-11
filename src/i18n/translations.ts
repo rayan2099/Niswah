@@ -37,6 +37,7 @@ export const translations = {
     // Onboarding
     splash_tagline: "رفيقتكِ المؤمنة لتتبع دورتكِ بوعي فقهي وصحي",
     choose_language: "اختر اللغة",
+    language_desc: "اختر اللغة المناسبة لكِ",
     arabic: "العربية",
     english: "English",
     madhhab_question: "ما هو مذهبك؟",
@@ -97,6 +98,7 @@ export const translations = {
     cond_none: "لا توجد حالات مشخصة",
     cond_prefer_not_to_say: "أفضل عدم الإفصاح",
     privacy_title: "خصوصيتك أولاً",
+    privacy_desc: "بياناتك مشفرة ومؤمنة بالكامل، نحن لا نبيع أو نشارك بياناتك مع أي طرف ثالث.",
     privacy_assurance_1_title: "تشفير كامل",
     privacy_assurance_1_sub: "بياناتك محمية بأعلى معايير الأمان",
     privacy_assurance_2_title: "لا إعلانات",
@@ -495,6 +497,7 @@ export const translations = {
     // Onboarding
     splash_tagline: "Your faithful companion for tracking your cycle with Fiqh and health awareness",
     choose_language: "Choose Language",
+    language_desc: "Select your preferred language",
     arabic: "العربية",
     english: "English",
     madhhab_question: "What is your Madhhab?",
@@ -555,6 +558,7 @@ export const translations = {
     cond_none: "No diagnosed conditions",
     cond_prefer_not_to_say: "Prefer not to say",
     privacy_title: "Privacy First",
+    privacy_desc: "Your data is fully encrypted and secured. We never sell or share your data with third parties.",
     privacy_assurance_1_title: "Full Encryption",
     privacy_assurance_1_sub: "Your data is protected by the highest security standards",
     privacy_assurance_2_title: "No Ads",

@@ -28,21 +28,27 @@ export function calculateFiqhState(entries: any[], madhhab: Madhhab): State {
   }
 
   const getTimestamp = (entry: any) => {
-    if (entry.time_logged && entry.time_logged.includes('T')) {
+    if (!entry) return 0;
+    if (entry.time_logged && typeof entry.time_logged === 'string' && entry.time_logged.includes('T')) {
       try {
         const t = new Date(entry.time_logged).getTime();
         if (!isNaN(t)) return t;
       } catch (e) {}
     }
     
-    const time = entry.time_logged || '00:00:00';
-    try {
-      const parts = time.split(':');
-      const formattedTime = parts.length === 2 ? `${time}:00` : (parts.length === 3 ? time : '00:00:00');
-      const t = new Date(`${entry.date}T${formattedTime}`).getTime();
-      if (!isNaN(t)) return t;
-    } catch (e) {}
-    return new Date(entry.date).getTime();
+    if (entry.date) {
+      const time = entry.time_logged || '00:00:00';
+      try {
+        const parts = time.split(':');
+        const formattedTime = parts.length === 2 ? `${time}:00` : (parts.length === 3 ? time : '00:00:00');
+        const t = new Date(`${entry.date}T${formattedTime}`).getTime();
+        if (!isNaN(t)) return t;
+      } catch (e) {}
+      
+      const dt = new Date(entry.date).getTime();
+      if (!isNaN(dt)) return dt;
+    }
+    return 0;
   };
 
   // Sort by date descending

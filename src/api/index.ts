@@ -168,57 +168,54 @@ export async function upsertUser(updates: Partial<DBUser>): Promise<ApiResponse<
     updated_at: new Date().toISOString()
   } as DBUser;
 
-  // Always save to localStorage as a first step/backup
+  // 1. Primary Save: Local Storage
   localStorage.setItem('niswah_local_user', JSON.stringify(userData));
 
   if (!user) {
-    console.warn("Not authenticated, using local storage backup for upsertUser");
+    console.warn("Not authenticated, using local storage as primary for upsertUser");
     return { data: userData, error: null };
   }
 
+  // 2. Background Sync: Firestore (non-blocking)
   const path = `users/${user.uid}`;
-  try {
-    await setDoc(doc(db, path), userData, { merge: true });
-    userData.premium_status = true; // Freemium for now
-    return { data: userData, error: null };
-  } catch (error) {
-    console.error("Firestore upsertUser failed:", error);
-    // Even if firestore fails, we have it in localStorage now.
-    // We throw so the UI can decide whether to show an error or proceed with local data.
-    handleFirestoreError(error, OperationType.WRITE, path);
-    return { data: userData, error: error instanceof Error ? error.message : String(error) };
-  }
+  setDoc(doc(db, path), userData, { merge: true }).catch(error => {
+    console.warn("Firestore sync failed for upsertUser (silent):", error);
+    // We don't throw here to ensure onboarding completion
+  });
+
+  return { data: userData, error: null };
 }
 
 export async function updateUser(updates: Partial<DBUser>): Promise<ApiResponse<DBUser>> {
   const user = auth.currentUser;
+  const localUserStr = localStorage.getItem('niswah_local_user');
+  let localUser = localUserStr ? JSON.parse(localUserStr) as DBUser : null;
+
+  if (localUser) {
+    localUser = { ...localUser, ...cleanObject(updates), updated_at: new Date().toISOString() };
+    localStorage.setItem('niswah_local_user', JSON.stringify(localUser));
+  }
+
   if (!user) {
-    const localUserStr = localStorage.getItem('niswah_local_user');
-    if (localUserStr) {
-      const localUser = JSON.parse(localUserStr);
-      const updatedUser = { ...localUser, ...updates, updated_at: new Date().toISOString() };
-      localStorage.setItem('niswah_local_user', JSON.stringify(updatedUser));
-      return { data: updatedUser, error: null };
-    }
-    return { data: null, error: 'Not authenticated' };
+    return { data: localUser, error: null };
   }
 
   const path = `users/${user.uid}`;
   try {
     const updateData = { ...cleanObject(updates), updated_at: new Date().toISOString() };
     await setDoc(doc(db, path), updateData, { merge: true });
+    // Update local storage again with potentially merged data
     const updatedDoc = await getDoc(doc(db, path));
-    const data = updatedDoc.data() as DBUser;
-    data.premium_status = true; // Freemium for now
-    return { data, error: null };
+    if (updatedDoc.exists()) {
+      const data = updatedDoc.data() as DBUser;
+      localStorage.setItem('niswah_local_user', JSON.stringify(data));
+      return { data, error: null };
+    }
+    return { data: localUser, error: null };
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
+    console.warn("Firestore updateUser failed (falling back to local):", error);
+    return { data: localUser, error: null };
   }
-}
-
-export async function updateMadhhab(madhhab: logic.Madhhab): Promise<ApiResponse<DBUser>> {
-  return updateUser({ madhhab });
 }
 
 export async function logCycleEntry(entry: Partial<DBCycleEntry>): Promise<ApiResponse<DBCycleEntry>> {
@@ -235,34 +232,48 @@ export async function logCycleEntry(entry: Partial<DBCycleEntry>): Promise<ApiRe
     created_at: new Date().toISOString()
   };
 
+  const entryData: DBCycleEntry = {
+    ...defaults,
+    ...cleanObject(entry),
+    user_id: user?.uid || 'demo-user-id',
+    id: entry.id || Math.random().toString(36).substr(2, 9),
+  } as DBCycleEntry;
+
+  // 1. Primary Save: Local Storage
+  const existingEntries = JSON.parse(localStorage.getItem('niswah_local_entries') || '[]');
+  const index = existingEntries.findIndex((e: any) => (e.id && e.id === entryData.id) || (e.date === entryData.date && e.fiqh_state === entryData.fiqh_state));
+  if (index >= 0) {
+    existingEntries[index] = entryData;
+  } else {
+    existingEntries.push(entryData);
+  }
+  localStorage.setItem('niswah_local_entries', JSON.stringify(existingEntries));
+
   if (!user) {
-    console.warn("Not authenticated, using local storage fallback for logCycleEntry");
-    const localEntry: DBCycleEntry = {
-      ...defaults,
-      ...entry,
-      id: Math.random().toString(36).substr(2, 9),
-      user_id: 'demo-user-id',
-    } as DBCycleEntry;
-    const existing = JSON.parse(localStorage.getItem('niswah_local_entries') || '[]');
-    localStorage.setItem('niswah_local_entries', JSON.stringify([...existing, localEntry]));
-    return { data: localEntry, error: null };
+    return { data: entryData, error: null };
   }
 
+  // 2. Background Sync: Firestore
   const path = `users/${user.uid}/cycle_entries`;
   try {
-    const entryData: DBCycleEntry = {
-      ...defaults,
-      ...cleanObject(entry),
-      user_id: user.uid
-    } as DBCycleEntry;
-
-    const docRef = await addDoc(collection(db, path), entryData);
-    entryData.id = docRef.id;
-    await updateDoc(docRef, { id: docRef.id });
+    if (entryData.id && !entryData.id.startsWith('0.')) {
+      await setDoc(doc(db, path, entryData.id), entryData, { merge: true });
+    } else {
+      const docRef = await addDoc(collection(db, path), entryData);
+      entryData.id = docRef.id;
+      await updateDoc(docRef, { id: docRef.id });
+      // Update local storage with real ID
+      const updatedEntries = JSON.parse(localStorage.getItem('niswah_local_entries') || '[]');
+      const localIdx = updatedEntries.findIndex((e: any) => e.date === entryData.date && e.fiqh_state === entryData.fiqh_state);
+      if (localIdx >= 0) {
+        updatedEntries[localIdx].id = docRef.id;
+        localStorage.setItem('niswah_local_entries', JSON.stringify(updatedEntries));
+      }
+    }
     return { data: entryData, error: null };
   } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
+    console.warn("Firestore logCycleEntry failed (silent):", error);
+    return { data: entryData, error: null };
   }
 }
 

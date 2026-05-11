@@ -1047,10 +1047,21 @@ const PrayerStatusWidget = ({ fiqhState, onOpenSettings }: { fiqhState: State; o
 
   // Find the latest HAID start in the current cycle
   const latestHaidStart = useMemo(() => {
+    if (!entries || entries.length === 0) return null;
     const haidEntries = entries
       .filter(e => e.fiqh_state === 'HAID')
-      .sort((a, b) => (b.time_logged || '').localeCompare(a.time_logged || ''));
-    return haidEntries.length > 0 ? new Date(haidEntries[0].time_logged || '').getTime() : null;
+      .sort((a, b) => {
+        const timeA = a.time_logged || a.date || '';
+        const timeB = b.time_logged || b.date || '';
+        return timeB.localeCompare(timeA);
+      });
+    
+    if (haidEntries.length === 0) return null;
+    const dateStr = haidEntries[0].time_logged || haidEntries[0].date;
+    if (!dateStr) return null;
+
+    const t = new Date(dateStr).getTime();
+    return isNaN(t) ? null : t;
   }, [entries]);
 
   const prayers = useMemo(() => {

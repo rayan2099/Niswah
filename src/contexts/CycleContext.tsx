@@ -38,8 +38,22 @@ import { useTranslation } from '../i18n/LanguageContext.tsx';
 
 export const CycleProvider = ({ children }: { children: ReactNode }) => {
   const { t } = useTranslation();
-  const [dbUser, setDbUser] = useState<DBUser | null>(null);
-  const [entries, setEntries] = useState<DBCycleEntry[]>([]);
+  const [dbUser, setDbUser] = useState<DBUser | null>(() => {
+    try {
+      const local = localStorage.getItem('niswah_local_user');
+      return local ? JSON.parse(local) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [entries, setEntries] = useState<DBCycleEntry[]>(() => {
+    try {
+      const local = localStorage.getItem('niswah_local_entries');
+      return local ? JSON.parse(local) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [ledger, setLedger] = useState<DBAdahLedger[]>([]);
   const [prayers, setPrayers] = useState<DBPrayerLog[]>([]);
   const [prayerTimes, setPrayerTimes] = useState<PrayerTime[]>([]);

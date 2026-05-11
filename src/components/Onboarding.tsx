@@ -181,7 +181,7 @@ const Screen2Language = ({ data, update, onNext }: { data: OnboardingData; updat
           {t('choose_language')}
         </h1>
         <p className="text-sm text-gray-400 text-center mb-8 leading-relaxed">
-          {t('language_desc' as any) || (data.language === 'ar' ? 'اختر اللغة المناسبة لكِ' : 'Select your preferred language')}
+          {t('language_desc')}
         </p>
         
         <div className="grid grid-cols-2 gap-4">
@@ -233,8 +233,8 @@ const Screen3Madhhab = ({ data, update, onNext }: { data: OnboardingData; update
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('madhhab_question')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('madhhab_desc')}</p>
+        <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('madhhab_question')}</h1>
+        <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('madhhab_desc')}</p>
         
         <div className="grid grid-cols-2 gap-4">
           {madhhabs.map((m) => (
@@ -243,7 +243,8 @@ const Screen3Madhhab = ({ data, update, onNext }: { data: OnboardingData; update
               whileTap={{ scale: 1.04 }}
               onClick={() => update({ madhhab: m.id })}
               className={cn(
-                "p-5 rounded-2xl border-2 transition-all text-left flex flex-col justify-between h-32",
+                "p-5 rounded-2xl border-2 transition-all flex flex-col justify-between h-32",
+                isRTL ? "text-right" : "text-left",
                 data.madhhab === m.id 
                   ? "border-rose-300 bg-rose-50 shadow-sm" 
                   : "border-black/5 bg-white hover:border-rose-100"
@@ -313,17 +314,17 @@ const Screen3Madhhab = ({ data, update, onNext }: { data: OnboardingData; update
 };
 
 const Screen4Goals = ({ data, update, onNext }: { data: OnboardingData; update: (d: Partial<OnboardingData>) => void; onNext: () => void }) => {
-  const { t } = useTranslation();
+  const { t, isRTL } = useTranslation();
   const [validationMsg, setValidationMsg] = useState('');
 
   const GOALS = [
-    { id: 'track_cycle', labelAr: 'تتبع دورتي الشهرية' },
-    { id: 'fiqh', labelAr: 'فهم التزاماتي الفقهية (الصلاة، الصيام)' },
-    { id: 'nifas', labelAr: 'تتبع فترة النفاس' },
-    { id: 'pregnancy', labelAr: 'التخطيط للحمل' },
-    { id: 'istihadah', labelAr: 'إدارة النزيف غير المنتظم' },
-    { id: 'health', labelAr: 'مراقبة الصحة العامة' },
-    { id: 'spiritual', labelAr: 'الصحة النفسية والروحية' },
+    { id: 'goal_track_cycle' },
+    { id: 'goal_understand_fiqh' },
+    { id: 'goal_postpartum' },
+    { id: 'goal_get_pregnant' },
+    { id: 'goal_irregular_bleeding' },
+    { id: 'goal_general_health' },
+    { id: 'goal_spiritual_wellness' },
   ];
 
   const toggleGoal = (id: string) => {
@@ -345,10 +346,10 @@ const Screen4Goals = ({ data, update, onNext }: { data: OnboardingData; update: 
   return (
     <div className="w-full flex flex-col h-full">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('goals_question')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('select_all_apply')}</p>
+        <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('goals_question')}</h1>
+        <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('select_all_apply')}</p>
 
-        <div className="flex flex-wrap gap-3 justify-center mt-8" dir="rtl">
+        <div className={cn("flex flex-wrap gap-3 mt-8", isRTL ? "justify-end" : "justify-start")} dir={isRTL ? "rtl" : "ltr"}>
           {GOALS.map(goal => (
             <motion.button
               key={goal.id}
@@ -361,7 +362,7 @@ const Screen4Goals = ({ data, update, onNext }: { data: OnboardingData; update: 
                   : 'bg-white border-gray-200 text-gray-700'
               )}
             >
-              {goal.labelAr}
+              {t(goal.id as any)}
             </motion.button>
           ))}
         </div>
@@ -674,8 +675,8 @@ const Screen5LastPeriod = ({ data, update, onNext }: { data: OnboardingData; upd
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('last_period_question')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('last_period_desc')}</p>
+        <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('last_period_question')}</h1>
+        <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('last_period_desc')}</p>
         
         <div className="bg-white rounded-3xl p-6 shadow-xl shadow-black/5 border border-black/5">
           <div className="grid grid-cols-7 gap-2 text-center mb-4">
@@ -910,13 +911,13 @@ const Screen8Conditions = ({ data, update, onNext }: { data: OnboardingData; upd
 };
 
 const Screen9Privacy = ({ data, update, onNext }: { data: OnboardingData; update: (d: Partial<OnboardingData>) => void; onNext: () => void }) => {
-  const { t } = useTranslation();
+  const { t, isRTL } = useTranslation();
   
   return (
     <div className="flex flex-col h-full w-full">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('privacy_title')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-10 leading-relaxed">{t('privacy_desc')}</p>
+        <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('privacy_title')}</h1>
+        <p className={cn("text-sm text-gray-400 mb-10 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('privacy_desc')}</p>
 
         {/* Anonymous mode — the only option */}
         <div className="bg-rose-50 border border-rose-100 rounded-2xl p-5">
@@ -986,8 +987,8 @@ const Screen10Notifications = ({ data, update, onNext }: { data: OnboardingData;
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2">{t('notifications_title')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8">{t('notifications_desc')}</p>
+        <h1 className={cn("text-3xl font-bold text-gray-900 mb-2", isRTL ? "text-right" : "text-left")}>{t('notifications_title')}</h1>
+        <p className={cn("text-sm text-gray-400 mb-8", isRTL ? "text-right" : "text-left")}>{t('notifications_desc')}</p>
 
         <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
           {options.map((opt) => (
@@ -1104,8 +1105,8 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
   const complete = async () => {
     try {
       setIsCompleting(true);
-      // Save to Database (tries Firestore + local backup)
-      const { data: savedUser, error: userError } = await api.upsertUser({
+      // Save to Database (tries Firestore + local primary save)
+      const { data: savedUser } = await api.upsertUser({
         madhhab: data.madhhab as Madhhab,
         language: data.language,
         avg_cycle_length: data.avg_cycle_length,
@@ -1127,42 +1128,36 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
         manual_prayer_offsets: { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 }
       });
 
-      // If we have any user data at all (even just local), we can try to proceed
-      // but if there's a critical error (like auth issue), we should know
-      if (userError && !savedUser) {
-        throw new Error(userError);
-      }
-
       if (data.last_period_date) {
-        const { error: entryError } = await api.logCycleEntry({
+        // Background sync cycle entry
+        await api.logCycleEntry({
           date: data.last_period_date.split('T')[0],
           time_logged: data.last_period_date,
           fiqh_state: 'HAID'
         });
-        if (entryError) {
-          console.error("Failed to log cycle entry", entryError);
-          // Don't throw for entries, user is saved at least
-        }
       }
       
+      // If we have any user data in localStorage (savedUser returns it), complete
       if (savedUser) {
-        // Even if there was a syncing error, if we have local data we can finish
-        if (userError) {
-          console.warn("User data saved locally but server sync failed:", userError);
-          // Show a subtle toast or just log it
-        }
         onFinish(savedUser);
       } else {
-        throw new Error("No user data available after save attempt.");
+        // Last resort fallback
+        const local = localStorage.getItem('niswah_local_user');
+        if (local) {
+          onFinish(JSON.parse(local));
+        } else {
+          throw new Error("Critical error: User session not initialized.");
+        }
       }
     } catch (err: any) {
-      console.error("Failed to save onboarding data", err);
-      const isNetwork = err?.message?.includes('offline') || err?.message?.includes('network');
-      const errorMsg = isNetwork 
-        ? t('error_saving_profile') 
-        : `${t('error_saving_profile')}\n\n(Error: ${err?.message?.substring(0, 50)}...)`;
-        
-      alert(errorMsg);
+      console.error("Non-blocking onboarding save error", err);
+      // Check if we can still finish
+      const local = localStorage.getItem('niswah_local_user');
+      if (local) {
+        onFinish(JSON.parse(local));
+      } else {
+        alert("Something went wrong. Please check your connection and try again.");
+      }
     } finally {
       setIsCompleting(false);
     }

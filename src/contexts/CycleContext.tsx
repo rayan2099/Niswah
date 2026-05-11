@@ -64,13 +64,22 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
 
   // Derived states using useMemo to avoid stale data and satisfy Scenario 5
   const user = useMemo(() => {
-    if (!dbUser) return null;
-    return api.mapDBUserToLogicUser(dbUser, ledger);
+    if (!dbUser || !dbUser.id) return null;
+    try {
+      return api.mapDBUserToLogicUser(dbUser, ledger);
+    } catch (e) {
+      console.error("Mapping failed in CycleContext", e);
+      return null;
+    }
   }, [dbUser, ledger]);
 
   const fiqhState = useMemo(() => {
-    if (!dbUser) return 'TAHARA' as State;
-    return logic.calculateFiqhState(entries, dbUser.madhhab as Madhhab);
+    if (!dbUser || !dbUser.madhhab) return 'TAHARA' as State;
+    try {
+      return logic.calculateFiqhState(entries, dbUser.madhhab as Madhhab);
+    } catch (e) {
+      return 'TAHARA' as State;
+    }
   }, [entries, dbUser?.madhhab]);
 
   const cycleStats = useMemo(() => {

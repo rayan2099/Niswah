@@ -12,8 +12,13 @@ export function getAverageCycleLength(user: User): number {
   const ledger = user.adahLedger || [];
   if (ledger.length === 0) return user.knownAdahDays || 28;
   
-  const totalCycleLengthDays = ledger.reduce((sum, cycle) => sum + (cycle.haidDurationHours / 24) + cycle.tuhrDurationDays, 0);
-  return totalCycleLengthDays / ledger.length;
+  const totalCycleLengthDays = ledger.reduce((sum, cycle) => {
+    const days = (cycle.haidDurationHours / 24) + cycle.tuhrDurationDays;
+    return sum + (isNaN(days) ? 0 : days);
+  }, 0);
+  
+  const avg = totalCycleLengthDays / ledger.length;
+  return isNaN(avg) || !isFinite(avg) || avg <= 0 ? (user.knownAdahDays || 28) : avg;
 }
 
 export function getAverageHaidDuration(user: User): number {
@@ -21,8 +26,13 @@ export function getAverageHaidDuration(user: User): number {
   if (ledger.length === 0) return user.avgHaidDuration || 5;
   
   const relevantCycles = ledger.slice(-6);
-  const totalHaidDurationDays = relevantCycles.reduce((sum, cycle) => sum + (cycle.haidDurationHours / 24), 0);
-  return totalHaidDurationDays / relevantCycles.length;
+  const totalHaidDurationDays = relevantCycles.reduce((sum, cycle) => {
+    const days = cycle.haidDurationHours / 24;
+    return sum + (isNaN(days) ? 0 : days);
+  }, 0);
+  
+  const avg = totalHaidDurationDays / relevantCycles.length;
+  return isNaN(avg) || !isFinite(avg) || avg <= 0 ? (user.avgHaidDuration || 5) : avg;
 }
 
 export function predictNextPeriod(user: User): PredictionResult {

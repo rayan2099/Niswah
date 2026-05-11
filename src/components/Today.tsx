@@ -163,6 +163,14 @@ const CycleRing = ({
   // Get segments from shared logic
   const initialSegments = logic.getCycleSegments(cycleStats, ovulation);
   
+  if (!initialSegments || initialSegments.length === 0) {
+    return (
+      <div className="w-[300px] h-[300px] flex items-center justify-center text-center p-10 bg-white rounded-full shadow-sm">
+        <p className="text-gray-400 text-sm">جاري تحديد بيانات دورتك...</p>
+      </div>
+    );
+  }
+
   // Enhance segments with labels and styles for Today screen
   const segments = initialSegments.map(s => {
     let label = '';

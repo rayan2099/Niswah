@@ -407,43 +407,52 @@ export async function getInsightsData(): Promise<ApiResponse<any>> {
 }
 
 export function mapDBUserToLogicUser(userData: DBUser, ledger: DBAdahLedger[] = []): logic.User {
-  const logicLedger: logic.AdahRecord[] = ledger.map(l => ({
-    cycleNumber: l.cycle_number,
-    haidStart: new Date(l.haid_start).getTime(),
-    haidEnd: l.haid_end ? new Date(l.haid_end).getTime() : 0,
-    haidDurationHours: l.haid_duration_hours || 0,
-    tuhrDurationDays: l.tuhr_duration_days || 0,
-    bloodColorPattern: l.blood_color_pattern || [],
-    bloodThicknessPattern: l.blood_thickness_pattern || [],
-    istihadahEpisode: l.istihadah_episode || false,
-    scholarConsulted: l.scholar_consulted || false
-  }));
+  if (!userData) {
+    // This should theoretically not be hit due to the check in CycleContext, but better safe
+    throw new Error("Cannot map null user data");
+  }
+
+  const logicLedger: logic.AdahRecord[] = (ledger || []).map(l => {
+    const start = l.haid_start ? new Date(l.haid_start).getTime() : Date.now();
+    const end = l.haid_end ? new Date(l.haid_end).getTime() : 0;
+    return {
+      cycleNumber: l.cycle_number || 0,
+      haidStart: isNaN(start) ? Date.now() : start,
+      haidEnd: isNaN(end) ? 0 : end,
+      haidDurationHours: l.haid_duration_hours || 0,
+      tuhrDurationDays: l.tuhr_duration_days || 0,
+      bloodColorPattern: l.blood_color_pattern || [],
+      bloodThicknessPattern: l.blood_thickness_pattern || [],
+      istihadahEpisode: l.istihadah_episode || false,
+      scholarConsulted: l.scholar_consulted || false
+    };
+  });
 
   return {
-    id: userData.id,
-    madhhab: userData.madhhab as logic.Madhhab,
-    currentState: 'TAHARA', // Default
+    id: userData.id || 'unknown',
+    madhhab: (userData.madhhab as logic.Madhhab) || 'HANAFI',
+    currentState: 'TAHARA',
     stateStartTime: Date.now(),
-    knownAdahDays: userData.avg_cycle_length,
-    avgHaidDuration: userData.avg_haid_duration,
-    adahConfidence: userData.adah_confidence,
+    knownAdahDays: userData.avg_cycle_length || userData.known_adah_days || 28,
+    avgHaidDuration: userData.avg_haid_duration || 5,
+    adahConfidence: userData.adah_confidence || 0,
     adahLedger: logicLedger,
-    prayerCity: userData.prayerCity,
-    prayerCountry: userData.prayerCountry,
-    prayerCityAr: userData.prayerCityAr,
-    prayerCountryAr: userData.prayerCountryAr,
+    prayerCity: userData.prayerCity || '',
+    prayerCountry: userData.prayerCountry || '',
+    prayerCityAr: userData.prayerCityAr || '',
+    prayerCountryAr: userData.prayerCountryAr || '',
     prayerLat: userData.prayerLat,
     prayerLon: userData.prayerLon,
-    locationName: userData.location_name,
-    manualPrayerOffsets: userData.manual_prayer_offsets,
-    pregnant: userData.pregnant,
-    pregnancy_week: userData.pregnancy_week,
-    reflect_health: userData.reflect_health,
-    conditions: userData.conditions,
-    display_name: userData.display_name,
-    anonymous_mode: userData.anonymous_mode,
-    notification_prefs: userData.notification_prefs,
-    language: userData.language,
+    locationName: userData.location_name || '',
+    manualPrayerOffsets: userData.manual_prayer_offsets || {},
+    pregnant: userData.pregnant || false,
+    pregnancy_week: userData.pregnancy_week || 0,
+    reflect_health: userData.reflect_health || false,
+    conditions: userData.conditions || [],
+    display_name: userData.display_name || '',
+    anonymous_mode: userData.anonymous_mode || false,
+    notification_prefs: userData.notification_prefs || {},
+    language: userData.language || 'ar',
     qadhaFastingDays: 0,
     qadhaCompleted: 0,
     qadhaRemaining: 0,

@@ -109,6 +109,16 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!firebaseUser) {
+      // Check local storage as a fallback even if not logged in (for demo/offline first start)
+      const localUserStr = localStorage.getItem('niswah_local_user');
+      if (localUserStr) {
+        try {
+          const localUser = JSON.parse(localUserStr) as DBUser;
+          setDbUser(localUser);
+        } catch (e) {
+          console.error("Failed to parse local user", e);
+        }
+      }
       setLoading(false);
       return;
     }
@@ -121,11 +131,14 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
 
     const unsubEntries = onSnapshot(entriesQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => doc.data() as DBCycleEntry);
-      data.sort((a, b) => b.date.localeCompare(a.date) || (b.time_logged || '').localeCompare(a.time_logged || ''));
+      data.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.time_logged || '').localeCompare(a.time_logged || ''));
       setEntries(data);
       setLoading(false); // Data loaded
     }, (error) => {
       console.error("Entries snapshot error", error);
+      // Fallback to local entries if any
+      const localEntries = JSON.parse(localStorage.getItem('niswah_local_entries') || '[]');
+      if (localEntries.length > 0) setEntries(localEntries);
       setLoading(false);
     });
 
@@ -148,9 +161,21 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
       if (snapshot.exists()) {
         const userData = snapshot.data() as DBUser;
         setDbUser(userData);
+        localStorage.setItem('niswah_local_user', JSON.stringify(userData));
+      } else {
+        // Doc might not exist yet if onboarding just finished and firestore is slow or failed
+        const localUserStr = localStorage.getItem('niswah_local_user');
+        if (localUserStr) {
+          const localUser = JSON.parse(localUserStr);
+          setDbUser(localUser);
+        }
       }
     }, (error) => {
       console.error("User snapshot error", error);
+      const localUserStr = localStorage.getItem('niswah_local_user');
+      if (localUserStr) {
+        setDbUser(JSON.parse(localUserStr));
+      }
     });
 
     return () => {

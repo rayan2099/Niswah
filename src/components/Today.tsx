@@ -1049,8 +1049,8 @@ const PrayerStatusWidget = ({ fiqhState, onOpenSettings }: { fiqhState: State; o
   const latestHaidStart = useMemo(() => {
     const haidEntries = entries
       .filter(e => e.fiqh_state === 'HAID')
-      .sort((a, b) => b.time_logged.localeCompare(a.time_logged));
-    return haidEntries.length > 0 ? new Date(haidEntries[0].time_logged).getTime() : null;
+      .sort((a, b) => (b.time_logged || '').localeCompare(a.time_logged || ''));
+    return haidEntries.length > 0 ? new Date(haidEntries[0].time_logged || '').getTime() : null;
   }, [entries]);
 
   const prayers = useMemo(() => {
@@ -1399,19 +1399,9 @@ export const Today = ({
         <div className="flex items-center space-x-4">
           <div className="relative cursor-pointer">
             <Bell className="w-6 h-6 text-emerald-900" />
-            {/* Ghost Notification Fix: Only show if there are actual notifications */}
-            {false && (
-              <motion.div 
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 border-[#FDFCFB] flex items-center justify-center"
-              >
-                <span className="text-[8px] text-white font-bold">{(0).toLocaleString('en-US')}</span>
-              </motion.div>
-            )}
           </div>
           <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center border-2 border-white shadow-sm overflow-hidden">
-            <span className="text-emerald-700 font-bold text-sm uppercase">{user?.display_name?.substring(0, 2) || 'AN'}</span>
+            <span className="text-emerald-700 font-bold text-sm uppercase">{(user?.display_name || 'AN').substring(0, 2)}</span>
           </div>
         </div>
       </header>

@@ -50,23 +50,39 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
     if (!entries || entries.length === 0) return null;
     
     const symptomCounts: Record<string, number> = {};
-    let totalEntriesWithSymptoms = 0;
+    let totalSignificantEntries = 0;
     
     entries.forEach(entry => {
-      if (entry.symptoms && Object.keys(entry.symptoms).length > 0) {
-        totalEntriesWithSymptoms++;
-        Object.entries(entry.symptoms).forEach(([s, level]) => {
-          // If level is a number (1, 2, 3), we can use it to weight the trend or just count occurrences
-          symptomCounts[s] = (symptomCounts[s] || 0) + 1;
-        });
+      const hasSymptoms = entry.symptoms && Object.values(entry.symptoms).some(v => v > 0);
+      const hasLowEnergy = entry.energy_level !== undefined && entry.energy_level <= 2;
+      const hasPoorSleep = entry.sleep_quality !== undefined && entry.sleep_quality <= 2;
+
+      if (hasSymptoms || hasLowEnergy || hasPoorSleep) {
+        totalSignificantEntries++;
+        
+        if (entry.symptoms) {
+          Object.entries(entry.symptoms).forEach(([s, level]) => {
+            if (level > 0) {
+              symptomCounts[s] = (symptomCounts[s] || 0) + 1;
+            }
+          });
+        }
+        
+        if (hasLowEnergy) {
+          symptomCounts['energy'] = (symptomCounts['energy'] || 0) + 1;
+        }
+        
+        if (hasPoorSleep) {
+          symptomCounts['sleep'] = (symptomCounts['sleep'] || 0) + 1;
+        }
       }
     });
     
-    if (totalEntriesWithSymptoms === 0) return null;
+    if (totalSignificantEntries === 0) return null;
     
     const results: Record<string, number> = {};
     Object.entries(symptomCounts).forEach(([key, count]) => {
-      results[key] = (count / totalEntriesWithSymptoms) * 100;
+      results[key] = (count / totalSignificantEntries) * 100;
     });
     return results;
   }, [entries]);
@@ -213,13 +229,17 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
 
           {(() => {
             const symptoms = [
+              { key: 'fatigue', labelAr: 'تعب', icon: '😫', color: '#1D9E75' },
+              { key: 'headache', labelAr: 'صداع', icon: '🧠', color: '#378ADD' },
               { key: 'cramps', labelAr: 'تشنجات', icon: '⚡', color: '#D4537E' },
               { key: 'mood', labelAr: 'المزاج', icon: '🫀', color: '#A09CF7' },
-              { key: 'headache', labelAr: 'صداع', icon: '🧠', color: '#378ADD' },
-              { key: 'energy', labelAr: 'الطاقة', icon: '⚡', color: '#1D9E75' },
-              { key: 'sleep', labelAr: 'النوم', icon: '🌙', color: '#FAC775' },
               { key: 'bloating', labelAr: 'انتفاخ', icon: '💫', color: '#F0997B' },
               { key: 'backache', labelAr: 'ألم الظهر', icon: '🔴', color: '#E24B4A' },
+              { key: 'energy', labelAr: 'طاقة منخفضة', icon: '🔋', color: '#F59E0B' },
+              { key: 'sleep', labelAr: 'نوم سيء', icon: '😴', color: '#6366F1' },
+              { key: 'nausea', labelAr: 'غثيان', icon: '🤢', color: '#FAC775' },
+              { key: 'acne', labelAr: 'حبوب', icon: '✨', color: '#B45309' },
+              { key: 'tender_breasts', labelAr: 'آلام الثدي', icon: '🎀', color: '#D4537E' },
             ];
 
             return (

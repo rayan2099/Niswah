@@ -151,12 +151,13 @@ export function calculateCycleStats(entries: any[], user?: User): CycleStats {
   for (let i = 0; i < sortedEntries.length; i++) {
     if (sortedEntries[i].fiqh_state === 'HAID') {
       if (i === 0 || sortedEntries[i - 1].fiqh_state !== 'HAID') {
-        try {
-          const d = new Date(sortedEntries[i].date);
+        const ts = getTimestamp(sortedEntries[i]);
+        if (ts > 0) {
+          const d = new Date(ts);
           if (!isNaN(d.getTime())) {
             lastPeriodStart = d;
           }
-        } catch (e) {}
+        }
       }
     }
   }
@@ -177,36 +178,43 @@ export function calculateCycleStats(entries: any[], user?: User): CycleStats {
 
   const today = startOfDay(new Date());
   const diffDays = differenceInDays(today, startOfDay(lastPeriodStart)) + 1;
+  const safeDiffDays = isNaN(diffDays) ? 1 : diffDays;
 
   // Calculate actual period duration if we are currently in or just finished one
   let currentPeriodLength = user ? getAverageHaidDuration(user) : 5;
   const periodEntries = actualEntries.filter(e => {
-    const d = new Date(e.date);
-    return e.fiqh_state === 'HAID' && d >= lastPeriodStart!;
+    const ts = getTimestamp(e);
+    return e.fiqh_state === 'HAID' && ts >= lastPeriodStart!.getTime();
   });
   
   if (periodEntries.length > 0) {
-    const entryDates = periodEntries.map(e => new Date(e.date).getTime());
-    const lastEntryDate = new Date(Math.max(...entryDates));
-    const actualSpan = differenceInDays(lastEntryDate, lastPeriodStart) + 1;
-    // If currently in HAID, we use max of avg and actual so far. 
-    // If TAHARA, the actual length is precisely what was logged.
-    const latestState = [...actualEntries].sort((a,b) => b.date.localeCompare(a.date))[0]?.fiqh_state;
-    if (latestState === 'HAID') {
-      currentPeriodLength = Math.max(currentPeriodLength, actualSpan);
-    } else {
-      currentPeriodLength = actualSpan;
+    const entryDates = periodEntries.map(e => getTimestamp(e));
+    const lastEntryTS = Math.max(...entryDates);
+    if (lastEntryTS > 0) {
+      const lastEntryDate = new Date(lastEntryTS);
+      const actualSpan = differenceInDays(startOfDay(lastEntryDate), startOfDay(lastPeriodStart)) + 1;
+      const safeActualSpan = isNaN(actualSpan) ? 1 : actualSpan;
+      
+      // If currently in HAID, we use max of avg and actual so far. 
+      // If TAHARA, the actual length is precisely what was logged.
+      const latestSorted = [...actualEntries].sort((a,b) => getTimestamp(b) - getTimestamp(a));
+      const latestState = latestSorted[0]?.fiqh_state;
+      if (latestState === 'HAID') {
+        currentPeriodLength = Math.max(currentPeriodLength, safeActualSpan);
+      } else {
+        currentPeriodLength = safeActualSpan;
+      }
     }
   }
 
   // Fix: If today is Day 28 and cycle is 28, daysUntilNext should be 1 (for tomorrow), not 0.
-  const daysUntilNext = Math.max(0, Math.round(cycleLength) - diffDays + 1);
-  const isOverdue = diffDays > Math.round(cycleLength);
-  const overdueDays = isOverdue ? diffDays - Math.round(cycleLength) : 0;
-  const progress = Math.min(100, Math.max(0, (diffDays / cycleLength) * 100));
+  const daysUntilNext = Math.max(0, Math.round(cycleLength) - safeDiffDays + 1);
+  const isOverdue = safeDiffDays > Math.round(cycleLength);
+  const overdueDays = isOverdue ? safeDiffDays - Math.round(cycleLength) : 0;
+  const progress = Math.min(100, Math.max(0, (safeDiffDays / cycleLength) * 100));
 
   return {
-    currentDay: diffDays,
+    currentDay: safeDiffDays,
     daysUntilNext,
     isOverdue,
     overdueDays,
@@ -226,8 +234,8 @@ export interface CycleSegment {
 }
 
 export function getCycleSegments(cycleStats: CycleStats, ovulation: OvulationResult | null): CycleSegment[] {
-  const cycleLength = Math.round(cycleStats.avgCycleLength || 28);
-  const avgPeriodLength = Math.round(cycleStats.avgPeriodLength || 5);
+  const cycleLength = Math.max(20, Math.round(cycleStats.avgCycleLength || 28));
+  const avgPeriodLength = Math.min(cycleLength - 10, Math.round(cycleStats.avgPeriodLength || 5));
 
   let fertileStart = Math.floor(cycleLength / 2) - 3;
   let fertileEnd = fertileStart + 5;
@@ -238,16 +246,19 @@ export function getCycleSegments(cycleStats: CycleStats, ovulation: OvulationRes
     fertileEnd = differenceInDays(startOfDay(new Date(ovulation.fertileWindowEnd)), lastPeriod) + 1;
   }
 
-  // Ensure logical order
-  fertileStart = Math.max(avgPeriodLength + 1, fertileStart);
-  fertileEnd = Math.min(cycleLength - 4, fertileEnd);
+  // Ensure logical order and constraints
+  fertileStart = Math.max(avgPeriodLength + 2, fertileStart);
+  fertileEnd = Math.min(cycleLength - 5, fertileEnd);
+  
   const fertileDuration = Math.max(0, fertileEnd - fertileStart + 1);
-
   const prePeriodDuration = 3;
   const expectedDuration = 1;
   
+  // Tahara segments are fillers
   const tahara1Duration = Math.max(0, fertileStart - avgPeriodLength - 1);
-  const tahara2Duration = Math.max(0, (cycleLength - prePeriodDuration - expectedDuration) - fertileEnd);
+  // Any remaining gap goes into Tahara 2
+  const consumedSoFar = avgPeriodLength + tahara1Duration + fertileDuration + prePeriodDuration + expectedDuration;
+  const tahara2Duration = Math.max(0, cycleLength - consumedSoFar);
   
   const segments: CycleSegment[] = [
     { id: 'haid' as CyclePhaseId, duration: avgPeriodLength },
@@ -268,6 +279,23 @@ export function getCycleSegments(cycleStats: CycleStats, ovulation: OvulationRes
       merged.push(s);
     }
   }
+  
+  // Final verification: ensure sum is exactly cycleLength
+  const total = merged.reduce((sum, s) => sum + s.duration, 0);
+  if (total < cycleLength && merged.length > 0) {
+    merged[merged.length - 1].duration += (cycleLength - total);
+  } else if (total > cycleLength && merged.length > 0) {
+    // If somehow over, trim from tahara or just from the end
+    let diff = total - cycleLength;
+    for (let i = merged.length - 1; i >= 0 && diff > 0; i--) {
+      const reduction = Math.min(merged[i].duration - 1, diff);
+      if (reduction > 0) {
+        merged[i].duration -= reduction;
+        diff -= reduction;
+      }
+    }
+  }
+
   return merged;
 }
 

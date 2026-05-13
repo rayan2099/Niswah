@@ -85,86 +85,132 @@ export const Calendar = () => {
   const cycleDates = useMemo(() => {
     if (!user || !prediction || !ovulation || !cycleStats.lastPeriodDate) return null;
     
+    const start = parseISO(cycleStats.lastPeriodDate);
+    const ovu = new Date(ovulation.predictedOvulationDate);
+    const next = new Date(prediction.predictedStartDate);
+    const fStart = new Date(ovulation.fertileWindowStart);
+    const fEnd = new Date(ovulation.fertileWindowEnd);
+
+    if (isNaN(start.getTime()) || isNaN(ovu.getTime()) || isNaN(next.getTime()) || isNaN(fStart.getTime()) || isNaN(fEnd.getTime())) {
+      return null;
+    }
+
     return { 
-      start: parseISO(cycleStats.lastPeriodDate), 
-      ovulation: new Date(ovulation.predictedOvulationDate), 
-      next: new Date(prediction.predictedStartDate),
-      fertileStart: new Date(ovulation.fertileWindowStart),
-      fertileEnd: new Date(ovulation.fertileWindowEnd)
+      start, 
+      ovulation: ovu, 
+      next,
+      fertileStart: fStart,
+      fertileEnd: fEnd
     };
   }, [user, prediction, ovulation, cycleStats.lastPeriodDate]);
 
   const pregnancyData = useMemo(() => {
-    const peakDay = Math.round(cycleLength) - 14;
-    return Array.from({ length: Math.round(cycleLength) }, (_, i) => {
+    const safeCycleLength = Math.max(1, Math.round(cycleLength || 28));
+    const peakDay = safeCycleLength - 14;
+    return Array.from({ length: safeCycleLength }, (_, i) => {
       const day = i + 1;
       // Normal distribution centered around peakDay
-      const chance = Math.exp(-Math.pow(day - peakDay, 2) / 15) * 100;
-      return { day, chance };
-    });
+      const variance = 15;
+      const chance = Math.exp(-Math.pow(day - peakDay, 2) / variance) * 100;
+      return { day, Math: isNaN(chance) ? 0 : chance };
+    }).map(d => ({ ...d, chance: Math.round(d.Math as number) }));
   }, [cycleLength]);
 
   const { calendarDays, displayTitle, monthStart } = useMemo(() => {
+    const safeDate = (currentDate instanceof Date && !isNaN(currentDate.getTime())) ? currentDate : new Date();
+    
     if (calendarType === 'gregorian') {
-      const mStart = startOfMonth(currentDate);
+      const mStart = startOfMonth(safeDate);
       const mEnd = endOfMonth(mStart);
       const sDate = startOfWeek(mStart);
       const eDate = endOfWeek(mEnd);
-      return {
-        calendarDays: eachDayOfInterval({ start: sDate, end: eDate }),
-        displayTitle: format(currentDate, 'MMMM yyyy'),
-        monthStart: mStart
-      };
-    } else {
-      const h = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
-      const mStart = new Date(currentDate);
-      mStart.setDate(currentDate.getDate() - (h.hd - 1));
       
-      const mEnd = new Date(mStart);
-      mEnd.setDate(mEnd.getDate() + 28);
-      let hEnd = toHijri(mEnd.getFullYear(), mEnd.getMonth() + 1, mEnd.getDate());
-      while (hEnd.hm === h.hm) {
-        mEnd.setDate(mEnd.getDate() + 1);
-        hEnd = toHijri(mEnd.getFullYear(), mEnd.getMonth() + 1, mEnd.getDate());
+      try {
+        return {
+          calendarDays: eachDayOfInterval({ start: sDate, end: eDate }),
+          displayTitle: format(safeDate, 'MMMM yyyy'),
+          monthStart: mStart
+        };
+      } catch (e) {
+        // Fallback to current month if interval is invalid
+        const now = new Date();
+        const curStart = startOfMonth(now);
+        return {
+          calendarDays: eachDayOfInterval({ start: startOfWeek(curStart), end: endOfWeek(endOfMonth(curStart)) }),
+          displayTitle: format(now, 'MMMM yyyy'),
+          monthStart: curStart
+        };
       }
-      mEnd.setDate(mEnd.getDate() - 1);
-      
-      const sDate = startOfWeek(mStart);
-      const eDate = endOfWeek(mEnd);
-      
-      const hijriMonthName = isRTL ? hijriMonthNamesAr[h.hm - 1] : hijriMonthNames[h.hm - 1];
-      
-      return {
-        calendarDays: eachDayOfInterval({ start: sDate, end: eDate }),
-        displayTitle: `${hijriMonthName} ${h.hy}`,
-        monthStart: mStart
-      };
+    } else {
+      try {
+        const h = toHijri(safeDate.getFullYear(), safeDate.getMonth() + 1, safeDate.getDate());
+        const mStart = new Date(safeDate);
+        mStart.setDate(safeDate.getDate() - (h.hd - 1));
+        
+        const mEnd = new Date(mStart);
+        mEnd.setDate(mEnd.getDate() + 28);
+        let hEnd = toHijri(mEnd.getFullYear(), mEnd.getMonth() + 1, mEnd.getDate());
+        let safetyCounter = 0;
+        while (hEnd.hm === h.hm && safetyCounter < 5) {
+          mEnd.setDate(mEnd.getDate() + 1);
+          hEnd = toHijri(mEnd.getFullYear(), mEnd.getMonth() + 1, mEnd.getDate());
+          safetyCounter++;
+        }
+        mEnd.setDate(mEnd.getDate() - 1);
+        
+        const sDate = startOfWeek(mStart);
+        const eDate = endOfWeek(mEnd);
+        
+        const hijriMonthName = isRTL ? hijriMonthNamesAr[h.hm - 1] : hijriMonthNames[h.hm - 1];
+        
+        return {
+          calendarDays: eachDayOfInterval({ start: sDate, end: eDate }),
+          displayTitle: `${hijriMonthName} ${h.hy}`,
+          monthStart: mStart
+        };
+      } catch (e) {
+        // Fallback for Hijri error
+        const mStart = startOfMonth(safeDate);
+        return {
+          calendarDays: eachDayOfInterval({ start: startOfWeek(mStart), end: endOfWeek(endOfMonth(mStart)) }),
+          displayTitle: format(safeDate, 'MMMM yyyy'),
+          monthStart: mStart
+        };
+      }
     }
   }, [currentDate, calendarType, isRTL]);
 
   const nextMonth = () => {
-    if (calendarType === 'gregorian') {
-      setCurrentDate(addMonths(currentDate, 1));
-    } else {
-      const h = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
-      const d = new Date(currentDate);
-      d.setDate(d.getDate() + (32 - h.hd));
-      const h2 = toHijri(d.getFullYear(), d.getMonth() + 1, d.getDate());
-      d.setDate(d.getDate() - (h2.hd - 1));
-      setCurrentDate(d);
+    try {
+      if (calendarType === 'gregorian') {
+        setCurrentDate(addMonths(currentDate, 1));
+      } else {
+        const h = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
+        const d = new Date(currentDate);
+        d.setDate(d.getDate() + (32 - h.hd));
+        const h2 = toHijri(d.getFullYear(), d.getMonth() + 1, d.getDate());
+        d.setDate(d.getDate() - (h2.hd - 1));
+        if (!isNaN(d.getTime())) setCurrentDate(d);
+      }
+    } catch (e) {
+      setCurrentDate(addMonths(new Date(), 1));
     }
   };
 
   const prevMonth = () => {
-    if (calendarType === 'gregorian') {
-      setCurrentDate(subMonths(currentDate, 1));
-    } else {
-      const h = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
-      const d = new Date(currentDate);
-      d.setDate(d.getDate() - (h.hd + 15));
-      const h2 = toHijri(d.getFullYear(), d.getMonth() + 1, d.getDate());
-      d.setDate(d.getDate() - (h2.hd - 1));
-      setCurrentDate(d);
+    try {
+      if (calendarType === 'gregorian') {
+        setCurrentDate(subMonths(currentDate, 1));
+      } else {
+        const h = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
+        const d = new Date(currentDate);
+        d.setDate(d.getDate() - (h.hd + 15));
+        const h2 = toHijri(d.getFullYear(), d.getMonth() + 1, d.getDate());
+        d.setDate(d.getDate() - (h2.hd - 1));
+        if (!isNaN(d.getTime())) setCurrentDate(d);
+      }
+    } catch (e) {
+      setCurrentDate(subMonths(new Date(), 1));
     }
   };
 
@@ -340,21 +386,30 @@ export const Calendar = () => {
           <div className="grid grid-cols-7 gap-y-4">
             {calendarDays.map((day, i) => {
               const { state, isExpected, isFertile, isOvulation } = getDayState(day);
+              
+              const isValidDay = day instanceof Date && !isNaN(day.getTime());
+              if (!isValidDay) return null;
+
               const hijri = toHijri(day.getFullYear(), day.getMonth() + 1, day.getDate());
+              const h_hm = hijri?.hm || 1;
+              const h_hy = hijri?.hy || 1445;
+              const h_hd = hijri?.hd || 1;
+
               const currentHijri = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
+              const cur_hm = currentHijri?.hm || 1;
+              const cur_hy = currentHijri?.hy || 1445;
               
               const isCurrentMonth = calendarType === 'gregorian' 
-                ? isSameMonth(day, monthStart)
-                : (hijri.hm === currentHijri.hm && hijri.hy === currentHijri.hy);
+                ? (isSameMonth(day, monthStart) && !isNaN(monthStart.getTime()))
+                : (h_hm === cur_hm && h_hy === cur_hy);
               
               const isTodayDay = isToday(day);
               
-              const hijriMonthName = isRTL ? hijriMonthNamesAr[hijri.hm - 1] : hijriMonthNames[hijri.hm - 1];
-              const hijriDisplay = `${hijri.hd} ${hijriMonthName}`;
+              const hijriMonthName = isRTL ? hijriMonthNamesAr[h_hm - 1] : hijriMonthNames[h_hm - 1];
 
               return (
                 <motion.div
-                  key={day.toString()}
+                  key={day.toISOString()}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: i * 0.005 }}
@@ -401,7 +456,7 @@ export const Calendar = () => {
                     state === 'TAHARA' && !isFertile && "text-[#0F6E56]",
                     isFertile && "text-[#633806] font-semibold"
                   )}>
-                    {calendarType === 'gregorian' ? format(day, 'd') : hijri.hd}
+                    {calendarType === 'gregorian' ? format(day, 'd') : h_hd}
                   </span>
                 </motion.div>
               );
@@ -469,12 +524,14 @@ export const Calendar = () => {
                   />
                 )}
                 {/* Current Day Marker */}
-                <ReferenceLine 
-                  x={cycleStats.currentDay} 
-                  stroke="#10B981" 
-                  strokeWidth={2}
-                  label={{ position: 'top', value: t('you_are_here'), fontSize: 8, fill: '#10B981', fontWeight: 'bold' }}
-                />
+                {cycleStats.currentDay > 0 && !isNaN(cycleStats.currentDay) && (
+                  <ReferenceLine 
+                    x={cycleStats.currentDay} 
+                    stroke="#10B981" 
+                    strokeWidth={2}
+                    label={{ position: 'top', value: t('you_are_here'), fontSize: 8, fill: '#10B981', fontWeight: 'bold' }}
+                  />
+                )}
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -483,19 +540,19 @@ export const Calendar = () => {
             <div className="flex flex-col">
               <span>{t('start_of_cycle')}</span>
               <span className="text-gray-900 mt-1">
-                {cycleDates ? cycleDates.start.toLocaleDateString(isRTL ? 'ar-SA-u-nu-latn' : 'en-US', { day: 'numeric', month: 'long' }) : '—'}
+                {cycleDates && !isNaN(cycleDates.start.getTime()) ? cycleDates.start.toLocaleDateString(isRTL ? 'ar-SA-u-nu-latn' : 'en-US', { day: 'numeric', month: 'long' }) : '—'}
               </span>
             </div>
             <div className="flex flex-col">
               <span>{t('ovulation')}</span>
               <span className="text-gray-900 mt-1">
-                {cycleDates ? cycleDates.ovulation.toLocaleDateString(isRTL ? 'ar-SA-u-nu-latn' : 'en-US', { day: 'numeric', month: 'long' }) : '—'}
+                {cycleDates && !isNaN(cycleDates.ovulation.getTime()) ? cycleDates.ovulation.toLocaleDateString(isRTL ? 'ar-SA-u-nu-latn' : 'en-US', { day: 'numeric', month: 'long' }) : '—'}
               </span>
             </div>
             <div className="flex flex-col">
               <span>{t('next_cycle')}</span>
               <span className="text-gray-900 mt-1">
-                {cycleDates ? cycleDates.next.toLocaleDateString(isRTL ? 'ar-SA-u-nu-latn' : 'en-US', { day: 'numeric', month: 'long' }) : '—'}
+                {cycleDates && !isNaN(cycleDates.next.getTime()) ? cycleDates.next.toLocaleDateString(isRTL ? 'ar-SA-u-nu-latn' : 'en-US', { day: 'numeric', month: 'long' }) : '—'}
               </span>
             </div>
           </div>

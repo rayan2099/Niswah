@@ -1102,11 +1102,14 @@ const PrayerStatusWidget = ({ fiqhState, onOpenSettings }: { fiqhState: State; o
         status = 'missed';
       }
 
-      const timeFormatted = new Date(pt.adhanTime).toLocaleTimeString(isRTL ? 'ar-SA' : 'en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true 
-      });
+      const adhanDate = new Date(pt.adhanTime);
+      const timeFormatted = !isNaN(adhanDate.getTime()) 
+        ? adhanDate.toLocaleTimeString(isRTL ? 'ar-SA' : 'en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            hour12: true 
+          })
+        : '--:--';
 
       return {
         id: pt.name,
@@ -1502,88 +1505,108 @@ export const Today = ({
                 </div>
 
                 {/* Daily Log Summary */}
-                {todayEntry && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="w-full max-w-sm bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 border border-black/5 space-y-6"
-                  >
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-gray-800">{t('logged_today')}</h3>
-                      <div className="flex items-center gap-2">
-                        {todayEntry.flow_intensity && todayEntry.flow_intensity !== 'none' && (
-                          <div className="px-3 py-1 bg-rose-50 text-rose-600 rounded-full text-[10px] font-bold uppercase tracking-wider border border-rose-100">
-                            {t(todayEntry.flow_intensity as any)}
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="w-full max-w-sm bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 border border-black/5 space-y-6"
+                >
+                  {todayEntry ? (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-gray-800">{t('logged_today')}</h3>
+                        <div className="flex items-center gap-2">
+                          {todayEntry.flow_intensity && todayEntry.flow_intensity !== 'none' && (
+                            <div className="px-3 py-1 bg-rose-50 text-rose-600 rounded-full text-[10px] font-bold uppercase tracking-wider border border-rose-100">
+                              {t(todayEntry.flow_intensity as any)}
+                            </div>
+                          )}
+                          <button 
+                            onClick={() => setIsLogOpen(true)}
+                            className="text-xs font-bold text-rose-400 uppercase tracking-widest hover:text-rose-500 transition-colors"
+                          >
+                            {t('edit')}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        {todayEntry.energy_level !== undefined && (
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">{t('energy')}</span>
+                            <div className="flex items-center justify-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 font-bold text-xs border border-rose-100">
+                                {todayEntry.energy_level}
+                              </div>
+                              <span className="text-[10px] text-gray-500 font-medium uppercase">
+                                {todayEntry.energy_level <= 2 ? t('energy_low') : todayEntry.energy_level >= 4 ? t('energy_high') : t('medium')}
+                              </span>
+                            </div>
                           </div>
                         )}
+                        {todayEntry.sleep_quality !== undefined && (
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">{t('sleep')}</span>
+                            <div className="flex items-center justify-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs border border-indigo-100">
+                                {todayEntry.sleep_quality}
+                              </div>
+                              <span className="text-[10px] text-gray-500 font-medium uppercase">
+                                {todayEntry.sleep_quality <= 2 ? t('sleep_poor') : todayEntry.sleep_quality >= 4 ? t('sleep_excellent') : t('medium')}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {todayEntry.symptoms && Object.entries(todayEntry.symptoms).filter(([_, v]) => (v as number) > 0).length > 0 && (
+                        <div className="space-y-3">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">{t('symptoms')}</span>
+                          <div className="flex flex-wrap justify-center gap-2">
+                            {Object.entries(todayEntry.symptoms)
+                              .filter(([_, v]) => (v as number) > 0)
+                              .map(([key, level]) => (
+                              <div key={key} className="px-3 py-1.5 bg-gray-50 rounded-full text-xs font-medium text-gray-700 flex items-center gap-2 border border-gray-100 shadow-sm">
+                                {t(key as any)}
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" style={{ opacity: (level as number) / 3 }} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {(todayEntry.mood !== undefined || todayEntry.feeling) && (
+                        <div className="space-y-3 pt-2 border-t border-gray-50 flex flex-col items-center">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">
+                            {t('mood')} ({t(MOODS_DATA[todayEntry.mood || 0]?.key as any)})
+                          </span>
+                          <div className="flex flex-col items-center">
+                            {todayEntry.feeling && (
+                              <p className="text-sm font-medium text-gray-800 text-center italic">"{todayEntry.feeling}"</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center space-y-4 py-2">
+                      <div className="flex items-center justify-between w-full">
+                        <h3 className="text-sm font-bold text-gray-800">{t('log_today_symptoms')}</h3>
                         <button 
                           onClick={() => setIsLogOpen(true)}
                           className="text-xs font-bold text-rose-400 uppercase tracking-widest hover:text-rose-500 transition-colors"
                         >
-                          {t('edit')}
+                          {t('add')}
                         </button>
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      {todayEntry.energy_level !== undefined && (
-                        <div className="space-y-2">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">{t('energy')}</span>
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 font-bold text-xs border border-rose-100">
-                              {todayEntry.energy_level}
-                            </div>
-                            <span className="text-[10px] text-gray-500 font-medium uppercase">
-                              {todayEntry.energy_level <= 2 ? t('energy_low') : todayEntry.energy_level >= 4 ? t('energy_high') : t('medium')}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      {todayEntry.sleep_quality !== undefined && (
-                        <div className="space-y-2">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">{t('sleep')}</span>
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs border border-indigo-100">
-                              {todayEntry.sleep_quality}
-                            </div>
-                            <span className="text-[10px] text-gray-500 font-medium uppercase">
-                              {todayEntry.sleep_quality <= 2 ? t('sleep_poor') : todayEntry.sleep_quality >= 4 ? t('sleep_excellent') : t('medium')}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {todayEntry.symptoms && Object.entries(todayEntry.symptoms).filter(([_, v]) => (v as number) > 0).length > 0 && (
-                      <div className="space-y-3">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">{t('symptoms')}</span>
-                        <div className="flex flex-wrap justify-center gap-2">
-                          {Object.entries(todayEntry.symptoms)
-                            .filter(([_, v]) => (v as number) > 0)
-                            .map(([key, level]) => (
-                            <div key={key} className="px-3 py-1.5 bg-gray-50 rounded-full text-xs font-medium text-gray-700 flex items-center gap-2 border border-gray-100 shadow-sm">
-                              {t(key as any)}
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" style={{ opacity: (level as number) / 3 }} />
-                            </div>
-                          ))}
-                        </div>
+                      <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center">
+                        <Plus className="w-6 h-6 text-rose-400" />
                       </div>
-                    )}
-
-                    {(todayEntry.mood !== undefined || todayEntry.feeling) && (
-                      <div className="space-y-3 pt-2 border-t border-gray-50 flex flex-col items-center">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">
-                          {t('mood')} ({t(MOODS_DATA[todayEntry.mood || 0]?.key as any)})
-                        </span>
-                        <div className="flex flex-col items-center">
-                          {todayEntry.feeling && (
-                            <p className="text-sm font-medium text-gray-800 text-center italic">"{todayEntry.feeling}"</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
+                      <p className="text-xs text-gray-400 text-center leading-relaxed">
+                        {t('tell_us_how_you_feel')}
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
 
                 {/* Health Doctor Card */}
                 <div

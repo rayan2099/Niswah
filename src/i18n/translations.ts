@@ -285,6 +285,9 @@ export const translations = {
     prayer_status_ended: "انتهى وقتها",
     prayer_status_upcoming: "قادمة",
     logged_today: "تم التسجيل اليوم",
+    log_today_symptoms: "سجلي أعراض اليوم",
+    tell_us_how_you_feel: "كيف تشعرين اليوم؟ سجلي أعراضك للحصول على رؤى أدق.",
+    add: "إضافة",
     qadha_example: "مثال للقضاء: صلاة الظهر الفائتة",
     
     // Calendar & Insights
@@ -744,6 +747,9 @@ export const translations = {
     prayer_status_ended: "Ended",
     prayer_status_upcoming: "Upcoming",
     logged_today: "Logged Today",
+    log_today_symptoms: "Log Today's Symptoms",
+    tell_us_how_you_feel: "How are you feeling today? Log your symptoms for better accuracy.",
+    add: "Add",
     qadha_example: "Qadha Example: Missed Dhuhr",
     
     // Calendar & Insights

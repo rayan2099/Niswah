@@ -55,7 +55,18 @@ export function predictNextPeriod(user: User): PredictionResult {
   const averageHaidDurationDays = totalHaidDurationDays / relevantCycles.length;
 
   const lastHaidStart = ledger[ledger.length - 1].haidStart;
-  const predictedStartDate = addDays(new Date(lastHaidStart), averageCycleLengthDays).getTime();
+  const lastDate = new Date(lastHaidStart);
+  if (isNaN(lastDate.getTime())) {
+    const fallback = addDays(new Date(), 28).getTime();
+    return {
+      predictedStartDate: fallback,
+      predictedEndDate: addDays(new Date(fallback), 5).getTime(),
+      confidenceScore: 0,
+      nextPeriodDate: new Date(fallback).toISOString()
+    };
+  }
+
+  const predictedStartDate = addDays(lastDate, averageCycleLengthDays).getTime();
   const predictedEndDate = addDays(new Date(predictedStartDate), averageHaidDurationDays).getTime();
 
   return {
@@ -312,8 +323,18 @@ export function getPhaseForDayInCycle(dayInCycle: number, segments: CycleSegment
 
 export function predictOvulation(user: User): OvulationResult {
   const prediction = predictNextPeriod(user);
-  const predictedStartDate = new Date(prediction.predictedStartDate);
+  const startDateTS = prediction.predictedStartDate;
+  const predictedStartDate = new Date(startDateTS);
   
+  if (isNaN(predictedStartDate.getTime())) {
+    const now = new Date();
+    return {
+      predictedOvulationDate: now.getTime(),
+      fertileWindowStart: subDays(now, 5).getTime(),
+      fertileWindowEnd: addDays(now, 1).getTime()
+    };
+  }
+
   // Ovulation = predictedStartDate minus 14 days
   const ovulationDate = subDays(predictedStartDate, 14);
   

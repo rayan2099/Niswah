@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect, Suspense, lazy, Component, ErrorInfo, ReactNode } from 'react';
 import { Onboarding } from './components/Onboarding.tsx';
-import { Paywall } from './components/Paywall.tsx';
 import * as api from './api/index.ts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -129,18 +128,10 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('today');
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [isDreamInterpreterOpen, setIsDreamInterpreterOpen] = useState(false);
-  const [showPremiumWelcome, setShowPremiumWelcome] = useState(false);
   const { t, isRTL } = useTranslation();
 
   useEffect(() => {
-    const hasSeenPremium = localStorage.getItem('niswah_seen_premium');
-    if (authUser && user?.madhhab && !hasSeenPremium && !showOnboarding) {
-      const timer = setTimeout(() => {
-        setShowPremiumWelcome(true);
-        localStorage.setItem('niswah_seen_premium', 'true');
-      }, 1500); // show 1.5s after reaching Today
-      return () => clearTimeout(timer);
-    }
+    // Paywall auto-trigger removed
   }, [authUser, user, showOnboarding]);
 
   useEffect(() => {
@@ -348,15 +339,7 @@ function AppContent() {
         />
       </Suspense>
 
-      {/* Premium Welcome Paywall */}
-      <Paywall 
-        isOpen={showPremiumWelcome} 
-        onClose={() => setShowPremiumWelcome(false)} 
-        onPurchase={(plan) => {
-          console.log("Purchasing plan:", plan);
-          setShowPremiumWelcome(false);
-        }}
-      />
+      {/* Premium Welcome Paywall removed */}
 
       <PWAInstallBanner />
     </div>

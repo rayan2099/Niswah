@@ -43,7 +43,6 @@ import { Madhhab } from '../logic/types.ts';
 import { popularCities } from '../logic/constants.ts';
 import { useTranslation } from '../i18n/LanguageContext.tsx';
 import { useCycleData } from '../contexts/CycleContext.tsx';
-import { Paywall } from './Paywall.tsx';
 import { NotificationService, notificationService } from '../services/NotificationService.ts';
 import { PWAInstallButton } from './PWAInstallBanner.tsx';
 
@@ -305,7 +304,6 @@ export const Profile = ({ }: ProfileProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showPaywall, setShowPaywall] = useState(false);
   const [showClinicShare, setShowClinicShare] = useState(false);
   const [clinicCode, setClinicCode] = useState('');
   const [shareType, setShareType] = useState<'health' | 'full'>('health');
@@ -957,16 +955,6 @@ export const Profile = ({ }: ProfileProps) => {
           </>
         )}
       </AnimatePresence>
-
-      <Paywall 
-        isOpen={showPaywall} 
-        onClose={() => setShowPaywall(false)} 
-        onPurchase={(plan) => {
-          setShowPaywall(false);
-          handleUpdateUser({ premium_status: true });
-          setIsPremium(true);
-        }}
-      />
     </div>
   );
 };

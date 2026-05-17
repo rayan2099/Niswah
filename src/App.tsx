@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useEffect, Suspense, lazy, Component, ErrorInfo, ReactNode } from 'react';
-import { Onboarding } from './components/Onboarding.tsx';
-import * as api from './api/index.ts';
+import { Onboarding } from './components/Onboarding';
+import * as api from './api/index';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Home, 
@@ -16,13 +16,13 @@ import {
   Users,
   AlertTriangle
 } from 'lucide-react';
-import { State, Madhhab } from './logic/types.ts';
-import * as logic from './logic/index.ts';
+import { State, Madhhab } from './logic/types';
+import * as logic from './logic/index';
 
-import { LanguageProvider, useTranslation } from './i18n/LanguageContext.tsx';
-import { CycleProvider, useCycleData } from './contexts/CycleContext.tsx';
+import { LanguageProvider, useTranslation } from './i18n/LanguageContext';
+import { CycleProvider, useCycleData } from './contexts/CycleContext';
 
-import { HapticService } from './services/HapticService.ts';
+import { HapticService } from './services/HapticService';
 
 // Error Boundary Component
 interface ErrorBoundaryProps {
@@ -77,14 +77,14 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 // Lazy load tab components
-const Today = lazy(() => import('./components/Today.tsx').then(m => ({ default: m.Today })));
-const Calendar = lazy(() => import('./components/Calendar.tsx').then(m => ({ default: m.Calendar })));
-const Discover = lazy(() => import('./components/Discover.tsx').then(m => ({ default: m.Discover })));
-const Profile = lazy(() => import('./components/Profile.tsx').then(m => ({ default: m.Profile })));
-const Insights = lazy(() => import('./components/Insights.tsx').then(m => ({ default: m.Insights })));
-const NiswahAI = lazy(() => import('./components/NiswahAI.tsx').then(m => ({ default: m.NiswahAI })));
-const DreamInterpreter = lazy(() => import('./components/DreamInterpreter.tsx').then(m => ({ default: m.DreamInterpreter })));
-const Community = lazy(() => import('./components/Community.tsx').then(m => ({ default: m.Community })));
+const Today = lazy(() => import('./components/Today').then(m => ({ default: m.Today })));
+const Calendar = lazy(() => import('./components/Calendar').then(m => ({ default: m.Calendar })));
+const Discover = lazy(() => import('./components/Discover').then(m => ({ default: m.Discover })));
+const Profile = lazy(() => import('./components/Profile').then(m => ({ default: m.Profile })));
+const Insights = lazy(() => import('./components/Insights').then(m => ({ default: m.Insights })));
+const NiswahAI = lazy(() => import('./components/NiswahAI'));
+const DreamInterpreter = lazy(() => import('./components/DreamInterpreter'));
+const Community = lazy(() => import('./components/Community').then(m => ({ default: m.Community })));
 
 type Tab = 'today' | 'calendar' | 'insights' | 'discover' | 'community' | 'profile';
 

@@ -114,7 +114,7 @@ async function retry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000):
   throw lastError;
 }
 
-export const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpreterProps) => {
+const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpreterProps) => {
   const { t, isRTL } = useTranslation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -341,3 +341,5 @@ User's Madhhab: ${userMadhhab}`;
     </AnimatePresence>
   );
 };
+
+export default DreamInterpreter;

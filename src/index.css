@@ -6,8 +6,8 @@
   --font-serif: "Playfair Display", ui-serif, Georgia, serif;
   --font-arabic: "Cairo", sans-serif;
   
-  --color-brand-primary: var(--color-rose-600);
-  --color-brand-secondary: var(--color-pink-500);
+  --color-brand-primary: #b8325f;
+  --color-brand-secondary: #ff7aa2;
   --color-brand-bg: #FDFCFB;
 }
 

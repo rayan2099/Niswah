@@ -231,7 +231,7 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
             const symptoms = [
               { key: 'fatigue', labelAr: 'تعب', icon: '😫', color: '#1D9E75' },
               { key: 'headache', labelAr: 'صداع', icon: '🧠', color: '#378ADD' },
-              { key: 'cramps', labelAr: 'تشنجات', icon: '⚡', color: '#D4537E' },
+              { key: 'cramps', labelAr: 'تشنجات', icon: '⚡', color: '#b8325f' },
               { key: 'mood', labelAr: 'المزاج', icon: '🫀', color: '#A09CF7' },
               { key: 'bloating', labelAr: 'انتفاخ', icon: '💫', color: '#F0997B' },
               { key: 'backache', labelAr: 'ألم الظهر', icon: '🔴', color: '#E24B4A' },
@@ -239,7 +239,7 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
               { key: 'sleep', labelAr: 'نوم سيء', icon: '😴', color: '#6366F1' },
               { key: 'nausea', labelAr: 'غثيان', icon: '🤢', color: '#FAC775' },
               { key: 'acne', labelAr: 'حبوب', icon: '✨', color: '#B45309' },
-              { key: 'tender_breasts', labelAr: 'آلام الثدي', icon: '🎀', color: '#D4537E' },
+              { key: 'tender_breasts', labelAr: 'آلام الثدي', icon: '🎀', color: '#b8325f' },
             ];
 
             return (
@@ -344,7 +344,7 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
                     borderRadius: '12px',
                     border: '1px solid #F4C0D1',
                     background: '#FBEAF0',
-                    color: '#D4537E',
+                    color: '#b8325f',
                     fontSize: '13px',
                     fontWeight: 600,
                     cursor: 'pointer',

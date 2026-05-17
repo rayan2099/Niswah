@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslation } from '../i18n/LanguageContext.tsx';
+import { useTranslation } from '../i18n/LanguageContext';
 import { 
   Send, 
   X, 
@@ -20,9 +20,9 @@ import {
 import { GoogleGenAI } from "@google/genai";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import * as api from '../api/index.ts';
-import { State, Madhhab } from '../logic/types.ts';
-import { DBChatMessage } from '../api/db-types.ts';
+import * as api from '../api/index';
+import { State, Madhhab } from '../logic/types';
+import { DBChatMessage } from '../api/db-types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -132,7 +132,7 @@ async function retry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000):
   throw lastError;
 }
 
-export const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
+const NiswahAI = ({ isOpen, onClose, userContext }: NiswahAIProps) => {
   const { t } = useTranslation();
   const [step, setStep] = useState<'start' | 'chat'>('start');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -468,3 +468,5 @@ Current user context:
     </AnimatePresence>
   );
 };
+
+export default NiswahAI;

@@ -24,9 +24,9 @@ import {
   deleteDoc,
   orderBy
 } from 'firebase/firestore';
-import { auth, db } from '../firebase.ts';
+import { auth, db } from '../firebase';
 import CryptoJS from 'crypto-js';
-import * as logic from '../logic/index.ts';
+import * as logic from '../logic/index';
 import { 
   DBUser, 
   DBCycleEntry, 
@@ -41,7 +41,7 @@ import {
   DBChatMessage
 } from './db-types.ts';
 
-export type { DBCycleEntry } from './db-types.ts';
+export type { DBCycleEntry } from './db-types';
 export type ApiResponse<T> = { data: T | null; error: string | null };
 
 // Helper to hash email

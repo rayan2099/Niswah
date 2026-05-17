@@ -89,7 +89,7 @@ const FirstTimeWelcome = ({ onStart }: { onStart: () => void }) => (
     </p>
     <div className="flex flex-col gap-2 mb-5">
       {[
-        { n: '١', c: '#D4537E', t: 'سجّلي بدء الحيض', s: 'اضغطي "بدء الحيض" فور رؤية الدم' },
+        { n: '١', c: '#b8325f', t: 'سجّلي بدء الحيض', s: 'اضغطي "بدء الحيض" فور رؤية الدم' },
         { n: '٢', c: '#A09CF7', t: 'تابعي يومياً', s: 'سجّلي الكثافة واللون كل يوم' },
         { n: '٣', c: '#1D9E75', t: 'سجّلي الانتهاء', s: 'اضغطي "انتهاء الحيض" عند الطهارة' },
       ].map(step => (
@@ -703,9 +703,9 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
     }));
   };
 
-  const levelColors = ['transparent', '#FBEAF0', '#F4C0D1', '#D4537E'];
+  const levelColors = ['transparent', '#FBEAF0', '#F4C0D1', '#b8325f'];
   const levelLabels = ['', t('light' as any), t('medium' as any), t('severe' as any)];
-  const levelTextColors = ['#9CA3AF', '#D4537E', '#993556', '#ffffff'];
+  const levelTextColors = ['#9CA3AF', '#b8325f', '#993556', '#ffffff'];
 
   const feelingTags = [
     t('feeling_anxious'), t('feeling_peaceful'), t('feeling_energetic'),
@@ -923,7 +923,7 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
                     style={{
                       padding: '8px 14px',
                       borderRadius: '20px',
-                      border: `1px solid ${symptoms[symptom.key] ? '#D4537E' : '#E5E7EB'}`,
+                      border: `1px solid ${symptoms[symptom.key] ? '#b8325f' : '#E5E7EB'}`,
                       background: levelColors[symptoms[symptom.key] || 0],
                       color: levelTextColors[symptoms[symptom.key] || 0],
                       fontSize: '13px',

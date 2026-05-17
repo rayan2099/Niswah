@@ -1,6 +1,6 @@
 {
-  "name": "Niswah v11 | نسوة",
-  "description": "Niswah: Empowering Muslim women with Fiqh-aligned health tracking. (v11.0-GEMINI-DIRECT)",
+  "name": "Niswah | نسوة",
+  "description": "نسوة — مجتمع رقمي للمرأة العربية. اكتشفي محتوى يلامس اهتماماتك وتتبعي دورتك الشهرية وصحتك بكل خصوصية.",
   "version": "11.0.0",
   "requestFramePermissions": ["geolocation"]
 }

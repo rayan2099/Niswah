@@ -421,7 +421,7 @@ export const Calendar = () => {
                 >
                   {/* Fiqh State Backgrounds */}
                   {state === 'HAID' && !isExpected && (
-                    <div className="absolute inset-1 rounded-[8px] bg-[#D4537E]" />
+                    <div className="absolute inset-1 rounded-[8px] bg-[#b8325f]" />
                   )}
                   {isExpected && (
                     <div className="absolute inset-1 rounded-[8px] bg-[#FBEAF0] border-[1.5px] border-dashed border-[#F4C0D1]" />
@@ -466,8 +466,8 @@ export const Calendar = () => {
           {/* New Pill Legend */}
           <div className="flex flex-wrap gap-2 mt-6 px-2" dir={isRTL ? "rtl" : "ltr"}>
             {[
-              { label: isRTL ? 'حيض' : t('haid'), bg: '#D4537E', text: 'white' },
-              { label: isRTL ? 'حيض متوقع' : t('expected_period'), bg: '#FBEAF0', text: '#D4537E', dashed: true },
+              { label: isRTL ? 'حيض' : t('haid'), bg: '#b8325f', text: 'white' },
+              { label: isRTL ? 'حيض متوقع' : t('expected_period'), bg: '#FBEAF0', text: '#b8325f', dashed: true },
               { label: isRTL ? 'طهارة' : t('tahara'), bg: '#E1F5EE', text: '#0F6E56' },
               { label: isRTL ? 'خصوبة' : t('fertile_window'), bg: '#FAEEDA', text: '#633806' },
             ].map(item => (

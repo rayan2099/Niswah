@@ -28,28 +28,11 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
 
-  const [dbStatus, setDbStatus] = useState<'checking' | 'ok' | 'error'>('checking');
-
-  React.useEffect(() => {
-    const checkDb = async () => {
-      try {
-        const { getDocFromServer, doc } = await import('firebase/firestore');
-        const { db } = await import('../firebase');
-        await getDocFromServer(doc(db, 'test', 'connection'));
-        setDbStatus('ok');
-      } catch (e) {
-        setDbStatus('error');
-      }
-    };
-    checkDb();
-  }, []);
-
   // Loading timeout to prevent getting stuck
   React.useEffect(() => {
     let timeout: NodeJS.Timeout;
     if (loading) {
       timeout = setTimeout(() => {
-        console.warn("Auth: Loading state timed out, forcing to false");
         setLoading(false);
         setError('استغرق الطلب وقتاً طويلاً. يرجى المحاولة مرة أخرى');
       }, 15000); // 15 seconds timeout
@@ -76,7 +59,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   };
 
   const handleEmailAuth = async () => {
-    console.log("Auth: handleEmailAuth started", { isRegistering, email: email ? 'provided' : 'missing' });
     if (!email || !password) {
       setError('يرجى إدخال البريد الإلكتروني وكلمة المرور');
       return;
@@ -89,7 +71,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     setError('');
     try {
       if (isRegistering) {
-        console.log("Auth: Attempting registration...");
         if (!name.trim()) { 
           setError('يرجى إدخال اسمك لإكمال التسجيل'); 
           setLoading(false); 
@@ -97,7 +78,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         }
         try {
           const cred = await createUserWithEmailAndPassword(auth, email, password);
-          console.log("Auth: Registration success, updating profile...");
           await updateProfile(cred.user, { displayName: name });
           await onSuccess();
         } catch (regErr: any) {
@@ -110,10 +90,8 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
           throw regErr;
         }
       } else {
-        console.log("Auth: Attempting login...");
         try {
           const cred = await signInWithEmailAndPassword(auth, email, password);
-          console.log("Auth: Login success", cred.user.uid);
           await onSuccess();
         } catch (loginErr: any) {
           if (loginErr.code === 'auth/user-not-found' || loginErr.code === 'auth/invalid-credential') {
@@ -131,7 +109,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         }
       }
     } catch (err: any) {
-      console.error("Auth Error (Email) FULL OBJECT:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
       setError(getErrorMessage(err.code));
     } finally {
       setLoading(false);
@@ -139,7 +116,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   };
 
   const handleGoogle = async () => {
-    console.log("Auth: handleGoogle started, agreed:", agreed);
     if (!agreed) {
       setError('يرجى الموافقة على سياسة الخصوصية وشروط الاستخدام أولاً');
       // Scroll to checkbox
@@ -152,14 +128,10 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       
-      console.log("Auth: Attempting Google Sign-in Popup...");
       try {
         const result = await signInWithPopup(auth, provider);
-        console.log("Auth: Google Sign-in Popup Success:", result.user.uid);
         await onSuccess();
       } catch (popupErr: any) {
-        console.warn("Auth: Google Popup Error:", popupErr.code, popupErr.message);
-        
         if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request' || popupErr.code === 'auth/popup-closed-by-user') {
           setError('تم منع نافذة تسجيل الدخول المنبثقة. يرجى السماح بالنوافذ المنبثقة في إعدادات المتصفح، أو استخدامه في متصفح مستقل (Safari/Chrome)، أو المتابعة بالبريد الإلكتروني.');
         } else {
@@ -167,7 +139,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         }
       }
     } catch (err: any) {
-      console.error("Auth Error (Google) FULL OBJECT:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
       setError(getErrorMessage(err.code));
     } finally {
       setLoading(false);
@@ -175,7 +146,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   };
 
   const handleApple = async () => {
-    console.log("Auth: handleApple started");
     if (!agreed) {
       setError('يرجى الموافقة على سياسة الخصوصية وشروط الاستخدام');
       return;
@@ -187,13 +157,10 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
       provider.addScope('email');
       provider.addScope('name');
       
-      console.log("Auth: Attempting Apple Sign-in Popup...");
       try {
         const result = await signInWithPopup(auth, provider);
-        console.log("Auth: Apple Sign-in Popup Success:", result.user.uid);
         await onSuccess();
       } catch (popupErr: any) {
-        console.warn("Auth: Apple Popup Error:", popupErr.code, popupErr.message);
         if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request' || popupErr.code === 'auth/popup-closed-by-user') {
           setError('تم منع نافذة تسجيل الدخول. يرجى المتابعة باستخدام البريد الإلكتروني أو فتح الموقع في متصفح خارجي (سفاري/كروم)');
         } else {
@@ -201,7 +168,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         }
       }
     } catch (err: any) {
-      console.error("Auth Error (Apple) FULL OBJECT:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
       setError(getErrorMessage(err.code));
     } finally {
       setLoading(false);
@@ -238,6 +204,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               <img src="/logo.svg" alt="Niswah Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
             <div className="text-center px-6">
+              <h1 className="text-3xl font-bold text-rose-900 mb-3">نسوة</h1>
               <p className="text-sm text-gray-400 max-w-xs text-center leading-relaxed">
                 تتبع دورتك بوعي فقهي وعناية صحية — خصوصيتك محمية تماماً
               </p>
@@ -520,6 +487,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
                   <label className="text-sm text-gray-500 text-right block mb-1">الاسم</label>
                   <input
                     type="text"
+                    autoComplete="name"
                     value={name}
                     onChange={e => setName(e.target.value)}
                     placeholder="اسمك أو لقبك"
@@ -535,6 +503,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               <label className="text-sm text-gray-500 text-right block mb-1">البريد الإلكتروني</label>
               <input
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="example@email.com"
@@ -548,6 +517,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               <label className="text-sm text-gray-500 text-right block mb-1">كلمة المرور</label>
               <input
                 type="password"
+                autoComplete={isRegistering ? 'new-password' : 'current-password'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -634,6 +604,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
             <div className="flex flex-col gap-4">
               <input
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="example@email.com"
@@ -656,13 +627,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
           )}
         </motion.div>
       )}
-      {/* Debug Info (Only for troubleshooting) */}
-      <div className="fixed bottom-4 left-4 right-4 p-2 bg-black/5 rounded text-[10px] font-mono text-gray-400 pointer-events-none opacity-50">
-        Auth: {auth.currentUser ? `Logged in (${auth.currentUser.uid.slice(0,5)})` : 'Not logged in'} | 
-        DB: {dbStatus} |
-        Mode: {mode} | 
-        Loading: {loading ? 'YES' : 'NO'}
-      </div>
     </div>
   );
 };

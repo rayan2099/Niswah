@@ -17,12 +17,11 @@ import {
   MessageSquare,
   ArrowLeft
 } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import * as api from '../api/index';
 import { State, Madhhab } from '../logic/types';
-import { DBChatMessage } from '../api/db-types';
+import { callGemini } from '../utils/aiClient';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -221,7 +220,6 @@ Current user context:
 - Conditions: ${(userContext.conditions || []).join(', ')}
 - Pregnant: ${userContext.pregnant}`;
 
-    const key = process.env.GEMINI_API_KEY;
     const aiMsgId = (Date.now() + 1).toString();
     
     // Add placeholder AI message
@@ -233,35 +231,22 @@ Current user context:
     }]);
 
     try {
-      if (!key) throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
-      
-      const ai = new GoogleGenAI({ apiKey: key });
       const currentHistory = messages.map(m => ({
         role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
         parts: [{ text: m.text }]
       }));
 
-      const streamResponse = await ai.models.generateContentStream({
-        model: "gemini-3-flash-preview",
+      const accumulatedText = await callGemini({
         contents: [
           ...currentHistory,
           { role: 'user', parts: [{ text: text.trim() }] }
         ],
-        config: {
-          systemInstruction: systemPrompt,
-          temperature: 0.7,
-          maxOutputTokens: 2048,
-        }
+        systemInstruction: systemPrompt,
+        temperature: 0.7,
+        maxOutputTokens: 2048,
       });
 
-      let accumulatedText = "";
-      for await (const chunk of streamResponse) {
-        const chunkText = chunk.text;
-        if (chunkText) {
-          accumulatedText += chunkText;
-          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: accumulatedText } : m));
-        }
-      }
+      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: accumulatedText } : m));
       
       setIsTyping(false);
 

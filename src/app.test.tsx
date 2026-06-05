@@ -1613,13 +1613,14 @@ describe('🔄 CycleContext Deep Coverage', () => {
     console.log('✅ TEST 17.9 PASSED: CycleContext handles snapshot errors');
   });
 
-  it.skip('TEST 17.10 — CycleContext triggers notifications when data is ready', async () => {
+  it('TEST 17.10 — CycleContext triggers notifications when data is ready', async () => {
     const { CycleProvider, useCycleData } = await import('./contexts/CycleContext');
     const { notificationService } = await import('./services/NotificationService');
-    const { auth } = await import('./firebase');
     const api = await import('./api/index');
     const prayerLogic = await import('./logic/prayer');
     const predictionLogic = await import('./logic/prediction');
+    const authModule = await import('firebase/auth');
+    const firestore = await import('firebase/firestore');
     
     const spyPrayer = vi.spyOn(notificationService, 'schedulePrayerReminders');
     const spyCycle = vi.spyOn(notificationService, 'scheduleCycleReminders');
@@ -1649,24 +1650,25 @@ describe('🔄 CycleContext Deep Coverage', () => {
       error: null 
     });
 
-    const { onSnapshot } = await import('firebase/firestore');
-    vi.mocked(onSnapshot).mockImplementation((ref: any, callback: any) => {
-      // ref could be a DocumentReference or a Query
-      // In Firestore Lite/Mocks, we check for path or _query
-      const path = ref?.path || (ref?._query?.path?.segments?.join('/'));
+    vi.mocked(firestore.collection).mockImplementation((_db: any, path: string) => ({ path }) as any);
+    vi.mocked(firestore.query).mockImplementation((ref: any) => ref);
+    vi.mocked(firestore.doc).mockImplementation((_db: any, path: string) => ({ path }) as any);
+    vi.mocked(firestore.onSnapshot).mockImplementation((ref: any, callback: any) => {
+      const path = ref?.path || '';
       
-      if (path && path.includes('u1')) {
+      if (path === 'users/u1') {
         callback({
           exists: () => true,
           data: () => ({ 
+            uid: 'u1',
             id: 'u1', 
             prayerCity: 'Mecca', 
+            prayerCountry: 'Saudi Arabia',
             madhhab: 'HANBALI', 
             notification_prefs: { prayer_alerts: true, haid_prediction_alerts: true } 
           })
         });
       } else {
-        // Return empty for other snapshots (entries, etc)
         callback({ docs: [], exists: () => false });
       }
       return vi.fn();
@@ -1674,7 +1676,7 @@ describe('🔄 CycleContext Deep Coverage', () => {
 
     // Manually trigger auth change
     let authCallback: any;
-    vi.mocked(auth.onAuthStateChanged).mockImplementation((callback: any) => {
+    vi.mocked(authModule.onAuthStateChanged).mockImplementation((_auth: any, callback: any) => {
       authCallback = callback;
       return vi.fn();
     });
@@ -1695,7 +1697,6 @@ describe('🔄 CycleContext Deep Coverage', () => {
     console.log('✅ TEST 17.10 PASSED: Notifications triggered from context');
     spyPrayer.mockRestore();
     spyCycle.mockRestore();
-    vi.restoreAllMocks(); // Clean up for next tests
   });
 
   it('TEST 17.11 — CycleContext handles prayer fetch failure in loadInitialData', async () => {

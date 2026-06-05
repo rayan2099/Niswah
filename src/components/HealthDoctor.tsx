@@ -6,9 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { GoogleGenAI } from "@google/genai";
 import * as api from '../api/index.ts';
-import { DBChatMessage } from '../api/db-types.ts';
+import { callGemini } from '../utils/aiClient.ts';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -131,8 +130,6 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     const userMessage = `أعاني من الأعراض التالية: ${symptomsText}. ${userNotes ? `ملاحظات: ${userNotes}` : ''}`;
     const userTextDisplay = `أعاني من: ${symptomsText}${userNotes ? `\n\nملاحظات: ${userNotes}` : ''}`;
 
-    const key = process.env.GEMINI_API_KEY;
-    
     // Set initial user message
     setMessages([{ role: 'user', text: userTextDisplay }]);
 
@@ -140,33 +137,20 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     setMessages(prev => [...prev, { role: 'ai', text: "" }]);
 
     try {
-      if (!key) throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
-      const ai = new GoogleGenAI({ apiKey: key });
-
-      const streamResponse = await ai.models.generateContentStream({
-        model: "gemini-3-flash-preview",
+      const accumulatedText = await callGemini({
         contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-        config: {
-          systemInstruction: systemPrompt,
-          temperature: 0.7,
-          maxOutputTokens: 2048,
-        }
+        systemInstruction: systemPrompt,
+        temperature: 0.7,
+        maxOutputTokens: 2048,
       });
 
-      let accumulatedText = "";
-      for await (const chunk of streamResponse) {
-        const chunkText = chunk.text;
-        if (chunkText) {
-          accumulatedText += chunkText;
-          setMessages(prev => {
-            const copy = [...prev];
-            if (copy.length > 0) {
-              copy[copy.length - 1] = { ...copy[copy.length - 1], text: accumulatedText };
-            }
-            return copy;
-          });
+      setMessages(prev => {
+        const copy = [...prev];
+        if (copy.length > 0) {
+          copy[copy.length - 1] = { ...copy[copy.length - 1], text: accumulatedText };
         }
-      }
+        return copy;
+      });
       
       setIsTyping(false);
 
@@ -210,42 +194,28 @@ export const HealthDoctor = ({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     setMessages(prev => [...prev, { role: 'ai', text: "" }]);
 
     try {
-      const key = process.env.GEMINI_API_KEY;
-      if (!key) throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
-      
-      const ai = new GoogleGenAI({ apiKey: key });
       const currentHistory = messages.map(m => ({
         role: (m.role === 'ai' ? 'model' : 'user') as 'user' | 'model',
         parts: [{ text: m.text }]
       }));
       
-      const streamResponse = await ai.models.generateContentStream({
-        model: "gemini-3-flash-preview",
+      const accumulatedText = await callGemini({
         contents: [
           ...currentHistory,
           { role: 'user', parts: [{ text: followUpText }] }
         ],
-        config: {
-          systemInstruction: systemPrompt,
-          temperature: 0.7,
-          maxOutputTokens: 2048,
-        }
+        systemInstruction: systemPrompt,
+        temperature: 0.7,
+        maxOutputTokens: 2048,
       });
 
-      let accumulatedText = "";
-      for await (const chunk of streamResponse) {
-        const chunkText = chunk.text;
-        if (chunkText) {
-          accumulatedText += chunkText;
-          setMessages(prev => {
-            const copy = [...prev];
-            if (copy.length > 0) {
-              copy[copy.length - 1] = { ...copy[copy.length - 1], text: accumulatedText };
-            }
-            return copy;
-          });
+      setMessages(prev => {
+        const copy = [...prev];
+        if (copy.length > 0) {
+          copy[copy.length - 1] = { ...copy[copy.length - 1], text: accumulatedText };
         }
-      }
+        return copy;
+      });
       
       setIsTyping(false);
 

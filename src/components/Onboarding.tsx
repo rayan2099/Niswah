@@ -680,8 +680,8 @@ const Screen5LastPeriod = ({ data, update, onNext }: { data: OnboardingData; upd
         
         <div className="bg-white rounded-3xl p-6 shadow-xl shadow-black/5 border border-black/5">
           <div className="grid grid-cols-7 gap-2 text-center mb-4">
-            {weekDays.map(d => (
-              <span key={d} className="text-[10px] font-bold text-gray-300 uppercase">{d}</span>
+            {weekDays.map((d, index) => (
+              <span key={`${d}-${index}`} className="text-[10px] font-bold text-gray-300 uppercase">{d}</span>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-2">
@@ -1089,10 +1089,10 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
 
   const nextStep = () => {
     setDirection(1);
-    if (step === 11) {
+    if (step === 12) {
       complete();
     } else {
-      setStep(s => Math.min(s + 1, 11));
+      setStep(s => Math.min(s + 1, 12));
     }
   };
 
@@ -1189,17 +1189,18 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
           transition={{ duration: 0.35, ease: 'easeOut' }}
           className="flex-1 flex flex-col items-center justify-start pt-24 p-6 w-full max-w-md mx-auto h-full"
         >
-          {step === 1 && <Screen2Language data={data} update={updateData} onNext={nextStep} />}
-          {step === 2 && <Screen1Splash onNext={nextStep} />}
+          {step === 1 && <Screen1Splash onNext={nextStep} />}
+          {step === 2 && <Screen2Language data={data} update={updateData} onNext={nextStep} />}
           {step === 3 && <Screen3Madhhab data={data} update={updateData} onNext={nextStep} />}
-          {step === 4 && <Screen6CycleLength data={data} update={updateData} onNext={nextStep} />}
-          {step === 5 && <Screen7PeriodDuration data={data} update={updateData} onNext={nextStep} />}
+          {step === 4 && <Screen4Goals data={data} update={updateData} onNext={nextStep} />}
+          {step === 5 && <ScreenLocation data={data} update={updateData} onNext={nextStep} />}
           {step === 6 && <Screen5LastPeriod data={data} update={updateData} onNext={nextStep} />}
-          {step === 7 && <Screen4Goals data={data} update={updateData} onNext={nextStep} />}
-          {step === 8 && <Screen8Conditions data={data} update={updateData} onNext={nextStep} />}
-          {step === 9 && <ScreenLocation data={data} update={updateData} onNext={nextStep} />}
-          {step === 10 && <Screen10Notifications data={data} update={updateData} onNext={nextStep} />}
-          {step === 11 && <Screen9Privacy data={data} update={updateData} onNext={nextStep} />}
+          {step === 7 && <Screen6CycleLength data={data} update={updateData} onNext={nextStep} />}
+          {step === 8 && <Screen7PeriodDuration data={data} update={updateData} onNext={nextStep} />}
+          {step === 9 && <Screen8Conditions data={data} update={updateData} onNext={nextStep} />}
+          {step === 10 && <Screen9Privacy data={data} update={updateData} onNext={nextStep} />}
+          {step === 11 && <Screen10Notifications data={data} update={updateData} onNext={nextStep} />}
+          {step === 12 && <Screen11Welcome onComplete={nextStep} isCompleting={isCompleting} />}
         </motion.div>
       </AnimatePresence>
       

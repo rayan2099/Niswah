@@ -43,14 +43,12 @@ const loadArabicFont = async (doc: jsPDF): Promise<boolean> => {
       (doc as any)._arabicFontLoaded = true;
       (doc as any)._arabicFontName = 'Arabic';
       
-      console.log(`✓ Font loaded: ${fontPath} (${arrayBuffer.byteLength} bytes)`);
       return true;
     } catch (err) {
       console.warn(`Font load failed: ${fontPath}`, err);
     }
   }
   
-  console.error('ALL FONTS FAILED — PDF will show text errors');
   (doc as any)._arabicFontLoaded = false;
   return false;
 };
@@ -70,16 +68,15 @@ const getHijriDate = (dateStr: string | null | undefined): string => {
   } catch { return '—'; }
 };
 
-// Simple Arabic reshaper/reverser to prevent garbled text in jsPDF
+// jsPDF ships an Arabic shaping plugin. It produces presentation forms that
+// render reliably with embedded Arabic TTF fonts.
 const reshapeArabic = (text: string): string => {
   if (!text) return '';
   const arabicRegex = /[\u0600-\u06FF]/;
   if (!arabicRegex.test(text)) return text;
-  
-  // Reverse for RTL - jsPDF doesn't handle RTL automatically
-  // Note: This is a basic fix; complex ligatures require a full reshaper library
-  // We also handle numbers and punctuation which should stay in order
-  return text.split('').reverse().join('');
+
+  const processor = (jsPDF as any).API?.processArabic;
+  return typeof processor === 'function' ? processor(text) : text;
 };
 
 // RTL text helper
@@ -95,34 +92,18 @@ const R = (doc: jsPDF, text: string, x: number, y: number, size = 10, align: 'le
     if (hasArabic && fontLoaded) {
       try {
         doc.setFont('Arabic', 'normal');
-        
-        // Defensive check for font metrics to prevent 'widths' crash
-        const currentFont = doc.internal.getFont();
-        if (hasArabic && (!currentFont || !currentFont.metadata || !currentFont.metadata.widths)) {
-          console.warn('Arabic font loaded but missing widths metadata. Falling back.');
-          throw new Error('Missing font widths');
-        }
-
+        (doc as any).setR2L?.(true);
         const processedText = reshapeArabic(val);
-        // Use a small try-catch for the specific text call to avoid crashing the whole PDF
-        try {
-          doc.text(processedText, x, y, { align });
-        } catch (textErr) {
-          console.error('doc.text failed for Arabic:', textErr);
-          doc.setFont('helvetica', 'normal');
-          doc.text('[Text Error]', x, y, { align });
-        }
+        doc.text(processedText, x, y, { align });
+        (doc as any).setR2L?.(false);
       } catch (err) {
-        console.warn('Arabic rendering failed with Cairo, falling back to Helvetica:', err);
+        console.warn('Arabic rendering failed; using original text with embedded font fallback:', err);
         doc.setFont('helvetica', 'normal');
-        doc.text('[Arabic Text]', x, y, { align });
+        doc.text(val, x, y, { align });
       }
     } else {
       doc.setFont('helvetica', 'normal');
-      // If we have Arabic but no font, we MUST use a placeholder to avoid 'widths' crash
-      // because Helvetica doesn't have Arabic glyphs and will throw the 'widths' error
-      const textToRender = hasArabic ? '[Arabic Text]' : val;
-      doc.text(textToRender, x, y, { align });
+      doc.text(val, x, y, { align });
     }
   } catch (err) {
     console.error('Critical error in R helper:', err);
@@ -144,7 +125,7 @@ export const generateFiqhPDF = async (user: any, ledger: any[], fiqhState: strin
     doc.setFontSize(14);
     doc.text('Niswah | Fiqh Report', 105, 20, { align: 'center' });
     doc.setFontSize(10);
-    doc.text('Arabic font failed to load. Please try again.', 105, 35, { align: 'center' });
+    doc.text('Report font unavailable. Please try again.', 105, 35, { align: 'center' });
     doc.text(`Current state: ${fiqhState}`, 105, 50, { align: 'center' });
     doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd')}`, 105, 60, { align: 'center' });
     return doc.output('blob');
@@ -256,7 +237,7 @@ export const generateDoctorPDF = async (user: any, ledger: any[], stats: any): P
     doc.setFontSize(14);
     doc.text('Niswah | Medical Cycle Report', 105, 20, { align: 'center' });
     doc.setFontSize(10);
-    doc.text('Arabic font failed to load. Please try again.', 105, 35, { align: 'center' });
+    doc.text('Report font unavailable. Please try again.', 105, 35, { align: 'center' });
     doc.text(`Patient: ${user?.display_name || 'Sister'}`, 105, 50, { align: 'center' });
     doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd')}`, 105, 60, { align: 'center' });
     return doc.output('blob');
@@ -345,7 +326,7 @@ export const generateHusbandPDF = async (
     doc.setFontSize(14);
     doc.text('Niswah | Summary for Husband', 105, 20, { align: 'center' });
     doc.setFontSize(10);
-    doc.text('Arabic font failed to load. Please try again.', 105, 35, { align: 'center' });
+    doc.text('Report font unavailable. Please try again.', 105, 35, { align: 'center' });
     doc.text(`Current state: ${fiqhState}`, 105, 50, { align: 'center' });
     doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd')}`, 105, 60, { align: 'center' });
     return doc.output('blob');

@@ -563,11 +563,11 @@ export async function updateQadhaSchedule(dates: string[]): Promise<ApiResponse<
 
 // PDF Generation Placeholders (would be edge functions)
 export async function generateFiqhReportPDF(): Promise<ApiResponse<string>> {
-  return { data: "PDF_URL_PLACEHOLDER", error: null };
+  return { data: null, error: 'Use the client-side report generator in components/Reports.tsx.' };
 }
 
 export async function generateDoctorReportPDF(): Promise<ApiResponse<string>> {
-  return { data: "PDF_URL_PLACEHOLDER", error: null };
+  return { data: null, error: 'Use the client-side report generator in components/Reports.tsx.' };
 }
 
 export async function deleteAccount(): Promise<ApiResponse<boolean>> {

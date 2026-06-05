@@ -16,12 +16,11 @@ import {
   ArrowLeft,
   Info
 } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Madhhab } from '../logic/types.ts';
 import * as api from '../api/index.ts';
-import { DBChatMessage } from '../api/db-types.ts';
+import { callGemini } from '../utils/aiClient.ts';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -174,7 +173,6 @@ const DreamInterpreter = ({ isOpen, onClose, userMadhhab }: DreamInterpreterProp
 لا تتجاوزي 250 كلمة. ردودك مطمئنة وإيجابية.
 User's Madhhab: ${userMadhhab}`;
 
-    const key = process.env.GEMINI_API_KEY;
     const aiMsgId = (Date.now() + 1).toString();
     
     // Add placeholder AI message
@@ -186,35 +184,22 @@ User's Madhhab: ${userMadhhab}`;
     }]);
 
     try {
-      if (!key) throw new Error('الرجاء التأكد من إعداد مفتاح API في إعدادات التطبيق.');
-      
-      const ai = new GoogleGenAI({ apiKey: key });
       const currentHistory = messages.map(m => ({
         role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
         parts: [{ text: m.text }]
       }));
 
-      const streamResponse = await ai.models.generateContentStream({
-        model: "gemini-3-flash-preview",
+      const accumulatedText = await callGemini({
         contents: [
           ...currentHistory,
           { role: 'user', parts: [{ text: textToInterpret.trim() }] }
         ],
-        config: {
-          systemInstruction: systemPrompt,
-          temperature: 0.7,
-          maxOutputTokens: 2048,
-        }
+        systemInstruction: systemPrompt,
+        temperature: 0.7,
+        maxOutputTokens: 2048,
       });
 
-      let accumulatedText = "";
-      for await (const chunk of streamResponse) {
-        const chunkText = chunk.text;
-        if (chunkText) {
-          accumulatedText += chunkText;
-          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: accumulatedText } : m));
-        }
-      }
+      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: accumulatedText } : m));
       
       setIsTyping(false);
 

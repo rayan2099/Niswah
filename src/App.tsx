@@ -136,7 +136,6 @@ function AppContent() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log("App Auth State Changed:", user?.uid);
       setAuthUser(user);
       setAuthLoading(false);
       if (user) {
@@ -206,7 +205,6 @@ function AppContent() {
 
   if (!authUser) {
     return <AuthScreen onSuccess={async () => {
-      console.log("App: Auth Success Callback triggered");
       await refresh();
     }} />;
   }
@@ -380,4 +378,3 @@ function TabButton({ active, onClick, icon: Icon, label }: { active: boolean, on
     </button>
   );
 }
-

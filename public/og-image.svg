@@ -1,0 +1,17 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#FDFCFB"/>
+      <stop offset="1" stop-color="#FBEAF0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="90" y="86" width="1020" height="458" rx="40" fill="#fff" stroke="#F4C0D1" stroke-width="2"/>
+  <g transform="translate(520 120)">
+    <rect width="160" height="160" rx="44" fill="#FBEAF0" stroke="#E7A0B8" stroke-width="4"/>
+    <text x="80" y="108" text-anchor="middle" font-family="Arial, sans-serif" font-size="64" font-weight="700" fill="#b8325f">نسوة</text>
+  </g>
+  <text x="600" y="350" text-anchor="middle" direction="rtl" font-family="Arial, sans-serif" font-size="68" font-weight="700" fill="#7f1d3a">نسوة</text>
+  <text x="600" y="414" text-anchor="middle" direction="rtl" font-family="Arial, sans-serif" font-size="34" fill="#6b7280">تتبع دورتك بوعي فقهي وعناية صحية</text>
+  <text x="600" y="475" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#9f3156">Niswah</text>
+</svg>

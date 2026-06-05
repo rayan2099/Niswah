@@ -418,10 +418,7 @@ export const Profile = ({ }: ProfileProps) => {
           url: url,
         });
       } catch (err: any) {
-        // Handle AbortError (user cancellation) separately to avoid logging as error
-        if (err.name === 'AbortError') {
-          console.log('Share was canceled by user');
-        } else {
+        if (err.name !== 'AbortError') {
           console.error('Error sharing:', err);
         }
       } finally {

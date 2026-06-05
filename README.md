@@ -1,20 +1,54 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Niswah
 
-# Run and deploy your AI Studio app
+Niswah is a Vite/React web app for cycle tracking with Islamic fiqh guidance, health insights, reports, and AI assistants.
 
-This contains everything you need to run your app locally.
+## Local Setup
 
-View your app in AI Studio: https://ai.studio/apps/63f76a7c-f5b3-4ac4-bdb0-d2ea0c59c65a
+```bash
+npm install
+npm run dev
+```
 
-## Run Locally
+## Production
 
-**Prerequisites:**  Node.js
+Build the static app:
 
+```bash
+npm run build
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Run the Cloud Run compatible server:
+
+```bash
+npm start
+```
+
+The production server serves `dist/`, exposes `/healthz`, and proxies AI requests through `/api/gemini`.
+
+## Environment Variables
+
+Server-only:
+
+- `GEMINI_API_KEY`: Gemini API key used by `server.cjs`.
+- `GEMINI_MODEL`: optional model override.
+- `PORT`: provided by Cloud Run; falls back to `3000`.
+
+Client-safe:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Never expose Gemini credentials with a `VITE_` prefix.
+
+## Verification
+
+```bash
+npm run lint
+npm test
+npm run build
+npm audit
+```
+
+## Cloud Run
+
+The included `Dockerfile` builds the Vite app, installs production dependencies, copies `dist/` and `server.cjs`, and starts the app with `npm start`. Configure `GEMINI_API_KEY` as a Cloud Run secret or environment variable.

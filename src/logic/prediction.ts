@@ -66,7 +66,11 @@ export function predictNextPeriod(user: User): PredictionResult {
     };
   }
 
-  const predictedStartDate = addDays(lastDate, averageCycleLengthDays).getTime();
+  let predictedStartDate = addDays(lastDate, averageCycleLengthDays).getTime();
+  const stalePredictionLimit = subDays(new Date(), 30).getTime();
+  while (predictedStartDate < stalePredictionLimit) {
+    predictedStartDate = addDays(new Date(predictedStartDate), averageCycleLengthDays).getTime();
+  }
   const predictedEndDate = addDays(new Date(predictedStartDate), averageHaidDurationDays).getTime();
 
   return {

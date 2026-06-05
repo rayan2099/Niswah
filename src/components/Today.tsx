@@ -1050,9 +1050,6 @@ const PrayerStatusWidget = ({ fiqhState, onOpenSettings }: { fiqhState: State; o
 
   const prayerIsLifted = fiqhState === 'HAID' || fiqhState === 'NIFAS';
 
-  // Debug line as requested
-  console.log('PRAYER DEBUG — fiqhState:', fiqhState, 'prayerIsLifted:', prayerIsLifted);
-
   // Find the latest HAID start in the current cycle
   const latestHaidStart = useMemo(() => {
     if (!entries || entries.length === 0) return null;
@@ -1308,9 +1305,6 @@ export const Today = ({
   const { t, isRTL } = useTranslation();
   const { user, fiqhState, currentDay, cycleStats, prediction, ovulation, entries, loading: dataLoading, refresh } = useCycleData();
   
-  if (!dataLoading) {
-    console.log('PRAYER DEBUG — fiqhState:', fiqhState);
-  }
   const isFirstTime = !dataLoading && (!entries || entries.filter(e => !e.is_predicted).length === 0);
 
   const [isLogOpen, setIsLogOpen] = useState(false);

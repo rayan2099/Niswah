@@ -34,10 +34,8 @@ interface CycleContextType {
 
 const CycleContext = createContext<CycleContextType | undefined>(undefined);
 
-import { useTranslation } from '../i18n/LanguageContext.tsx';
-
 export const CycleProvider = ({ children }: { children: ReactNode }) => {
-  const { t } = useTranslation();
+  const t = useCallback((key: string) => key, []);
   const [dbUser, setDbUser] = useState<DBUser | null>(() => {
     try {
       const local = localStorage.getItem('niswah_local_user');
@@ -116,7 +114,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
   const loadInitialData = useCallback(async () => {
     // onSnapshot handles real-time data, so we don't need a heavy initial load
     // but we can keep it as a manual trigger for refresh if needed.
-    console.log("CycleContext: Refresh triggered");
+    return;
   }, []);
 
   useEffect(() => {

@@ -113,8 +113,7 @@ const LoadingOverlay = () => (
 );
 
 
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebase';
+import { onAuthStateChanged } from './auth';
 import { AuthScreen } from './components/Auth';
 import { notificationService } from './services/NotificationService.ts';
 
@@ -135,7 +134,7 @@ function AppContent() {
   }, [authUser, user, showOnboarding]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged((user) => {
       setAuthUser(user);
       setAuthLoading(false);
       if (user) {

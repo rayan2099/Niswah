@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  GoogleAuthProvider,
-  OAuthProvider,
-  sendPasswordResetEmail,
-  updateProfile,
-} from 'firebase/auth';
-import { auth } from '../firebase';
+import {
+  sendPasswordReset,
+  signInWithEmail,
+  signInWithProvider,
+  signUpWithEmail,
+} from '../auth';
 import { useTranslation } from '../i18n/LanguageContext';
 
 type AuthMode = 'welcome' | 'email' | 'reset';
@@ -42,20 +38,12 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
 
   const getErrorMessage = (code: string): string => {
     const errors: Record<string, string> = {
-      'auth/email-already-in-use': 'البريد الإلكتروني مسجل مسبقاً',
-      'auth/wrong-password': 'كلمة المرور غير صحيحة',
-      'auth/user-not-found': 'البريد الإلكتروني غير مسجل',
-      'auth/weak-password': 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
-      'auth/invalid-email': 'البريد الإلكتروني غير صالح',
-      'auth/too-many-requests': 'تم تجاوز عدد المحاولات. حاولي لاحقاً',
-      'auth/network-request-failed': 'تحققي من الاتصال بالإنترنت',
-      'auth/popup-closed-by-user': 'تم إغلاق نافذة تسجيل الدخول',
-      'auth/invalid-credential': 'بيانات الاعتماد غير صالحة. تأكدي من البريد وكلمة المرور',
-      'auth/user-disabled': 'تم تعطيل هذا الحساب',
-      'auth/operation-not-allowed': 'تسجيل الدخول بهذا الأسلوب غير مفعل حالياً في إعدادات Firebase. يرجى تفعيل (Email/Password) في لوحة تحكم Firebase.',
-      'auth/unauthorized-domain': 'هذا النطاق (Domain) غير مصرح به في إعدادات Firebase. يرجى إضافة النطاق الحالي للقائمة البيضاء.',
+      'User already registered': 'البريد الإلكتروني مسجل مسبقاً',
+      'Invalid login credentials': 'بيانات الاعتماد غير صالحة. تأكدي من البريد وكلمة المرور',
+      'Password should be at least 6 characters': 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
+      'Email not confirmed': 'يرجى تأكيد البريد الإلكتروني أولاً',
     };
-    return errors[code] || `حدث خطأ (${code}). حاولي مرة أخرى`;
+    return errors[code] || `حدث خطأ (${code || 'غير معروف'}). حاولي مرة أخرى`;
   };
 
   const handleEmailAuth = async () => {
@@ -76,40 +64,32 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
           setLoading(false); 
           return; 
         }
-        try {
-          const cred = await createUserWithEmailAndPassword(auth, email, password);
-          await updateProfile(cred.user, { displayName: name });
-          await onSuccess();
-        } catch (regErr: any) {
-          if (regErr.code === 'auth/email-already-in-use') {
+        const { error: signUpError } = await signUpWithEmail(email, password, name);
+        if (signUpError) {
+          if (signUpError.message.includes('already registered')) {
             setIsRegistering(false);
             setError('هذا البريد مسجل مسبقاً، يرجى تسجيل الدخول باستخدام كلمة المرور الخاصة بكِ');
             setLoading(false);
             return;
           }
-          throw regErr;
+          throw signUpError;
         }
+        await onSuccess();
       } else {
-        try {
-          const cred = await signInWithEmailAndPassword(auth, email, password);
-          await onSuccess();
-        } catch (loginErr: any) {
-          if (loginErr.code === 'auth/user-not-found' || loginErr.code === 'auth/invalid-credential') {
-            // If user not found, we check if it's potentially a new user
-            // Firebase v9+ often returns 'invalid-credential' for both wrong password and user not found
-            // but we can try to create the account if they provide a name
-            if (!isRegistering) {
-              setIsRegistering(true);
-              setError('يبدو أنكِ مستخدمة جديدة، يرجى إدخال اسمكِ لإكمال التسجيل');
-              setLoading(false);
-              return;
-            }
+        const { error: signInError } = await signInWithEmail(email, password);
+        if (signInError) {
+          if (signInError.message.includes('Invalid login credentials') && !isRegistering) {
+            setIsRegistering(true);
+            setError('يبدو أنكِ مستخدمة جديدة، يرجى إدخال اسمكِ لإكمال التسجيل');
+            setLoading(false);
+            return;
           }
-          throw loginErr;
+          throw signInError;
         }
+        await onSuccess();
       }
     } catch (err: any) {
-      setError(getErrorMessage(err.code));
+      setError(getErrorMessage(err.message || err.code));
     } finally {
       setLoading(false);
     }
@@ -125,21 +105,10 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     setLoading(true);
     setError('');
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      
-      try {
-        const result = await signInWithPopup(auth, provider);
-        await onSuccess();
-      } catch (popupErr: any) {
-        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request' || popupErr.code === 'auth/popup-closed-by-user') {
-          setError('تم منع نافذة تسجيل الدخول المنبثقة. يرجى السماح بالنوافذ المنبثقة في إعدادات المتصفح، أو استخدامه في متصفح مستقل (Safari/Chrome)، أو المتابعة بالبريد الإلكتروني.');
-        } else {
-          setError(getErrorMessage(popupErr.code));
-        }
-      }
+      const { error: providerError } = await signInWithProvider('google');
+      if (providerError) setError(getErrorMessage(providerError.message));
     } catch (err: any) {
-      setError(getErrorMessage(err.code));
+      setError(getErrorMessage(err.message || err.code));
     } finally {
       setLoading(false);
     }
@@ -153,22 +122,10 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     setLoading(true);
     setError('');
     try {
-      const provider = new OAuthProvider('apple.com');
-      provider.addScope('email');
-      provider.addScope('name');
-      
-      try {
-        const result = await signInWithPopup(auth, provider);
-        await onSuccess();
-      } catch (popupErr: any) {
-        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request' || popupErr.code === 'auth/popup-closed-by-user') {
-          setError('تم منع نافذة تسجيل الدخول. يرجى المتابعة باستخدام البريد الإلكتروني أو فتح الموقع في متصفح خارجي (سفاري/كروم)');
-        } else {
-          setError(getErrorMessage(popupErr.code));
-        }
-      }
+      const { error: providerError } = await signInWithProvider('apple');
+      if (providerError) setError(getErrorMessage(providerError.message));
     } catch (err: any) {
-      setError(getErrorMessage(err.code));
+      setError(getErrorMessage(err.message || err.code));
     } finally {
       setLoading(false);
     }
@@ -178,10 +135,11 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     if (!email) { setError('يرجى إدخال بريدك الإلكتروني'); return; }
     setLoading(true);
     try {
-      await sendPasswordResetEmail(auth, email);
+      const { error: resetError } = await sendPasswordReset(email);
+      if (resetError) throw resetError;
       setResetSent(true);
     } catch (err: any) {
-      setError(getErrorMessage(err.code));
+      setError(getErrorMessage(err.message || err.code));
     } finally {
       setLoading(false);
     }
@@ -319,10 +277,10 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
                   <div className="space-y-3">
                     <p className="font-bold">٣. تخزين البيانات وحمايتها</p>
                     <ul className="list-disc list-inside text-sm space-y-1 pr-2">
-                      <li>تُخزَّن بياناتك في خوادم Firebase (Google Cloud) بتشفير كامل</li>
+                      <li>تُخزَّن بياناتك في Supabase بتشفير وحماية على مستوى الصفوف</li>
                       <li>لا يمكن لأحد — بما في ذلك فريق نسوة — الاطلاع على بياناتك الشخصية</li>
                       <li>أنتِ الوحيدة التي تملك الوصول الكامل إلى بياناتك</li>
-                      <li>نستخدم بروتوكولات HTTPS وFirestore Security Rules لضمان عزل بيانات كل مستخدمة</li>
+                      <li>نستخدم بروتوكولات HTTPS وسياسات Supabase RLS لضمان عزل بيانات كل مستخدمة</li>
                     </ul>
                   </div>
 

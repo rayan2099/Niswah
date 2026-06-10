@@ -4,9 +4,8 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import { onSnapshot, collection, query, where, orderBy, doc } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth, db } from '../firebase.ts';
+import { onAuthStateChanged } from '../auth.ts';
+import { supabase } from '../supabase.ts';
 import * as api from '../api/index.ts';
 import * as logic from '../logic/index.ts';
 import { notificationService } from '../services/NotificationService.ts';
@@ -44,6 +43,40 @@ const readLocalJson = <T,>(key: string, fallback: T): T => {
   }
 };
 
+const userFromSupabase = (row: any): DBUser => ({
+  id: row.id,
+  email_hash: row.email_hash || '',
+  madhhab: row.madhhab || 'HANBALI',
+  language: row.language || 'ar',
+  birth_year: row.birth_year || 1995,
+  display_name: row.display_name || 'Sister',
+  anonymous_mode: row.anonymous_mode ?? false,
+  premium_status: row.premium_status ?? true,
+  premium_expires_at: row.premium_expires_at || null,
+  avg_cycle_length: row.avg_cycle_length || 28,
+  avg_haid_duration: row.avg_haid_duration || 5,
+  known_adah_days: row.known_adah_days ?? null,
+  adah_confidence: row.adah_confidence || 0,
+  goal_flags: row.goal_flags || [],
+  conditions: row.conditions || [],
+  notification_prefs: row.notification_prefs || {},
+  pregnant: row.pregnant || false,
+  pregnancy_week: row.pregnancy_week || 0,
+  reflect_health: row.reflect_health || false,
+  prayerCity: row.prayer_city || '',
+  prayerCountry: row.prayer_country || '',
+  prayerCityAr: row.prayer_city_ar || '',
+  prayerCountryAr: row.prayer_country_ar || '',
+  prayerLat: row.prayer_lat ?? row.location_lat ?? 0,
+  prayerLon: row.prayer_lon ?? row.location_lng ?? 0,
+  location_lat: row.location_lat ?? row.prayer_lat ?? 0,
+  location_lng: row.location_lng ?? row.prayer_lon ?? 0,
+  location_name: row.location_name || '',
+  manual_prayer_offsets: row.manual_prayer_offsets || {},
+  created_at: row.created_at,
+  updated_at: row.updated_at,
+});
+
 export const CycleProvider = ({ children }: { children: ReactNode }) => {
   const t = useCallback((key: string) => key, []);
   const [dbUser, setDbUser] = useState<DBUser | null>(() => {
@@ -58,7 +91,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
   const [prayerTimesLoading, setPrayerTimesLoading] = useState(false);
   const [prayerTimesError, setPrayerTimesError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [firebaseUser, setFirebaseUser] = useState<any>(null);
+  const [authUser, setAuthUser] = useState<any>(null);
 
   // Derived states using useMemo to avoid stale data and satisfy Scenario 5
   const user = useMemo(() => {
@@ -117,22 +150,22 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
 
     if (hasLocalUser) {
       setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
-    } else if (!firebaseUser) {
+    } else if (!authUser) {
       setDbUser(null);
     }
 
     if (hasLocalEntries) {
       setEntries(readLocalJson<DBCycleEntry[]>('niswah_local_entries', []));
-    } else if (!firebaseUser) {
+    } else if (!authUser) {
       setEntries([]);
     }
 
     setLoading(false);
-  }, [firebaseUser]);
+  }, [authUser]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setFirebaseUser(user);
+    const unsubscribe = onAuthStateChanged(async (user) => {
+      setAuthUser(user);
       if (!user) {
         setLoading(false);
       }
@@ -142,68 +175,92 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (!firebaseUser) {
+    if (!authUser) {
       loadInitialData();
       return;
     }
 
-    // Set up real-time listeners
-    const entriesQuery = query(collection(db, `users/${firebaseUser.uid}/cycle_entries`));
-    const ledgerQuery = query(collection(db, `users/${firebaseUser.uid}/adah_ledger`));
-    const prayersQuery = query(collection(db, `users/${firebaseUser.uid}/prayer_log`));
-    const userDoc = doc(db, `users/${firebaseUser.uid}`);
+    const loadRemoteData = async () => {
+      try {
+        const [{ data: userRow, error: userError }, { data: entryRows, error: entriesError }, { data: ledgerRows, error: ledgerError }, { data: prayerRows, error: prayersError }] = await Promise.all([
+          supabase.from('users').select('*').eq('id', authUser.id).maybeSingle(),
+          supabase.from('cycle_entries').select('*').eq('user_id', authUser.id).order('date', { ascending: false }).order('time_logged', { ascending: false }),
+          supabase.from('adah_ledger').select('*').eq('user_id', authUser.id).order('cycle_number', { ascending: false }),
+          supabase.from('prayer_log').select('*').eq('user_id', authUser.id).order('date', { ascending: false }),
+        ]);
 
-    const unsubEntries = onSnapshot(entriesQuery, (snapshot) => {
-      const data = snapshot.docs.map(doc => doc.data() as DBCycleEntry);
-      data.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.time_logged || '').localeCompare(a.time_logged || ''));
-      setEntries(data);
-      setLoading(false); // Data loaded
-    }, (error) => {
-      console.error("Entries snapshot error", error);
-      const localEntries = readLocalJson<DBCycleEntry[]>('niswah_local_entries', []);
-      if (localEntries.length > 0) setEntries(localEntries);
-      setLoading(false);
-    });
+        if (userError) throw userError;
+        if (entriesError) throw entriesError;
+        if (ledgerError) throw ledgerError;
+        if (prayersError) throw prayersError;
 
-    const unsubLedger = onSnapshot(ledgerQuery, (snapshot) => {
-      const data = snapshot.docs.map(doc => doc.data() as DBAdahLedger);
-      data.sort((a, b) => b.cycle_number - a.cycle_number);
-      setLedger(data);
-    }, (error) => {
-      console.error("Ledger snapshot error", error);
-    });
-
-    const unsubPrayers = onSnapshot(prayersQuery, (snapshot) => {
-      const data = snapshot.docs.map(doc => doc.data() as DBPrayerLog);
-      setPrayers(data);
-    }, (error) => {
-      console.error("Prayers snapshot error", error);
-    });
-
-    const unsubUser = onSnapshot(userDoc, (snapshot) => {
-      if (snapshot.exists()) {
-        const userData = snapshot.data() as DBUser;
-        setDbUser(userData);
-        localStorage.setItem('niswah_local_user', JSON.stringify(userData));
-      } else {
-        // Doc might not exist yet if onboarding just finished and firestore is slow or failed
-        const localUserStr = localStorage.getItem('niswah_local_user');
-        if (localUserStr) {
+        if (userRow) {
+          const mapped = userFromSupabase(userRow);
+          setDbUser(mapped);
+          localStorage.setItem('niswah_local_user', JSON.stringify(mapped));
+        } else {
           setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
         }
+
+        const remoteEntries = (entryRows || []) as DBCycleEntry[];
+        setEntries(remoteEntries);
+        localStorage.setItem('niswah_local_entries', JSON.stringify(remoteEntries));
+        setLedger((ledgerRows || []) as DBAdahLedger[]);
+        setPrayers((prayerRows || []) as DBPrayerLog[]);
+      } catch (error) {
+        console.error('Supabase realtime bootstrap failed', error);
+        const localEntries = readLocalJson<DBCycleEntry[]>('niswah_local_entries', []);
+        if (localEntries.length > 0) setEntries(localEntries);
+        setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
+      } finally {
+        setLoading(false);
       }
-    }, (error) => {
-      console.error("User snapshot error", error);
-      setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
-    });
+    };
+
+    loadRemoteData();
+
+    const userChannel = supabase.channel(`user-${authUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `id=eq.${authUser.id}` }, payload => {
+        const row = payload.new || payload.old;
+        if (row) {
+          const mapped = userFromSupabase(row);
+          setDbUser(mapped);
+          localStorage.setItem('niswah_local_user', JSON.stringify(mapped));
+        }
+      })
+      .subscribe();
+
+    const entriesChannel = supabase.channel(`cycle-entries-${authUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cycle_entries', filter: `user_id=eq.${authUser.id}` }, () => {
+        api.getCycleEntries().then(({ data }) => {
+          if (data) {
+            setEntries(data);
+            localStorage.setItem('niswah_local_entries', JSON.stringify(data));
+          }
+        });
+      })
+      .subscribe();
+
+    const ledgerChannel = supabase.channel(`adah-ledger-${authUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'adah_ledger', filter: `user_id=eq.${authUser.id}` }, () => {
+        api.getAdahLedger().then(({ data }) => data && setLedger(data));
+      })
+      .subscribe();
+
+    const prayersChannel = supabase.channel(`prayer-log-${authUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'prayer_log', filter: `user_id=eq.${authUser.id}` }, async () => {
+        const { data } = await supabase.from('prayer_log').select('*').eq('user_id', authUser.id).order('date', { ascending: false });
+        if (data) setPrayers(data as DBPrayerLog[]);
+      })
+      .subscribe();
 
     return () => {
-      unsubEntries();
-      unsubLedger();
-      unsubPrayers();
-      unsubUser();
+      supabase.removeChannel(userChannel);
+      supabase.removeChannel(entriesChannel);
+      supabase.removeChannel(ledgerChannel);
+      supabase.removeChannel(prayersChannel);
     };
-  }, [firebaseUser, loadInitialData]);
+  }, [authUser, loadInitialData]);
 
   // Update logic user and state when raw data changes
   // Derived states are now handled by useMemo above

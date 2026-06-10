@@ -1,220 +1,301 @@
--- Supabase Schema for niswah app
+-- Niswah Supabase production schema
+-- Run this in the Supabase SQL editor before deploying the Supabase-backed app.
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+create extension if not exists "pgcrypto";
 
--- TABLE: users
-CREATE TABLE users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email_hash TEXT, -- hashed — never store plain email
-  madhhab TEXT CHECK (madhhab IN ('HANAFI','MALIKI','SHAFII','HANBALI')),
-  language TEXT DEFAULT 'en',
-  birth_year INT,
-  display_name TEXT,
-  anonymous_mode BOOLEAN DEFAULT false,
-  premium_status BOOLEAN DEFAULT false,
-  premium_expires_at TIMESTAMPTZ,
-  avg_cycle_length INT DEFAULT 28,
-  avg_haid_duration INT DEFAULT 5,
-  known_adah_days INT,
-  adah_confidence INT DEFAULT 0,
-  goal_flags JSONB DEFAULT '[]',
-  conditions JSONB DEFAULT '[]',
-  notification_prefs JSONB DEFAULT '{}',
-  prayer_calculation_method TEXT DEFAULT 'MWL',
-  location_lat FLOAT,
-  location_lng FLOAT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create table if not exists public.users (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email_hash text,
+  madhhab text not null default 'HANBALI' check (madhhab in ('HANAFI','MALIKI','SHAFII','HANBALI')),
+  language text not null default 'ar' check (language in ('en','ar')),
+  birth_year integer,
+  display_name text,
+  anonymous_mode boolean not null default false,
+  premium_status boolean not null default true,
+  premium_expires_at timestamptz,
+  avg_cycle_length integer not null default 28,
+  avg_haid_duration integer not null default 5,
+  known_adah_days integer,
+  adah_confidence integer not null default 0,
+  goal_flags jsonb not null default '[]'::jsonb,
+  conditions jsonb not null default '[]'::jsonb,
+  notification_prefs jsonb not null default '{}'::jsonb,
+  pregnant boolean not null default false,
+  pregnancy_week integer,
+  reflect_health boolean not null default false,
+  prayer_city text,
+  prayer_country text,
+  prayer_city_ar text,
+  prayer_country_ar text,
+  prayer_lat double precision,
+  prayer_lon double precision,
+  location_lat double precision,
+  location_lng double precision,
+  location_name text,
+  manual_prayer_offsets jsonb not null default '{}'::jsonb,
+  role text not null default 'user' check (role in ('user','admin')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
--- TABLE: cycle_entries
-CREATE TABLE cycle_entries (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  date DATE NOT NULL,
-  time_logged TIMESTAMPTZ NOT NULL,
-  fiqh_state TEXT CHECK (fiqh_state IN ('HAID','TAHARA','NIFAS','ISTIHADAH')),
-  flow_intensity TEXT CHECK (flow_intensity IN ('none','spotting','light','medium','heavy')),
-  blood_color TEXT CHECK (blood_color IN ('red','dark','brown','pink','other')),
-  blood_thickness TEXT CHECK (blood_thickness IN ('thick','thin','normal')),
-  kursuf_used BOOLEAN,
-  discharge_internal BOOLEAN,
-  is_predicted BOOLEAN DEFAULT false,
-  prediction_confidence INT DEFAULT 0,
-  ramadan_day INT,
-  fasting_status TEXT CHECK (fasting_status IN ('obligatory','lifted','qadha')),
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+create table if not exists public.cycle_entries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  date date not null,
+  time_logged timestamptz not null default now(),
+  fiqh_state text not null check (fiqh_state in ('HAID','TAHARA','NIFAS','ISTIHADAH')),
+  flow_intensity text not null default 'medium' check (flow_intensity in ('none','spotting','light','medium','heavy')),
+  blood_color text not null default 'red' check (blood_color in ('red','dark','brown','pink','other')),
+  blood_thickness text not null default 'normal' check (blood_thickness in ('thick','thin','normal')),
+  kursuf_used boolean not null default false,
+  discharge_internal boolean not null default false,
+  is_predicted boolean not null default false,
+  prediction_confidence numeric not null default 1,
+  ramadan_day integer,
+  fasting_status text check (fasting_status in ('obligatory','lifted','qadha')),
+  symptoms jsonb,
+  sleep_quality integer,
+  energy_level integer,
+  mood integer,
+  feeling text,
+  notes text,
+  created_at timestamptz not null default now()
 );
 
--- TABLE: symptoms_log
-CREATE TABLE symptoms_log (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  cycle_entry_id UUID REFERENCES cycle_entries(id) ON DELETE SET NULL,
-  date DATE NOT NULL,
-  symptom_type TEXT NOT NULL,
-  severity INT CHECK (severity BETWEEN 1 AND 5),
-  body_location TEXT,
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+create table if not exists public.symptoms_log (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  cycle_entry_id uuid references public.cycle_entries(id) on delete set null,
+  date date not null,
+  symptom_type text not null,
+  severity integer check (severity between 1 and 5),
+  body_location text,
+  notes text,
+  created_at timestamptz not null default now()
 );
 
--- TABLE: prayer_log
-CREATE TABLE prayer_log (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  date DATE NOT NULL,
-  prayer_name TEXT CHECK (prayer_name IN ('fajr','dhuhr','asr','maghrib','isha')),
-  scheduled_time TIMESTAMPTZ,
-  status TEXT CHECK (status IN ('prayed','qadha_required','lifted','missed')),
-  fiqh_state_at_time TEXT,
-  period_started_after_prayer_entered BOOLEAN,
-  notes TEXT
+create table if not exists public.prayer_log (
+  id text primary key,
+  user_id uuid not null references public.users(id) on delete cascade,
+  date date not null,
+  prayer_name text not null check (prayer_name in ('fajr','dhuhr','asr','maghrib','isha')),
+  scheduled_time timestamptz,
+  status text not null check (status in ('prayed','qadha_required','lifted','missed')),
+  fiqh_state_at_time text,
+  period_started_after_prayer_entered boolean,
+  notes text
 );
 
--- TABLE: adah_ledger
-CREATE TABLE adah_ledger (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  cycle_number INT,
-  haid_start TIMESTAMPTZ NOT NULL,
-  haid_end TIMESTAMPTZ,
-  haid_duration_hours FLOAT,
-  tuhr_duration_days FLOAT,
-  blood_color_pattern JSONB DEFAULT '[]',
-  blood_thickness_pattern JSONB DEFAULT '[]',
-  istihadah_episode BOOLEAN DEFAULT false,
-  scholar_consulted BOOLEAN DEFAULT false,
-  notes TEXT
+create table if not exists public.adah_ledger (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  cycle_number integer not null default 0,
+  haid_start timestamptz not null,
+  haid_end timestamptz,
+  haid_duration_hours numeric,
+  tuhr_duration_days numeric,
+  blood_color_pattern jsonb not null default '[]'::jsonb,
+  blood_thickness_pattern jsonb not null default '[]'::jsonb,
+  istihadah_episode boolean not null default false,
+  scholar_consulted boolean not null default false,
+  notes text
 );
 
--- TABLE: istihadah_episodes
-CREATE TABLE istihadah_episodes (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  start_date DATE,
-  end_date DATE,
-  madhhab_at_time TEXT,
-  tamyiz_applied BOOLEAN DEFAULT false,
-  blood_distinguishable BOOLEAN,
-  reverted_to_adah BOOLEAN DEFAULT false,
-  adah_days_used INT,
-  notes TEXT
+create table if not exists public.istihadah_episodes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  start_date date,
+  end_date date,
+  madhhab_at_time text,
+  tamyiz_applied boolean not null default false,
+  blood_distinguishable boolean,
+  reverted_to_adah boolean not null default false,
+  adah_days_used integer,
+  notes text
 );
 
--- TABLE: nifas_records
-CREATE TABLE nifas_records (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  birth_date TIMESTAMPTZ NOT NULL,
-  madhhab_max_days INT CHECK (madhhab_max_days IN (40, 60)),
-  expected_end DATE,
-  actual_end DATE,
-  breastfeeding_started BOOLEAN DEFAULT false,
-  notes TEXT
+create table if not exists public.nifas_records (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  birth_date timestamptz not null,
+  madhhab_max_days integer check (madhhab_max_days in (40, 60)),
+  expected_end date,
+  actual_end date,
+  breastfeeding_started boolean not null default false,
+  notes text
 );
 
--- TABLE: ramadan_records
-CREATE TABLE ramadan_records (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  hijri_year INT,
-  total_missed_fasting INT DEFAULT 0,
-  qadha_completed INT DEFAULT 0,
-  qadha_schedule JSONB DEFAULT '[]'
+create table if not exists public.ramadan_records (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  hijri_year integer not null,
+  total_missed_fasting integer not null default 0,
+  qadha_completed integer not null default 0,
+  qadha_schedule jsonb not null default '[]'::jsonb
 );
 
--- TABLE: pregnancy_records
-CREATE TABLE pregnancy_records (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  lmp_date DATE,
-  due_date DATE,
-  current_week INT,
-  birth_date DATE,
-  nifas_id UUID REFERENCES nifas_records(id) ON DELETE SET NULL,
-  weekly_notes JSONB DEFAULT '{}'
+create table if not exists public.pregnancy_records (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  lmp_date date,
+  due_date date,
+  current_week integer,
+  birth_date date,
+  nifas_id uuid references public.nifas_records(id) on delete set null,
+  weekly_notes jsonb not null default '{}'::jsonb
 );
 
--- TABLE: secret_vault_entries
-CREATE TABLE secret_vault_entries (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  encrypted_content TEXT, -- AES-256 encrypted client-side
-  entry_type TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+create table if not exists public.secret_vault (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  encrypted_content text,
+  entry_type text,
+  created_at timestamptz not null default now()
 );
 
--- ROW LEVEL SECURITY (RLS)
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE cycle_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE symptoms_log ENABLE ROW LEVEL SECURITY;
-ALTER TABLE prayer_log ENABLE ROW LEVEL SECURITY;
-ALTER TABLE adah_ledger ENABLE ROW LEVEL SECURITY;
-ALTER TABLE istihadah_episodes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE nifas_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ramadan_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pregnancy_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE secret_vault_entries ENABLE ROW LEVEL SECURITY;
+create table if not exists public.chat_history (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  chat_type text not null check (chat_type in ('dream','doctor','niswah')),
+  role text not null,
+  content text not null,
+  timestamp timestamptz not null default now()
+);
 
--- Policies for users
-CREATE POLICY "Users can only read their own data" ON users FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can only insert their own data" ON users FOR INSERT WITH CHECK (auth.uid() = id);
-CREATE POLICY "Users can only update their own data" ON users FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Users can only delete their own data" ON users FOR DELETE USING (auth.uid() = id);
+create table if not exists public.community_posts (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references public.users(id) on delete cascade,
+  content text not null check (char_length(content) < 5000),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
--- Policies for cycle_entries
-CREATE POLICY "Users can only read their own cycle_entries" ON cycle_entries FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can only insert their own cycle_entries" ON cycle_entries FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can only update their own cycle_entries" ON cycle_entries FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can only delete their own cycle_entries" ON cycle_entries FOR DELETE USING (auth.uid() = user_id);
+create index if not exists cycle_entries_user_date_idx on public.cycle_entries(user_id, date desc, time_logged desc);
+create index if not exists adah_ledger_user_cycle_idx on public.adah_ledger(user_id, cycle_number desc);
+create index if not exists prayer_log_user_date_idx on public.prayer_log(user_id, date desc);
+create index if not exists ramadan_records_user_year_idx on public.ramadan_records(user_id, hijri_year);
+create index if not exists chat_history_user_type_ts_idx on public.chat_history(user_id, chat_type, timestamp);
 
--- Policies for symptoms_log
-CREATE POLICY "Users can only read their own symptoms_log" ON symptoms_log FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can only insert their own symptoms_log" ON symptoms_log FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can only update their own symptoms_log" ON symptoms_log FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can only delete their own symptoms_log" ON symptoms_log FOR DELETE USING (auth.uid() = user_id);
+drop trigger if exists users_set_updated_at on public.users;
+create trigger users_set_updated_at before update on public.users
+for each row execute function public.set_updated_at();
 
--- Policies for prayer_log
-CREATE POLICY "Users can only read their own prayer_log" ON prayer_log FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can only insert their own prayer_log" ON prayer_log FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can only update their own prayer_log" ON prayer_log FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can only delete their own prayer_log" ON prayer_log FOR DELETE USING (auth.uid() = user_id);
+drop trigger if exists community_posts_set_updated_at on public.community_posts;
+create trigger community_posts_set_updated_at before update on public.community_posts
+for each row execute function public.set_updated_at();
 
--- Policies for adah_ledger
-CREATE POLICY "Users can only read their own adah_ledger" ON adah_ledger FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can only insert their own adah_ledger" ON adah_ledger FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can only update their own adah_ledger" ON adah_ledger FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can only delete their own adah_ledger" ON adah_ledger FOR DELETE USING (auth.uid() = user_id);
+alter table public.users enable row level security;
+alter table public.cycle_entries enable row level security;
+alter table public.symptoms_log enable row level security;
+alter table public.prayer_log enable row level security;
+alter table public.adah_ledger enable row level security;
+alter table public.istihadah_episodes enable row level security;
+alter table public.nifas_records enable row level security;
+alter table public.ramadan_records enable row level security;
+alter table public.pregnancy_records enable row level security;
+alter table public.secret_vault enable row level security;
+alter table public.chat_history enable row level security;
+alter table public.community_posts enable row level security;
 
--- Policies for istihadah_episodes
-CREATE POLICY "Users can only read their own istihadah_episodes" ON istihadah_episodes FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can only insert their own istihadah_episodes" ON istihadah_episodes FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can only update their own istihadah_episodes" ON istihadah_episodes FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can only delete their own istihadah_episodes" ON istihadah_episodes FOR DELETE USING (auth.uid() = user_id);
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.users
+    where id = auth.uid() and role = 'admin'
+  );
+$$;
 
--- Policies for nifas_records
-CREATE POLICY "Users can only read their own nifas_records" ON nifas_records FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can only insert their own nifas_records" ON nifas_records FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can only update their own nifas_records" ON nifas_records FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can only delete their own nifas_records" ON nifas_records FOR DELETE USING (auth.uid() = user_id);
+create or replace function public.can_access_user(row_user_id uuid)
+returns boolean
+language sql
+stable
+as $$
+  select auth.uid() = row_user_id or public.is_admin();
+$$;
 
--- Policies for ramadan_records
-CREATE POLICY "Users can only read their own ramadan_records" ON ramadan_records FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can only insert their own ramadan_records" ON ramadan_records FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can only update their own ramadan_records" ON ramadan_records FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can only delete their own ramadan_records" ON ramadan_records FOR DELETE USING (auth.uid() = user_id);
+drop policy if exists "users_read_own" on public.users;
+create policy "users_read_own" on public.users for select using (public.can_access_user(id));
+drop policy if exists "users_insert_own" on public.users;
+create policy "users_insert_own" on public.users for insert with check (auth.uid() = id and role = 'user');
+drop policy if exists "users_update_own" on public.users;
+create policy "users_update_own" on public.users for update using (auth.uid() = id or public.is_admin()) with check (auth.uid() = id or public.is_admin());
+drop policy if exists "users_delete_own" on public.users;
+create policy "users_delete_own" on public.users for delete using (auth.uid() = id or public.is_admin());
 
--- Policies for pregnancy_records
-CREATE POLICY "Users can only read their own pregnancy_records" ON pregnancy_records FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can only insert their own pregnancy_records" ON pregnancy_records FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can only update their own pregnancy_records" ON pregnancy_records FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can only delete their own pregnancy_records" ON pregnancy_records FOR DELETE USING (auth.uid() = user_id);
+drop policy if exists "cycle_entries_own" on public.cycle_entries;
+create policy "cycle_entries_own" on public.cycle_entries for all using (public.can_access_user(user_id)) with check (auth.uid() = user_id);
+drop policy if exists "symptoms_log_own" on public.symptoms_log;
+create policy "symptoms_log_own" on public.symptoms_log for all using (public.can_access_user(user_id)) with check (auth.uid() = user_id);
+drop policy if exists "prayer_log_own" on public.prayer_log;
+create policy "prayer_log_own" on public.prayer_log for all using (public.can_access_user(user_id)) with check (auth.uid() = user_id);
+drop policy if exists "adah_ledger_own" on public.adah_ledger;
+create policy "adah_ledger_own" on public.adah_ledger for all using (public.can_access_user(user_id)) with check (auth.uid() = user_id);
+drop policy if exists "istihadah_episodes_own" on public.istihadah_episodes;
+create policy "istihadah_episodes_own" on public.istihadah_episodes for all using (public.can_access_user(user_id)) with check (auth.uid() = user_id);
+drop policy if exists "nifas_records_own" on public.nifas_records;
+create policy "nifas_records_own" on public.nifas_records for all using (public.can_access_user(user_id)) with check (auth.uid() = user_id);
+drop policy if exists "ramadan_records_own" on public.ramadan_records;
+create policy "ramadan_records_own" on public.ramadan_records for all using (public.can_access_user(user_id)) with check (auth.uid() = user_id);
+drop policy if exists "pregnancy_records_own" on public.pregnancy_records;
+create policy "pregnancy_records_own" on public.pregnancy_records for all using (public.can_access_user(user_id)) with check (auth.uid() = user_id);
+drop policy if exists "secret_vault_own" on public.secret_vault;
+create policy "secret_vault_own" on public.secret_vault for all using (public.can_access_user(user_id)) with check (auth.uid() = user_id);
+drop policy if exists "chat_history_own" on public.chat_history;
+create policy "chat_history_own" on public.chat_history for all using (public.can_access_user(user_id)) with check (auth.uid() = user_id);
 
--- Policies for secret_vault_entries
-CREATE POLICY "Users can only read their own secret_vault_entries" ON secret_vault_entries FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can only insert their own secret_vault_entries" ON secret_vault_entries FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can only update their own secret_vault_entries" ON secret_vault_entries FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can only delete their own secret_vault_entries" ON secret_vault_entries FOR DELETE USING (auth.uid() = user_id);
+drop policy if exists "community_posts_read_auth" on public.community_posts;
+create policy "community_posts_read_auth" on public.community_posts for select using (auth.role() = 'authenticated');
+drop policy if exists "community_posts_insert_own" on public.community_posts;
+create policy "community_posts_insert_own" on public.community_posts for insert with check (auth.uid() = author_id);
+drop policy if exists "community_posts_update_own" on public.community_posts;
+create policy "community_posts_update_own" on public.community_posts for update using (auth.uid() = author_id or public.is_admin()) with check (auth.uid() = author_id or public.is_admin());
+drop policy if exists "community_posts_delete_own" on public.community_posts;
+create policy "community_posts_delete_own" on public.community_posts for delete using (auth.uid() = author_id or public.is_admin());
+
+create or replace function public.delete_my_account()
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+
+grant execute on function public.delete_my_account() to authenticated;
+
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'users') then
+    alter publication supabase_realtime add table public.users;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'cycle_entries') then
+    alter publication supabase_realtime add table public.cycle_entries;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'adah_ledger') then
+    alter publication supabase_realtime add table public.adah_ledger;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'prayer_log') then
+    alter publication supabase_realtime add table public.prayer_log;
+  end if;
+end $$;

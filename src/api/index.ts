@@ -3,148 +3,136 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { 
-  onAuthStateChanged,
-  User as FirebaseUser,
-  getAuth
-} from 'firebase/auth';
-import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  getDocs,
-  onSnapshot,
-  Timestamp,
-  getDocFromServer,
-  deleteDoc,
-  orderBy
-} from 'firebase/firestore';
-import { auth, db } from '../firebase';
 import CryptoJS from 'crypto-js';
+import { supabase } from '../supabase';
+import { getAuthUser, signOut } from '../auth';
 import * as logic from '../logic/index';
-import { 
-  DBUser, 
-  DBCycleEntry, 
-  DBSymptomLog, 
-  DBPrayerLog, 
-  DBAdahLedger, 
-  DBIstihadahEpisode, 
-  DBNifasRecord, 
-  DBRamadanRecord, 
-  DBPregnancyRecord, 
-  DBSecretVaultEntry,
-  DBChatMessage
+import {
+  DBUser,
+  DBCycleEntry,
+  DBSymptomLog,
+  DBPrayerLog,
+  DBAdahLedger,
+  DBNifasRecord,
+  DBRamadanRecord,
+  DBChatMessage,
 } from './db-types.ts';
 
 export type { DBCycleEntry } from './db-types';
 export type ApiResponse<T> = { data: T | null; error: string | null };
 
-// Helper to hash email
 const hashEmail = (email: string) => CryptoJS.SHA256(email).toString();
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-// Operation types for error handling
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
-
-// Helper to remove undefined values from objects
 function cleanObject<T extends object>(obj: T): T {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([_, v]) => v !== undefined)
-  ) as T;
+  return Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined)) as T;
 }
 
-// API LAYER
+function readLocal<T>(key: string, fallback: T): T {
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) as T : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+const userFromDb = (row: any): DBUser => ({
+  id: row.id,
+  email_hash: row.email_hash || '',
+  madhhab: row.madhhab || 'HANBALI',
+  language: row.language || 'ar',
+  birth_year: row.birth_year || 1995,
+  display_name: row.display_name || 'Sister',
+  anonymous_mode: row.anonymous_mode ?? false,
+  premium_status: row.premium_status ?? true,
+  premium_expires_at: row.premium_expires_at || null,
+  avg_cycle_length: row.avg_cycle_length || 28,
+  avg_haid_duration: row.avg_haid_duration || 5,
+  known_adah_days: row.known_adah_days ?? null,
+  adah_confidence: row.adah_confidence || 0,
+  goal_flags: row.goal_flags || [],
+  conditions: row.conditions || [],
+  notification_prefs: row.notification_prefs || {},
+  pregnant: row.pregnant || false,
+  pregnancy_week: row.pregnancy_week || 0,
+  reflect_health: row.reflect_health || false,
+  prayerCity: row.prayer_city || '',
+  prayerCountry: row.prayer_country || '',
+  prayerCityAr: row.prayer_city_ar || '',
+  prayerCountryAr: row.prayer_country_ar || '',
+  prayerLat: row.prayer_lat ?? row.location_lat ?? 0,
+  prayerLon: row.prayer_lon ?? row.location_lng ?? 0,
+  location_lat: row.location_lat ?? row.prayer_lat ?? 0,
+  location_lng: row.location_lng ?? row.prayer_lon ?? 0,
+  location_name: row.location_name || '',
+  manual_prayer_offsets: row.manual_prayer_offsets || {},
+  created_at: row.created_at,
+  updated_at: row.updated_at,
+});
+
+const userToDb = (user: Partial<DBUser>) => cleanObject({
+  id: user.id,
+  email_hash: user.email_hash,
+  madhhab: user.madhhab,
+  language: user.language,
+  birth_year: user.birth_year,
+  display_name: user.display_name,
+  anonymous_mode: user.anonymous_mode,
+  premium_status: user.premium_status,
+  premium_expires_at: user.premium_expires_at,
+  avg_cycle_length: user.avg_cycle_length,
+  avg_haid_duration: user.avg_haid_duration,
+  known_adah_days: user.known_adah_days,
+  adah_confidence: user.adah_confidence,
+  goal_flags: user.goal_flags,
+  conditions: user.conditions,
+  notification_prefs: user.notification_prefs,
+  pregnant: user.pregnant,
+  pregnancy_week: user.pregnancy_week,
+  reflect_health: user.reflect_health,
+  prayer_city: user.prayerCity,
+  prayer_country: user.prayerCountry,
+  prayer_city_ar: user.prayerCityAr,
+  prayer_country_ar: user.prayerCountryAr,
+  prayer_lat: user.prayerLat,
+  prayer_lon: user.prayerLon,
+  location_lat: user.location_lat ?? user.prayerLat,
+  location_lng: user.location_lng ?? user.prayerLon,
+  location_name: user.location_name,
+  manual_prayer_offsets: user.manual_prayer_offsets,
+  created_at: user.created_at,
+  updated_at: user.updated_at,
+});
+
+const ensureUser = async () => {
+  const user = await getAuthUser();
+  if (!user) return null;
+  return user;
+};
 
 export async function getUser(): Promise<ApiResponse<DBUser>> {
-  const user = auth.currentUser;
-  const localUserStr = localStorage.getItem('niswah_local_user');
-  const localUser = localUserStr ? JSON.parse(localUserStr) as DBUser : null;
+  const localUser = readLocal<DBUser | null>('niswah_local_user', null);
+  const authUser = await ensureUser();
+  if (!authUser) return { data: localUser, error: null };
 
-  if (!user) {
-    return { data: localUser, error: null };
+  const { data, error } = await supabase.from('users').select('*').eq('id', authUser.id).maybeSingle();
+  if (error) {
+    console.warn('Supabase getUser failed, falling back to local storage:', error.message);
+    return localUser ? { data: localUser, error: null } : { data: null, error: error.message };
   }
 
-  const path = `users/${user.uid}`;
-  try {
-    const userDoc = await getDoc(doc(db, path));
-    if (userDoc.exists()) {
-      const data = userDoc.data() as DBUser;
-      data.premium_status = true; // Freemium for now
-      // Update local storage with fresh data from server
-      localStorage.setItem('niswah_local_user', JSON.stringify(data));
-      return { data, error: null };
-    }
-    // If authenticated but no doc, maybe we have local data from a failed previous onboarding?
-    return { data: localUser, error: null };
-  } catch (error) {
-    console.warn("Firestore getUser failed, falling back to local storage:", error);
-    if (localUser) {
-      return { data: localUser, error: null };
-    }
-    handleFirestoreError(error, OperationType.GET, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  if (!data) return { data: localUser, error: null };
+  const mapped = userFromDb(data);
+  localStorage.setItem('niswah_local_user', JSON.stringify(mapped));
+  return { data: mapped, error: null };
 }
 
 export async function upsertUser(updates: Partial<DBUser>): Promise<ApiResponse<DBUser>> {
-  const user = auth.currentUser;
-  
+  const authUser = await ensureUser();
   const defaults: Partial<DBUser> = {
     birth_year: 1995,
-    display_name: 'Sister',
+    display_name: authUser?.user_metadata?.display_name || authUser?.user_metadata?.full_name || 'Sister',
     anonymous_mode: false,
     premium_status: true,
     adah_confidence: 0,
@@ -157,71 +145,58 @@ export async function upsertUser(updates: Partial<DBUser>): Promise<ApiResponse<
     goal_flags: [],
     conditions: [],
     notification_prefs: {},
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
   };
 
   const userData: DBUser = {
     ...defaults,
     ...cleanObject(updates),
-    id: user?.uid || 'demo-user-id',
-    email_hash: hashEmail(user?.email || 'anonymous'),
-    updated_at: new Date().toISOString()
+    id: authUser?.id || 'demo-user-id',
+    email_hash: hashEmail(authUser?.email || 'anonymous'),
+    updated_at: new Date().toISOString(),
   } as DBUser;
 
-  // 1. Primary Save: Local Storage
   localStorage.setItem('niswah_local_user', JSON.stringify(userData));
+  if (!authUser) return { data: userData, error: null };
 
-  if (!user) {
-    console.warn("Not authenticated, using local storage as primary for upsertUser");
-    return { data: userData, error: null };
+  const { error } = await supabase.from('users').upsert(userToDb(userData), { onConflict: 'id' });
+  if (error) {
+    console.warn('Supabase upsertUser failed, keeping local copy:', error.message);
   }
-
-  // 2. Background Sync: Firestore (non-blocking)
-  const path = `users/${user.uid}`;
-  setDoc(doc(db, path), userData, { merge: true }).catch(error => {
-    console.warn("Firestore sync failed for upsertUser (silent):", error);
-    // We don't throw here to ensure onboarding completion
-  });
 
   return { data: userData, error: null };
 }
 
 export async function updateUser(updates: Partial<DBUser>): Promise<ApiResponse<DBUser>> {
-  const user = auth.currentUser;
-  const localUserStr = localStorage.getItem('niswah_local_user');
-  let localUser = localUserStr ? JSON.parse(localUserStr) as DBUser : null;
+  const authUser = await ensureUser();
+  const localUser = readLocal<DBUser | null>('niswah_local_user', null);
+  const nextLocal = localUser
+    ? { ...localUser, ...cleanObject(updates), updated_at: new Date().toISOString() } as DBUser
+    : null;
 
-  if (localUser) {
-    localUser = { ...localUser, ...cleanObject(updates), updated_at: new Date().toISOString() };
-    localStorage.setItem('niswah_local_user', JSON.stringify(localUser));
+  if (nextLocal) localStorage.setItem('niswah_local_user', JSON.stringify(nextLocal));
+  if (!authUser) return { data: nextLocal, error: null };
+
+  const { data, error } = await supabase
+    .from('users')
+    .update(userToDb({ ...updates, updated_at: new Date().toISOString() }))
+    .eq('id', authUser.id)
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    console.warn('Supabase updateUser failed, falling back to local:', error.message);
+    return { data: nextLocal, error: null };
   }
 
-  if (!user) {
-    return { data: localUser, error: null };
-  }
-
-  const path = `users/${user.uid}`;
-  try {
-    const updateData = { ...cleanObject(updates), updated_at: new Date().toISOString() };
-    await setDoc(doc(db, path), updateData, { merge: true });
-    // Update local storage again with potentially merged data
-    const updatedDoc = await getDoc(doc(db, path));
-    if (updatedDoc.exists()) {
-      const data = updatedDoc.data() as DBUser;
-      localStorage.setItem('niswah_local_user', JSON.stringify(data));
-      return { data, error: null };
-    }
-    return { data: localUser, error: null };
-  } catch (error) {
-    console.warn("Firestore updateUser failed (falling back to local):", error);
-    return { data: localUser, error: null };
-  }
+  const mapped = data ? userFromDb(data) : nextLocal;
+  if (mapped) localStorage.setItem('niswah_local_user', JSON.stringify(mapped));
+  return { data: mapped, error: null };
 }
 
 export async function logCycleEntry(entry: Partial<DBCycleEntry>): Promise<ApiResponse<DBCycleEntry>> {
-  const user = auth.currentUser;
-  
-  const defaults: Partial<DBCycleEntry> = {
+  const authUser = await ensureUser();
+  const entryData: DBCycleEntry = {
     flow_intensity: 'medium',
     blood_color: 'red',
     blood_thickness: 'normal',
@@ -229,188 +204,123 @@ export async function logCycleEntry(entry: Partial<DBCycleEntry>): Promise<ApiRe
     discharge_internal: false,
     is_predicted: false,
     prediction_confidence: 1,
-    created_at: new Date().toISOString()
-  };
-
-  const entryData: DBCycleEntry = {
-    ...defaults,
+    created_at: new Date().toISOString(),
     ...cleanObject(entry),
-    user_id: user?.uid || 'demo-user-id',
-    id: entry.id || Math.random().toString(36).substr(2, 9),
+    user_id: authUser?.id || 'demo-user-id',
+    id: entry.id || crypto.randomUUID(),
   } as DBCycleEntry;
 
-  // 1. Primary Save: Local Storage
-  const existingEntries = JSON.parse(localStorage.getItem('niswah_local_entries') || '[]');
-  const index = existingEntries.findIndex((e: any) => (e.id && e.id === entryData.id) || (e.date === entryData.date && e.fiqh_state === entryData.fiqh_state));
-  if (index >= 0) {
-    existingEntries[index] = entryData;
-  } else {
-    existingEntries.push(entryData);
-  }
+  const existingEntries = readLocal<DBCycleEntry[]>('niswah_local_entries', []);
+  const index = existingEntries.findIndex(e => (e.id && e.id === entryData.id) || (e.date === entryData.date && e.fiqh_state === entryData.fiqh_state));
+  if (index >= 0) existingEntries[index] = entryData;
+  else existingEntries.push(entryData);
   localStorage.setItem('niswah_local_entries', JSON.stringify(existingEntries));
 
-  if (!user) {
+  if (!authUser) return { data: entryData, error: null };
+
+  const payload = cleanObject({
+    ...entryData,
+    id: uuidRegex.test(entryData.id) ? entryData.id : undefined,
+    user_id: authUser.id,
+  });
+
+  const { data, error } = await supabase.from('cycle_entries').upsert(payload, { onConflict: 'id' }).select('*').single();
+  if (error) {
+    console.warn('Supabase logCycleEntry failed, keeping local copy:', error.message);
     return { data: entryData, error: null };
   }
 
-  // 2. Background Sync: Firestore
-  const path = `users/${user.uid}/cycle_entries`;
-  try {
-    if (entryData.id && !entryData.id.startsWith('0.')) {
-      await setDoc(doc(db, path, entryData.id), entryData, { merge: true });
-    } else {
-      const docRef = await addDoc(collection(db, path), entryData);
-      entryData.id = docRef.id;
-      await updateDoc(docRef, { id: docRef.id });
-      // Update local storage with real ID
-      const updatedEntries = JSON.parse(localStorage.getItem('niswah_local_entries') || '[]');
-      const localIdx = updatedEntries.findIndex((e: any) => e.date === entryData.date && e.fiqh_state === entryData.fiqh_state);
-      if (localIdx >= 0) {
-        updatedEntries[localIdx].id = docRef.id;
-        localStorage.setItem('niswah_local_entries', JSON.stringify(updatedEntries));
-      }
-    }
-    return { data: entryData, error: null };
-  } catch (error) {
-    console.warn("Firestore logCycleEntry failed (silent):", error);
-    return { data: entryData, error: null };
+  const saved = data as DBCycleEntry;
+  const updatedEntries = readLocal<DBCycleEntry[]>('niswah_local_entries', []);
+  const localIdx = updatedEntries.findIndex(e => e.id === entryData.id || (e.date === entryData.date && e.fiqh_state === entryData.fiqh_state));
+  if (localIdx >= 0) {
+    updatedEntries[localIdx] = saved;
+    localStorage.setItem('niswah_local_entries', JSON.stringify(updatedEntries));
   }
+  return { data: saved, error: null };
 }
 
-// Firebase initialized
 export async function logSymptoms(symptoms: Partial<DBSymptomLog>[]): Promise<ApiResponse<DBSymptomLog[]>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  const path = `users/${user.uid}/symptoms_log`;
-  try {
-    const results: DBSymptomLog[] = [];
-    for (const symptom of symptoms) {
-      const symptomData = { ...cleanObject(symptom), user_id: user.uid };
-      const docRef = await addDoc(collection(db, path), symptomData);
-      results.push({ ...symptomData, id: docRef.id } as DBSymptomLog);
-    }
-    return { data: results, error: null };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  const rows = symptoms.map(symptom => cleanObject({ ...symptom, user_id: authUser.id }));
+  const { data, error } = await supabase.from('symptoms_log').insert(rows).select('*');
+  return error ? { data: null, error: error.message } : { data: data as DBSymptomLog[], error: null };
 }
 
 export async function updatePrayerStatus(prayer: string, status: string, date: string): Promise<ApiResponse<DBPrayerLog>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  const path = `users/${user.uid}/prayer_log`;
-  const docId = `${date}_${prayer}`;
-  try {
-    const prayerData = { 
-      user_id: user.uid, 
-      date, 
-      prayer_name: prayer as any, 
-      status: status as any 
-    };
-    await setDoc(doc(db, path, docId), prayerData, { merge: true });
-    return { data: { ...prayerData, id: docId } as DBPrayerLog, error: null };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  const prayerData = {
+    id: `${authUser.id}_${date}_${prayer}`,
+    user_id: authUser.id,
+    date,
+    prayer_name: prayer as DBPrayerLog['prayer_name'],
+    status: status as DBPrayerLog['status'],
+  };
+  const { data, error } = await supabase.from('prayer_log').upsert(prayerData, { onConflict: 'id' }).select('*').single();
+  return error ? { data: null, error: error.message } : { data: data as DBPrayerLog, error: null };
 }
 
 export async function getCalendarData(month: number, year: number): Promise<ApiResponse<DBCycleEntry[]>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
   const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
   const endDate = new Date(year, month, 0).toISOString().split('T')[0];
-
-  const path = `users/${user.uid}/cycle_entries`;
-  try {
-    const q = query(
-      collection(db, path),
-      where('date', '>=', startDate),
-      where('date', '<=', endDate)
-    );
-    const querySnapshot = await getDocs(q);
-    const data = querySnapshot.docs.map(doc => doc.data() as DBCycleEntry);
-    // Sort by date desc, then time_logged desc to ensure latest entry is first
-    data.sort((a, b) => {
-      const dateCompare = b.date.localeCompare(a.date);
-      if (dateCompare !== 0) return dateCompare;
-      return (b.time_logged || '').localeCompare(a.time_logged || '');
-    });
-    return { data, error: null };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  const { data, error } = await supabase
+    .from('cycle_entries')
+    .select('*')
+    .eq('user_id', authUser.id)
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date', { ascending: false })
+    .order('time_logged', { ascending: false });
+  return error ? { data: null, error: error.message } : { data: data as DBCycleEntry[], error: null };
 }
 
 export async function getCycleEntries(): Promise<ApiResponse<DBCycleEntry[]>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  const path = `users/${user.uid}/cycle_entries`;
-  try {
-    const q = query(
-      collection(db, path)
-      // Note: Firestore doesn't support multiple orderBys without composite indexes
-      // We'll sort in memory for now if needed, or just return as is
-    );
-    const querySnapshot = await getDocs(q);
-    const data = querySnapshot.docs.map(doc => doc.data() as DBCycleEntry);
-    // Sort by date desc, then time_logged desc
-    data.sort((a, b) => {
-      const dateCompare = b.date.localeCompare(a.date);
-      if (dateCompare !== 0) return dateCompare;
-      return (b.time_logged || '').localeCompare(a.time_logged || '');
-    });
-    return { data, error: null };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  const { data, error } = await supabase
+    .from('cycle_entries')
+    .select('*')
+    .eq('user_id', authUser.id)
+    .order('date', { ascending: false })
+    .order('time_logged', { ascending: false });
+  return error ? { data: null, error: error.message } : { data: data as DBCycleEntry[], error: null };
 }
 
 export async function getAdahLedger(): Promise<ApiResponse<DBAdahLedger[]>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  const path = `users/${user.uid}/adah_ledger`;
-  try {
-    const q = query(collection(db, path));
-    const querySnapshot = await getDocs(q);
-    const data = querySnapshot.docs.map(doc => doc.data() as DBAdahLedger);
-    data.sort((a, b) => b.cycle_number - a.cycle_number);
-    return { data, error: null };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  const { data, error } = await supabase
+    .from('adah_ledger')
+    .select('*')
+    .eq('user_id', authUser.id)
+    .order('cycle_number', { ascending: false });
+  return error ? { data: null, error: error.message } : { data: data as DBAdahLedger[], error: null };
 }
 
 export async function getInsightsData(): Promise<ApiResponse<any>> {
-  // This would be a complex query or an edge function call
-  // For now, return basic stats
   const { data: user } = await getUser();
   if (!user) return { data: null, error: 'User not found' };
-
-  return { 
+  return {
     data: {
       avgCycleLength: user.avg_cycle_length,
       avgHaidDuration: user.avg_haid_duration,
-      adahConfidence: user.adah_confidence
-    }, 
-    error: null 
+      adahConfidence: user.adah_confidence,
+    },
+    error: null,
   };
 }
 
 export function mapDBUserToLogicUser(userData: DBUser, ledger: DBAdahLedger[] = []): logic.User {
-  if (!userData) {
-    // This should theoretically not be hit due to the check in CycleContext, but better safe
-    throw new Error("Cannot map null user data");
-  }
+  if (!userData) throw new Error('Cannot map null user data');
 
   const logicLedger: logic.AdahRecord[] = (ledger || []).map(l => {
     const start = l.haid_start ? new Date(l.haid_start).getTime() : Date.now();
@@ -424,7 +334,7 @@ export function mapDBUserToLogicUser(userData: DBUser, ledger: DBAdahLedger[] = 
       bloodColorPattern: l.blood_color_pattern || [],
       bloodThicknessPattern: l.blood_thickness_pattern || [],
       istihadahEpisode: l.istihadah_episode || false,
-      scholarConsulted: l.scholar_consulted || false
+      scholarConsulted: l.scholar_consulted || false,
     };
   });
 
@@ -456,112 +366,77 @@ export function mapDBUserToLogicUser(userData: DBUser, ledger: DBAdahLedger[] = 
     qadhaFastingDays: 0,
     qadhaCompleted: 0,
     qadhaRemaining: 0,
-    pendingBloodStart: null
+    pendingBloodStart: null,
   };
 }
 
 export async function getPredictions(): Promise<ApiResponse<logic.PredictionResult>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  // Simulate Edge Function: calculate-predictions
   const { data: ledger } = await getAdahLedger();
   const { data: userData } = await getUser();
-  
   if (!userData) return { data: null, error: 'User not found' };
-  const mockUser = mapDBUserToLogicUser(userData, ledger || []);
-  const prediction = logic.predictNextPeriod(mockUser);
-  return { data: prediction, error: null };
+  return { data: logic.predictNextPeriod(mapDBUserToLogicUser(userData, ledger || [])), error: null };
 }
 
 export async function markGhusulComplete(timestamp: number): Promise<ApiResponse<any>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  const path = `users/${user.uid}`;
-  try {
-    await updateDoc(doc(db, path), { 
-      updated_at: new Date().toISOString() 
-    });
-
-    // Log the TAHARA state entry
-    return logCycleEntry({
-      date: new Date(timestamp).toISOString().split('T')[0],
-      time_logged: new Date(timestamp).toISOString(),
-      fiqh_state: 'TAHARA'
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  await updateUser({ updated_at: new Date().toISOString() } as Partial<DBUser>);
+  return logCycleEntry({
+    date: new Date(timestamp).toISOString().split('T')[0],
+    time_logged: new Date(timestamp).toISOString(),
+    fiqh_state: 'TAHARA',
+  });
 }
 
 export async function logBirthEvent(timestamp: number): Promise<ApiResponse<DBNifasRecord>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
   const { data: userData } = await getUser();
   if (!userData) return { data: null, error: 'User not found' };
 
   const maxDays = userData.madhhab === 'MALIKI' ? 60 : 40;
-  const expectedEnd = new Date(timestamp + maxDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-  const path = `users/${user.uid}/nifas_records`;
-  try {
-    const nifasData = {
-      user_id: user.uid,
-      birth_date: new Date(timestamp).toISOString(),
-      madhhab_max_days: maxDays,
-      expected_end: expectedEnd
-    };
-    const docRef = await addDoc(collection(db, path), nifasData);
-    return { data: { ...nifasData, id: docRef.id } as DBNifasRecord, error: null };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  const nifasData = {
+    user_id: authUser.id,
+    birth_date: new Date(timestamp).toISOString(),
+    madhhab_max_days: maxDays,
+    expected_end: new Date(timestamp + maxDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  };
+  const { data, error } = await supabase.from('nifas_records').insert(nifasData).select('*').single();
+  return error ? { data: null, error: error.message } : { data: data as DBNifasRecord, error: null };
 }
 
 export async function getRamadanData(hijriYear: number): Promise<ApiResponse<DBRamadanRecord>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  const path = `users/${user.uid}/ramadan_records`;
-  try {
-    const q = query(collection(db, path), where('hijri_year', '==', hijriYear));
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      return { data: querySnapshot.docs[0].data() as DBRamadanRecord, error: null };
-    }
-    return { data: null, error: null };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  const { data, error } = await supabase
+    .from('ramadan_records')
+    .select('*')
+    .eq('user_id', authUser.id)
+    .eq('hijri_year', hijriYear)
+    .maybeSingle();
+  return error ? { data: null, error: error.message } : { data: data as DBRamadanRecord | null, error: null };
 }
 
 export async function updateQadhaSchedule(dates: string[]): Promise<ApiResponse<DBRamadanRecord>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  const path = `users/${user.uid}/ramadan_records`;
-  try {
-    const q = query(collection(db, path));
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      const docRef = querySnapshot.docs[0].ref;
-      await updateDoc(docRef, { qadha_schedule: dates });
-      const updatedDoc = await getDoc(docRef);
-      return { data: updatedDoc.data() as DBRamadanRecord, error: null };
-    }
-    return { data: null, error: 'Ramadan record not found' };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  const { data, error } = await supabase
+    .from('ramadan_records')
+    .update({ qadha_schedule: dates })
+    .eq('user_id', authUser.id)
+    .select('*')
+    .limit(1)
+    .maybeSingle();
+  return error ? { data: null, error: error.message } : { data: data as DBRamadanRecord | null, error: data ? null : 'Ramadan record not found' };
 }
 
-// Legacy server PDF endpoints; the reports are generated client-side in Reports.tsx.
 export async function generateFiqhReportPDF(): Promise<ApiResponse<string>> {
   return { data: null, error: 'Use the client-side report generator in components/Reports.tsx.' };
 }
@@ -571,71 +446,41 @@ export async function generateDoctorReportPDF(): Promise<ApiResponse<string>> {
 }
 
 export async function deleteAccount(): Promise<ApiResponse<boolean>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  const uid = user.uid;
-  try {
-    // Delete subcollections
-    const subcollections = ['cycle_entries', 'adah_ledger', 'prayer_log', 'symptoms_log', 'nifas_records', 'ramadan_records', 'pregnancy_records', 'secret_vault', 'chat_history'];
-    for (const sub of subcollections) {
-      const snap = await getDocs(collection(db, 'users', uid, sub));
-      await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
-    }
+  const { error } = await supabase.rpc('delete_my_account');
+  if (error) return { data: false, error: error.message };
 
-    // Delete user document
-    await deleteDoc(doc(db, 'users', uid));
-
-    // Delete auth user
-    try {
-      await user.delete();
-    } catch (e) {
-      console.warn("Auth user deletion failed, signing out instead", e);
-      await auth.signOut();
-    }
-
-    return { data: true, error: null };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
-    return { data: false, error: error instanceof Error ? error.message : String(error) };
-  }
+  localStorage.removeItem('niswah_local_user');
+  localStorage.removeItem('niswah_local_entries');
+  await signOut();
+  return { data: true, error: null };
 }
 
 export async function saveChatMessage(message: Omit<DBChatMessage, 'id' | 'user_id'>): Promise<ApiResponse<DBChatMessage>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  const path = `users/${user.uid}/chat_history`;
-  try {
-    const messageData = {
-      ...cleanObject(message),
-      user_id: user.uid,
-      timestamp: new Date().toISOString()
-    };
-    const docRef = await addDoc(collection(db, path), messageData);
-    return { data: { ...messageData, id: docRef.id } as DBChatMessage, error: null };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  const messageData = {
+    ...cleanObject(message),
+    user_id: authUser.id,
+    timestamp: new Date().toISOString(),
+  };
+  const { data, error } = await supabase.from('chat_history').insert(messageData).select('*').single();
+  return error ? { data: null, error: error.message } : { data: data as DBChatMessage, error: null };
 }
 
 export async function getChatHistory(chatType: DBChatMessage['chat_type']): Promise<ApiResponse<DBChatMessage[]>> {
-  const user = auth.currentUser;
-  if (!user) return { data: null, error: 'Not authenticated' };
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  const path = `users/${user.uid}/chat_history`;
-  try {
-    const q = query(
-      collection(db, path),
-      where('chat_type', '==', chatType),
-      orderBy('timestamp', 'asc')
-    );
-    const querySnapshot = await getDocs(q);
-    const messages = querySnapshot.docs.map(d => ({ ...d.data(), id: d.id } as DBChatMessage));
-    return { data: messages, error: null };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-    return { data: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  const { data, error } = await supabase
+    .from('chat_history')
+    .select('*')
+    .eq('user_id', authUser.id)
+    .eq('chat_type', chatType)
+    .order('timestamp', { ascending: true });
+  return error ? { data: null, error: error.message } : { data: data as DBChatMessage[], error: null };
 }
+

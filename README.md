@@ -2,6 +2,8 @@
 
 Niswah is a Vite/React web app for cycle tracking with Islamic fiqh guidance, health insights, reports, and AI assistants.
 
+The app uses Supabase for authentication, Postgres data storage, row-level security, and realtime updates.
+
 ## Local Setup
 
 ```bash
@@ -39,6 +41,14 @@ Client-safe:
 - `VITE_SUPABASE_ANON_KEY`
 
 Never expose Gemini credentials with a `VITE_` prefix.
+
+## Supabase Setup
+
+1. Create a Supabase project.
+2. Run `supabase/schema.sql` in the Supabase SQL editor.
+3. Enable Email auth.
+4. Configure Google and Apple OAuth providers if those login buttons should be active.
+5. Add the production URL to Supabase auth redirect URLs.
 
 ## Verification
 

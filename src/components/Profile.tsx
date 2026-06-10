@@ -36,8 +36,7 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { format } from 'date-fns';
-import { signOut } from 'firebase/auth';
-import { auth } from '../firebase';
+import { signOut } from '../auth';
 import * as api from '../api/index.ts';
 import { Madhhab } from '../logic/types.ts';
 import { popularCities } from '../logic/constants.ts';
@@ -817,7 +816,7 @@ export const Profile = ({ }: ProfileProps) => {
 
         <div className="pt-8 pb-4 text-center">
           <button 
-            onClick={() => signOut(auth)}
+            onClick={() => signOut()}
             className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-sm active:scale-95 transition-transform"
           >
             {t('sign_out')}

@@ -13,7 +13,7 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://nominatim.openstreetmap.org https://api.aladhan.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.googleapis.com https://www.google-analytics.com https://nominatim.openstreetmap.org https://api.aladhan.com",
 ].join('; ');
 
 app.disable('x-powered-by');

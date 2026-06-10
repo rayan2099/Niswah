@@ -26,7 +26,7 @@ export default defineConfig(({mode}) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            'firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+            'supabase': ['@supabase/supabase-js'],
             'charts': ['recharts'],
             'adhan': ['adhan'],
           }

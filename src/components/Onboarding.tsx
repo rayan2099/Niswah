@@ -1105,7 +1105,7 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
   const complete = async () => {
     try {
       setIsCompleting(true);
-      // Save to Database (tries Firestore + local primary save)
+      // Save to database with a local-first fallback.
       const { data: savedUser } = await api.upsertUser({
         madhhab: data.madhhab as Madhhab,
         language: data.language,

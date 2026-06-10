@@ -175,59 +175,79 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
+  const loadRemoteData = useCallback(async () => {
+    if (!authUser) return;
+
+    try {
+      const [{ data: userData, error: userError }, { data: entryRows, error: entriesError }, { data: ledgerRows, error: ledgerError }, { data: prayerRows, error: prayersError }] = await Promise.all([
+        api.getUser(),
+        supabase.from('cycle_entries').select('*').eq('user_id', authUser.id).order('date', { ascending: false }).order('time_logged', { ascending: false }),
+        supabase.from('adah_ledger').select('*').eq('user_id', authUser.id).order('cycle_number', { ascending: false }),
+        supabase.from('prayer_log').select('*').eq('user_id', authUser.id).order('date', { ascending: false }),
+      ]);
+
+      if (userError) throw new Error(userError);
+      if (entriesError) throw entriesError;
+      if (ledgerError) throw ledgerError;
+      if (prayersError) throw prayersError;
+
+      if (userData) {
+        setDbUser(userData);
+        localStorage.setItem('niswah_local_user', JSON.stringify(userData));
+      } else {
+        setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
+      }
+
+      const remoteEntries = (entryRows || []) as DBCycleEntry[];
+      setEntries(remoteEntries);
+      localStorage.setItem('niswah_local_entries', JSON.stringify(remoteEntries));
+      setLedger((ledgerRows || []) as DBAdahLedger[]);
+      setPrayers((prayerRows || []) as DBPrayerLog[]);
+    } catch (error) {
+      console.error('Supabase realtime bootstrap failed', error);
+      const localEntries = readLocalJson<DBCycleEntry[]>('niswah_local_entries', []);
+      if (localEntries.length > 0) setEntries(localEntries);
+      setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
+    } finally {
+      setLoading(false);
+    }
+  }, [authUser]);
+
+  const refreshData = useCallback(async () => {
+    if (authUser) {
+      await loadRemoteData();
+    } else {
+      await loadInitialData();
+    }
+  }, [authUser, loadInitialData, loadRemoteData]);
+
   useEffect(() => {
     if (!authUser) {
       loadInitialData();
       return;
     }
 
-    const loadRemoteData = async () => {
-      try {
-        const [{ data: userRow, error: userError }, { data: entryRows, error: entriesError }, { data: ledgerRows, error: ledgerError }, { data: prayerRows, error: prayersError }] = await Promise.all([
-          supabase.from('users').select('*').eq('id', authUser.id).maybeSingle(),
-          supabase.from('cycle_entries').select('*').eq('user_id', authUser.id).order('date', { ascending: false }).order('time_logged', { ascending: false }),
-          supabase.from('adah_ledger').select('*').eq('user_id', authUser.id).order('cycle_number', { ascending: false }),
-          supabase.from('prayer_log').select('*').eq('user_id', authUser.id).order('date', { ascending: false }),
-        ]);
-
-        if (userError) throw userError;
-        if (entriesError) throw entriesError;
-        if (ledgerError) throw ledgerError;
-        if (prayersError) throw prayersError;
-
-        if (userRow) {
-          const mapped = userFromSupabase(userRow);
-          setDbUser(mapped);
-          localStorage.setItem('niswah_local_user', JSON.stringify(mapped));
-        } else {
-          setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
-        }
-
-        const remoteEntries = (entryRows || []) as DBCycleEntry[];
-        setEntries(remoteEntries);
-        localStorage.setItem('niswah_local_entries', JSON.stringify(remoteEntries));
-        setLedger((ledgerRows || []) as DBAdahLedger[]);
-        setPrayers((prayerRows || []) as DBPrayerLog[]);
-      } catch (error) {
-        console.error('Supabase realtime bootstrap failed', error);
-        const localEntries = readLocalJson<DBCycleEntry[]>('niswah_local_entries', []);
-        if (localEntries.length > 0) setEntries(localEntries);
-        setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadRemoteData();
 
     const userChannel = supabase.channel(`user-${authUser.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `id=eq.${authUser.id}` }, payload => {
-        const row = payload.new || payload.old;
-        if (row) {
-          const mapped = userFromSupabase(row);
-          setDbUser(mapped);
-          localStorage.setItem('niswah_local_user', JSON.stringify(mapped));
-        }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `id=eq.${authUser.id}` }, () => {
+        api.getUser().then(({ data }) => {
+          if (data) {
+            setDbUser(data);
+            localStorage.setItem('niswah_local_user', JSON.stringify(data));
+          }
+        });
+      })
+      .subscribe();
+
+    const pregnancyChannel = supabase.channel(`pregnancy-records-${authUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pregnancy_records', filter: `user_id=eq.${authUser.id}` }, () => {
+        api.getUser().then(({ data }) => {
+          if (data) {
+            setDbUser(data);
+            localStorage.setItem('niswah_local_user', JSON.stringify(data));
+          }
+        });
       })
       .subscribe();
 
@@ -257,11 +277,12 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       supabase.removeChannel(userChannel);
+      supabase.removeChannel(pregnancyChannel);
       supabase.removeChannel(entriesChannel);
       supabase.removeChannel(ledgerChannel);
       supabase.removeChannel(prayersChannel);
     };
-  }, [authUser, loadInitialData]);
+  }, [authUser, loadInitialData, loadRemoteData]);
 
   // Update logic user and state when raw data changes
   // Derived states are now handled by useMemo above
@@ -333,7 +354,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
       nextPeriodDate,
       loading,
       updatePrayerTimes,
-      refresh: loadInitialData
+      refresh: refreshData
     }}>
       {children}
     </CycleContext.Provider>

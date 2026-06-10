@@ -1428,8 +1428,23 @@ export const Today = ({
             {isPregnant ? (
               <PregnancyTracker 
                 currentWeek={user?.pregnancy_week || 1} 
-                onLogBirth={() => {
-                  // Handle birth logging logic
+                onWeekChange={async (week) => {
+                  await api.updateUser({ pregnancy_week: week, pregnant: true });
+                  await api.ensurePregnancyRecord(week);
+                  await refresh();
+                }}
+                onLogBirth={async () => {
+                  await api.logBirthEvent(Date.now());
+                  await api.clearActivePregnancyRecords();
+                  await api.updateUser({
+                    pregnant: false,
+                    pregnancy_week: 0,
+                    conditions: Array.from(new Set([...(user?.conditions || []), 'postpartum'])),
+                  });
+                  await refresh();
+                  setBloomMessage(t('nifas'));
+                  setShowBloom(true);
+                  setTimeout(() => setShowBloom(false), 2500);
                 }} 
               />
             ) : isFirstTime ? (

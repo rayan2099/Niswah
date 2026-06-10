@@ -22,7 +22,7 @@ export default async function handler(req: any, res: any) {
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-      model: process.env.GEMINI_MODEL || 'gemini-3-flash-preview',
+      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
       contents,
       config: {
         systemInstruction: typeof systemInstruction === 'string' ? systemInstruction.slice(0, 8000) : '',
@@ -31,7 +31,15 @@ export default async function handler(req: any, res: any) {
       },
     });
 
-    return res.status(200).json({ text: response.text || '' });
+    const text =
+      response.text ||
+      response.candidates?.flatMap((candidate: any) => candidate.content?.parts || [])
+        .map((part: any) => part.text || '')
+        .join('')
+        .trim() ||
+      '';
+
+    return res.status(200).json({ text });
   } catch (error: any) {
     console.error('Gemini API error:', error?.message || error);
     return res.status(502).json({ error: 'AI service is temporarily unavailable.' });

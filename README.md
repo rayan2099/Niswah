@@ -30,7 +30,7 @@ The production server serves `dist/`, exposes `/healthz`, and proxies AI request
 Server-only:
 
 - `GEMINI_API_KEY`: Gemini API key used by `server.cjs`.
-- `GEMINI_MODEL`: optional model override.
+- `GEMINI_MODEL`: optional model override. Defaults to `gemini-2.5-flash`.
 - `PORT`: provided by Cloud Run; falls back to `3000`.
 
 Client-safe:

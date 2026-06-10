@@ -561,7 +561,7 @@ export async function updateQadhaSchedule(dates: string[]): Promise<ApiResponse<
   }
 }
 
-// PDF Generation Placeholders (would be edge functions)
+// Legacy server PDF endpoints; the reports are generated client-side in Reports.tsx.
 export async function generateFiqhReportPDF(): Promise<ApiResponse<string>> {
   return { data: null, error: 'Use the client-side report generator in components/Reports.tsx.' };
 }

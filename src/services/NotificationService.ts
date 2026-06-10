@@ -37,8 +37,8 @@ class NotificationService {
 
     try {
       new Notification(title, {
-        icon: '/logo192.png',
-        badge: '/logo192.png',
+        icon: '/icons/icon-192.svg',
+        badge: '/icons/icon-192.svg',
         ...options
       });
     } catch (e) {

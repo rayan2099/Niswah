@@ -34,23 +34,23 @@ interface CycleContextType {
 
 const CycleContext = createContext<CycleContextType | undefined>(undefined);
 
+const readLocalJson = <T,>(key: string, fallback: T): T => {
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) as T : fallback;
+  } catch (e) {
+    console.error(`Failed to parse ${key}`, e);
+    return fallback;
+  }
+};
+
 export const CycleProvider = ({ children }: { children: ReactNode }) => {
   const t = useCallback((key: string) => key, []);
   const [dbUser, setDbUser] = useState<DBUser | null>(() => {
-    try {
-      const local = localStorage.getItem('niswah_local_user');
-      return local ? JSON.parse(local) : null;
-    } catch (e) {
-      return null;
-    }
+    return readLocalJson<DBUser | null>('niswah_local_user', null);
   });
   const [entries, setEntries] = useState<DBCycleEntry[]>(() => {
-    try {
-      const local = localStorage.getItem('niswah_local_entries');
-      return local ? JSON.parse(local) : [];
-    } catch (e) {
-      return [];
-    }
+    return readLocalJson<DBCycleEntry[]>('niswah_local_entries', []);
   });
   const [ledger, setLedger] = useState<DBAdahLedger[]>([]);
   const [prayers, setPrayers] = useState<DBPrayerLog[]>([]);
@@ -112,10 +112,23 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const loadInitialData = useCallback(async () => {
-    // onSnapshot handles real-time data, so we don't need a heavy initial load
-    // but we can keep it as a manual trigger for refresh if needed.
-    return;
-  }, []);
+    const hasLocalUser = localStorage.getItem('niswah_local_user') !== null;
+    const hasLocalEntries = localStorage.getItem('niswah_local_entries') !== null;
+
+    if (hasLocalUser) {
+      setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
+    } else if (!firebaseUser) {
+      setDbUser(null);
+    }
+
+    if (hasLocalEntries) {
+      setEntries(readLocalJson<DBCycleEntry[]>('niswah_local_entries', []));
+    } else if (!firebaseUser) {
+      setEntries([]);
+    }
+
+    setLoading(false);
+  }, [firebaseUser]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -130,17 +143,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!firebaseUser) {
-      // Check local storage as a fallback even if not logged in (for demo/offline first start)
-      const localUserStr = localStorage.getItem('niswah_local_user');
-      if (localUserStr) {
-        try {
-          const localUser = JSON.parse(localUserStr) as DBUser;
-          setDbUser(localUser);
-        } catch (e) {
-          console.error("Failed to parse local user", e);
-        }
-      }
-      setLoading(false);
+      loadInitialData();
       return;
     }
 
@@ -157,8 +160,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false); // Data loaded
     }, (error) => {
       console.error("Entries snapshot error", error);
-      // Fallback to local entries if any
-      const localEntries = JSON.parse(localStorage.getItem('niswah_local_entries') || '[]');
+      const localEntries = readLocalJson<DBCycleEntry[]>('niswah_local_entries', []);
       if (localEntries.length > 0) setEntries(localEntries);
       setLoading(false);
     });
@@ -187,16 +189,12 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
         // Doc might not exist yet if onboarding just finished and firestore is slow or failed
         const localUserStr = localStorage.getItem('niswah_local_user');
         if (localUserStr) {
-          const localUser = JSON.parse(localUserStr);
-          setDbUser(localUser);
+          setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
         }
       }
     }, (error) => {
       console.error("User snapshot error", error);
-      const localUserStr = localStorage.getItem('niswah_local_user');
-      if (localUserStr) {
-        setDbUser(JSON.parse(localUserStr));
-      }
+      setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
     });
 
     return () => {
@@ -205,7 +203,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
       unsubPrayers();
       unsubUser();
     };
-  }, [firebaseUser]);
+  }, [firebaseUser, loadInitialData]);
 
   // Update logic user and state when raw data changes
   // Derived states are now handled by useMemo above

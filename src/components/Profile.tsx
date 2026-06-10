@@ -635,11 +635,9 @@ export const Profile = ({ }: ProfileProps) => {
                 }
                 const updated = await api.updateUser({ pregnant: val, pregnancy_week: val ? (user?.pregnancy_week || 1) : 0 });
                 if (updated.error) {
-                  alert(isRTL ? 'تعذر حفظ إعداد الحمل. حاولي مرة أخرى.' : 'Could not save pregnancy setting. Please try again.');
-                  await refresh();
-                  return;
+                  console.warn('Pregnancy profile mirror update failed:', updated.error);
                 }
-                if (updated.data) setUser(updated.data);
+                setUser(prev => prev ? { ...prev, ...(updated.data || {}), pregnant: val, pregnancy_week: val ? (prev.pregnancy_week || 1) : 0 } : updated.data);
                 await refresh();
               }} 
             />

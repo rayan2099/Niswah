@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { format } from 'date-fns';
+import { differenceInCalendarDays, format } from 'date-fns';
 import { toHijri } from 'hijri-converter';
 
 // Load and embed Arabic font into jsPDF instance
@@ -67,6 +67,14 @@ const getHijriDate = (dateStr: string | null | undefined): string => {
     const h = toHijri(date.getFullYear(), date.getMonth() + 1, date.getDate());
     return `${h.hd}/${h.hm}/${h.hy}`;
   } catch { return '—'; }
+};
+
+const daysPhrase = (days: number): string => {
+  if (days <= 0) return 'اليوم';
+  if (days === 1) return 'يوم واحد';
+  if (days === 2) return 'يومان';
+  if (days <= 10) return `${days} أيام`;
+  return `${days} يوماً`;
 };
 
 type ReportRow = [string, string];
@@ -522,9 +530,34 @@ export const generateHusbandPDF = async (
   fertilityEnd: Date | null
 ): Promise<Blob> => {
   const visualStateNames: Record<string, string> = { HAID: 'حيض', TAHARA: 'طهارة', ISTIHADAH: 'استحاضة', NIFAS: 'نفاس' };
+  const today = new Date();
+  const daysUntilPeriod = nextPeriodDate ? differenceInCalendarDays(nextPeriodDate, today) : null;
+  const daysUntilFertility = fertilityStart ? differenceInCalendarDays(fertilityStart, today) : null;
+  const fertilityEndsIn = fertilityEnd ? differenceInCalendarDays(fertilityEnd, today) : null;
   const visualFertilityRange = fertilityStart && fertilityEnd
     ? `${format(fertilityStart, 'dd/MM/yyyy')} - ${format(fertilityEnd, 'dd/MM/yyyy')}`
     : 'غير محدد بعد';
+  const waitingGuidance = fiqhState === 'HAID'
+    ? 'الحالة الآن حيض، يلزم الانتظار حتى حصول الطهر والاغتسال قبل المعاشرة.'
+    : fiqhState === 'NIFAS'
+      ? 'الحالة الآن نفاس، يلزم الانتظار حتى حصول الطهر والاغتسال قبل المعاشرة.'
+      : fiqhState === 'ISTIHADAH'
+        ? 'الحالة الآن استحاضة، راجعوا الحكم الفقهي المناسب للحالة والمذهب.'
+        : 'الحالة الآن طهارة، ولا يظهر منع متعلق بالحيض حسب البيانات الحالية.';
+  const periodGuidance = daysUntilPeriod === null
+    ? 'لا يوجد موعد موثوق للحيض القادم بعد.'
+    : daysUntilPeriod > 0
+      ? `متوقع بدء الحيض القادم بعد حوالي ${daysPhrase(daysUntilPeriod)}.`
+      : daysUntilPeriod === 0
+        ? 'قد يبدأ الحيض المتوقع اليوم حسب بيانات التطبيق.'
+        : 'موعد الحيض المتوقع السابق قد مر، يرجى تحديث السجلات إذا تغيرت الحالة.';
+  const fertilityGuidance = daysUntilFertility === null || fertilityEndsIn === null
+    ? 'نافذة الخصوبة غير محددة بعد لعدم كفاية البيانات.'
+    : daysUntilFertility > 0
+      ? `تبدأ نافذة الخصوبة المتوقعة بعد ${daysPhrase(daysUntilFertility)} وتستمر تقريباً حتى ${format(fertilityEnd!, 'dd/MM/yyyy')}.`
+      : fertilityEndsIn >= 0
+        ? `نافذة الخصوبة المتوقعة نشطة الآن، وتنتهي تقريباً بعد ${daysPhrase(fertilityEndsIn)}.`
+        : 'نافذة الخصوبة المتوقعة لهذه الدورة انتهت حسب البيانات الحالية.';
   const visualPdf = await renderVisualPdf(
     'ملخص للزوج',
     'ملخص خاص وسري أُعد بموافقة الزوجة عبر تطبيق نسوة.',
@@ -536,10 +569,20 @@ export const generateHusbandPDF = async (
     ],
     [
       {
+        title: 'الخلاصة العملية',
+        paragraphs: [
+          waitingGuidance,
+          periodGuidance,
+          fertilityGuidance,
+          'يرجى مراجعة التطبيق عند تغير الحالة أو نزول دم جديد، لأن الأحكام والتوقعات تعتمد على آخر تسجيل.',
+        ],
+      },
+      {
         title: 'الأيام القادمة',
         rows: [
-          ['نافذة الخصوبة', visualFertilityRange],
-          ['موعد انتهاء الدورة المتوقع', nextPeriodDate ? format(nextPeriodDate, 'dd/MM/yyyy') : 'غير محدد بعد'],
+          ['نافذة الخصوبة المتوقعة', visualFertilityRange],
+          ['الحيض المتوقع القادم', nextPeriodDate ? format(nextPeriodDate, 'dd/MM/yyyy') : 'غير محدد بعد'],
+          ['متى يلزم الانتباه؟', daysUntilPeriod !== null && daysUntilPeriod > 0 ? `بعد حوالي ${daysPhrase(daysUntilPeriod)}` : periodGuidance],
         ],
       },
       {
@@ -588,7 +631,8 @@ export const generateHusbandPDF = async (
   doc.setTextColor(55, 65, 81);
   R(doc, `الحالة: ${stateNames[fiqhState] || 'طهارة'}`, right, y, 10); y += 6;
   R(doc, `اليوم ${currentDay || 1} من الدورة`, right, y, 10); y += 6;
-  R(doc, `موعد انتهاء الدورة المتوقع: ${nextPeriodDate ? format(nextPeriodDate, 'dd/MM/yyyy') : 'غير محدد بعد'}`, right, y, 10); y += 10;
+  R(doc, waitingGuidance, right, y, 10); y += 6;
+  R(doc, periodGuidance, right, y, 10); y += 10;
 
   doc.setTextColor(6, 95, 70);
   R(doc, 'الأيام القادمة', right, y, 13); y += 7;
@@ -598,7 +642,8 @@ export const generateHusbandPDF = async (
   const fertilityRange = fertilityStart && fertilityEnd
     ? `${format(fertilityStart, 'dd/MM/yyyy')} - ${format(fertilityEnd, 'dd/MM/yyyy')}`
     : 'غير محدد بعد';
-  R(doc, `نافذة الخصوبة: ${fertilityRange}`, right, y, 10); y += 10;
+  R(doc, `نافذة الخصوبة: ${fertilityRange}`, right, y, 10); y += 6;
+  R(doc, fertilityGuidance, right, y, 10); y += 10;
 
   doc.setTextColor(6, 95, 70);
   R(doc, 'ملاحظة شرعية', right, y, 13); y += 7;

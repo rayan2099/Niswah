@@ -618,7 +618,16 @@ export const Profile = ({ }: ProfileProps) => {
               label={t('currently_pregnant')} 
               active={user?.pregnant} 
               onChange={async (val) => {
-                await api.updateUser({ pregnant: val });
+                if (val) {
+                  const pregnancy = await api.ensurePregnancyRecord(user?.pregnancy_week || 1);
+                  if (pregnancy.error) {
+                    alert(isRTL ? 'تعذر حفظ سجل الحمل. حاولي مرة أخرى.' : 'Could not save pregnancy record. Please try again.');
+                    await refresh();
+                    return;
+                  }
+                }
+                const updated = await api.updateUser({ pregnant: val, pregnancy_week: val ? (user?.pregnancy_week || 1) : 0 });
+                if (updated.data) setUser(updated.data);
                 await refresh();
               }} 
             />

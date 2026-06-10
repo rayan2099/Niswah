@@ -15,6 +15,7 @@ import {
   DBAdahLedger,
   DBNifasRecord,
   DBRamadanRecord,
+  DBPregnancyRecord,
   DBChatMessage,
 } from './db-types.ts';
 
@@ -195,6 +196,34 @@ export async function updateUser(updates: Partial<DBUser>): Promise<ApiResponse<
   const mapped = data ? userFromDb(data) : nextLocal;
   if (mapped) localStorage.setItem('niswah_local_user', JSON.stringify(mapped));
   return { data: mapped, error: null };
+}
+
+export async function ensurePregnancyRecord(currentWeek = 1): Promise<ApiResponse<DBPregnancyRecord>> {
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
+
+  const { data: existing, error: existingError } = await supabase
+    .from('pregnancy_records')
+    .select('*')
+    .eq('user_id', authUser.id)
+    .is('birth_date', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) return { data: null, error: existingError.message };
+  if (existing) return { data: existing as DBPregnancyRecord, error: null };
+
+  const { data, error } = await supabase
+    .from('pregnancy_records')
+    .insert({
+      user_id: authUser.id,
+      current_week: Math.max(1, currentWeek || 1),
+      weekly_notes: {},
+    })
+    .select('*')
+    .single();
+
+  return error ? { data: null, error: error.message } : { data: data as DBPregnancyRecord, error: null };
 }
 
 export async function logCycleEntry(entry: Partial<DBCycleEntry>): Promise<ApiResponse<DBCycleEntry>> {

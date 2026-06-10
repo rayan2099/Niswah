@@ -204,7 +204,7 @@ begin
   )
   values (
     new.id,
-    encode(digest(coalesce(new.email, 'anonymous'), 'sha256'), 'hex'),
+    md5(coalesce(new.email, 'anonymous')),
     coalesce(new.raw_user_meta_data ->> 'display_name', new.raw_user_meta_data ->> 'full_name', 'Sister'),
     'HANBALI',
     'ar',
@@ -237,7 +237,7 @@ insert into public.users (
 )
 select
   auth_users.id,
-  encode(digest(coalesce(auth_users.email, 'anonymous'), 'sha256'), 'hex'),
+  md5(coalesce(auth_users.email, 'anonymous')),
   coalesce(auth_users.raw_user_meta_data ->> 'display_name', auth_users.raw_user_meta_data ->> 'full_name', 'Sister'),
   'HANBALI',
   'ar',

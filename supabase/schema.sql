@@ -180,6 +180,66 @@ create table if not exists public.community_posts (
   updated_at timestamptz not null default now()
 );
 
+create or replace function public.create_user_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.users (
+    id,
+    email_hash,
+    display_name,
+    madhhab,
+    language,
+    premium_status,
+    created_at,
+    updated_at
+  )
+  values (
+    new.id,
+    encode(digest(coalesce(new.email, 'anonymous'), 'sha256'), 'hex'),
+    coalesce(new.raw_user_meta_data ->> 'display_name', new.raw_user_meta_data ->> 'full_name', 'Sister'),
+    'HANBALI',
+    'ar',
+    true,
+    now(),
+    now()
+  )
+  on conflict (id) do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists auth_users_create_profile on auth.users;
+create trigger auth_users_create_profile
+after insert on auth.users
+for each row execute function public.create_user_profile();
+
+insert into public.users (
+  id,
+  email_hash,
+  display_name,
+  madhhab,
+  language,
+  premium_status,
+  created_at,
+  updated_at
+)
+select
+  auth_users.id,
+  encode(digest(coalesce(auth_users.email, 'anonymous'), 'sha256'), 'hex'),
+  coalesce(auth_users.raw_user_meta_data ->> 'display_name', auth_users.raw_user_meta_data ->> 'full_name', 'Sister'),
+  'HANBALI',
+  'ar',
+  true,
+  now(),
+  now()
+from auth.users auth_users
+on conflict (id) do nothing;
+
 create index if not exists cycle_entries_user_date_idx on public.cycle_entries(user_id, date desc, time_logged desc);
 create index if not exists adah_ledger_user_cycle_idx on public.adah_ledger(user_id, cycle_number desc);
 create index if not exists prayer_log_user_date_idx on public.prayer_log(user_id, date desc);

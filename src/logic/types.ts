@@ -59,6 +59,7 @@ export interface User {
   reflect_health?: boolean;
   notification_prefs?: Record<string, any>;
   anonymous_mode?: boolean;
+  onboarding_completed?: boolean;
   premium_status?: boolean;
   language?: string;
   avatar?: string;

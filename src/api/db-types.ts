@@ -13,6 +13,7 @@ export interface DBUser {
   birth_year: number;
   display_name: string;
   anonymous_mode: boolean;
+  onboarding_completed?: boolean;
   premium_status: boolean;
   premium_expires_at: string | null;
   avg_cycle_length: number;

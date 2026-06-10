@@ -21,6 +21,7 @@ create table if not exists public.users (
   birth_year integer,
   display_name text,
   anonymous_mode boolean not null default false,
+  onboarding_completed boolean not null default false,
   premium_status boolean not null default true,
   premium_expires_at timestamptz,
   avg_cycle_length integer not null default 28,
@@ -47,6 +48,9 @@ create table if not exists public.users (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.users
+add column if not exists onboarding_completed boolean not null default false;
 
 create table if not exists public.cycle_entries (
   id uuid primary key default gen_random_uuid(),
@@ -193,6 +197,7 @@ begin
     display_name,
     madhhab,
     language,
+    onboarding_completed,
     premium_status,
     created_at,
     updated_at
@@ -203,6 +208,7 @@ begin
     coalesce(new.raw_user_meta_data ->> 'display_name', new.raw_user_meta_data ->> 'full_name', 'Sister'),
     'HANBALI',
     'ar',
+    false,
     true,
     now(),
     now()
@@ -224,6 +230,7 @@ insert into public.users (
   display_name,
   madhhab,
   language,
+  onboarding_completed,
   premium_status,
   created_at,
   updated_at
@@ -234,6 +241,7 @@ select
   coalesce(auth_users.raw_user_meta_data ->> 'display_name', auth_users.raw_user_meta_data ->> 'full_name', 'Sister'),
   'HANBALI',
   'ar',
+  false,
   true,
   now(),
   now()

@@ -45,6 +45,7 @@ const userFromDb = (row: any): DBUser => ({
   birth_year: row.birth_year || 1995,
   display_name: row.display_name || 'Sister',
   anonymous_mode: row.anonymous_mode ?? false,
+  onboarding_completed: row.onboarding_completed ?? false,
   premium_status: row.premium_status ?? true,
   premium_expires_at: row.premium_expires_at || null,
   avg_cycle_length: row.avg_cycle_length || 28,
@@ -79,6 +80,7 @@ const userToDb = (user: Partial<DBUser>) => cleanObject({
   birth_year: user.birth_year,
   display_name: user.display_name,
   anonymous_mode: user.anonymous_mode,
+  onboarding_completed: user.onboarding_completed,
   premium_status: user.premium_status,
   premium_expires_at: user.premium_expires_at,
   avg_cycle_length: user.avg_cycle_length,
@@ -134,6 +136,7 @@ export async function upsertUser(updates: Partial<DBUser>): Promise<ApiResponse<
     birth_year: 1995,
     display_name: authUser?.user_metadata?.display_name || authUser?.user_metadata?.full_name || 'Sister',
     anonymous_mode: false,
+    onboarding_completed: false,
     premium_status: true,
     adah_confidence: 0,
     prayerCity: '',
@@ -361,6 +364,7 @@ export function mapDBUserToLogicUser(userData: DBUser, ledger: DBAdahLedger[] = 
     conditions: userData.conditions || [],
     display_name: userData.display_name || '',
     anonymous_mode: userData.anonymous_mode || false,
+    onboarding_completed: userData.onboarding_completed || false,
     notification_prefs: userData.notification_prefs || {},
     language: userData.language || 'ar',
     qadhaFastingDays: 0,
@@ -483,4 +487,3 @@ export async function getChatHistory(chatType: DBChatMessage['chat_type']): Prom
     .order('timestamp', { ascending: true });
   return error ? { data: null, error: error.message } : { data: data as DBChatMessage[], error: null };
 }
-

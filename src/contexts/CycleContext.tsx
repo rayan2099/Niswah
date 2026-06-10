@@ -51,6 +51,7 @@ const userFromSupabase = (row: any): DBUser => ({
   birth_year: row.birth_year || 1995,
   display_name: row.display_name || 'Sister',
   anonymous_mode: row.anonymous_mode ?? false,
+  onboarding_completed: row.onboarding_completed ?? false,
   premium_status: row.premium_status ?? true,
   premium_expires_at: row.premium_expires_at || null,
   avg_cycle_length: row.avg_cycle_length || 28,

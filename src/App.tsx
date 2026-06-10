@@ -157,7 +157,7 @@ function AppContent() {
   }, [refresh, authLoading]);
 
   useEffect(() => {
-    if (user && user.madhhab) {
+    if (user?.onboarding_completed) {
       setShowOnboarding(false);
     }
   }, [user]);

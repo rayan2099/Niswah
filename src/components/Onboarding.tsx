@@ -1115,6 +1115,7 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
         conditions: data.conditions,
         notification_prefs: data.notification_prefs,
         anonymous_mode: data.privacy_setup.anonymous_mode,
+        onboarding_completed: true,
         premium_status: true,
         prayerCity: data.location.city,
         prayerCountry: data.location.country,

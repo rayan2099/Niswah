@@ -95,8 +95,8 @@ const buildReportPage = (title: string, subtitle: string, meta: string[], sectio
   const page = document.createElement('div');
   page.dir = 'rtl';
   page.style.cssText = [
-    'position:absolute',
-    'left:-10000px',
+    'position:fixed',
+    'left:0',
     'top:0',
     'width:794px',
     'min-height:1123px',
@@ -108,6 +108,8 @@ const buildReportPage = (title: string, subtitle: string, meta: string[], sectio
     'direction:rtl',
     'text-align:right',
     'line-height:1.8',
+    'pointer-events:none',
+    'z-index:-1',
   ].join(';');
 
   const header = document.createElement('div');
@@ -150,7 +152,7 @@ const buildReportPage = (title: string, subtitle: string, meta: string[], sectio
     section.paragraphs?.forEach(text => appendText(page, 'div', text, 'note'));
   });
 
-  appendText(page, 'div', 'تم إنشاء هذا التقرير بواسطة تطبيق نسوة', 'footer');
+  appendText(page, 'div', 'تم إنشاء هذا التقرير بواسطة تطبيق نسوة · PDF v2', 'footer');
   return page;
 };
 

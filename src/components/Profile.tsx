@@ -625,8 +625,20 @@ export const Profile = ({ }: ProfileProps) => {
                     await refresh();
                     return;
                   }
+                } else {
+                  const pregnancy = await api.clearActivePregnancyRecords();
+                  if (pregnancy.error) {
+                    alert(isRTL ? 'تعذر إيقاف وضع الحمل. حاولي مرة أخرى.' : 'Could not turn off pregnancy mode. Please try again.');
+                    await refresh();
+                    return;
+                  }
                 }
                 const updated = await api.updateUser({ pregnant: val, pregnancy_week: val ? (user?.pregnancy_week || 1) : 0 });
+                if (updated.error) {
+                  alert(isRTL ? 'تعذر حفظ إعداد الحمل. حاولي مرة أخرى.' : 'Could not save pregnancy setting. Please try again.');
+                  await refresh();
+                  return;
+                }
                 if (updated.data) setUser(updated.data);
                 await refresh();
               }} 

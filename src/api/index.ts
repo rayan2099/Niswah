@@ -114,6 +114,18 @@ const ensureUser = async () => {
   return user;
 };
 
+async function getActivePregnancyRecordForUser(userId: string): Promise<ApiResponse<DBPregnancyRecord>> {
+  const { data, error } = await supabase
+    .from('pregnancy_records')
+    .select('*')
+    .eq('user_id', userId)
+    .is('birth_date', null)
+    .limit(1)
+    .maybeSingle();
+
+  return error ? { data: null, error: error.message } : { data: data as DBPregnancyRecord | null, error: null };
+}
+
 export async function getUser(): Promise<ApiResponse<DBUser>> {
   const localUser = readLocal<DBUser | null>('niswah_local_user', null);
   const authUser = await ensureUser();
@@ -127,6 +139,11 @@ export async function getUser(): Promise<ApiResponse<DBUser>> {
 
   if (!data) return { data: localUser, error: null };
   const mapped = userFromDb(data);
+  const activePregnancy = await getActivePregnancyRecordForUser(authUser.id);
+  if (activePregnancy.data) {
+    mapped.pregnant = true;
+    mapped.pregnancy_week = activePregnancy.data.current_week || mapped.pregnancy_week || 1;
+  }
   localStorage.setItem('niswah_local_user', JSON.stringify(mapped));
   return { data: mapped, error: null };
 }
@@ -190,7 +207,7 @@ export async function updateUser(updates: Partial<DBUser>): Promise<ApiResponse<
 
   if (error) {
     console.warn('Supabase updateUser failed, falling back to local:', error.message);
-    return { data: nextLocal, error: null };
+    return { data: nextLocal, error: error.message };
   }
 
   const mapped = data ? userFromDb(data) : nextLocal;
@@ -202,16 +219,9 @@ export async function ensurePregnancyRecord(currentWeek = 1): Promise<ApiRespons
   const authUser = await ensureUser();
   if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  const { data: existing, error: existingError } = await supabase
-    .from('pregnancy_records')
-    .select('*')
-    .eq('user_id', authUser.id)
-    .is('birth_date', null)
-    .limit(1)
-    .maybeSingle();
-
-  if (existingError) return { data: null, error: existingError.message };
-  if (existing) return { data: existing as DBPregnancyRecord, error: null };
+  const existing = await getActivePregnancyRecordForUser(authUser.id);
+  if (existing.error) return existing;
+  if (existing.data) return existing;
 
   const { data, error } = await supabase
     .from('pregnancy_records')
@@ -224,6 +234,19 @@ export async function ensurePregnancyRecord(currentWeek = 1): Promise<ApiRespons
     .single();
 
   return error ? { data: null, error: error.message } : { data: data as DBPregnancyRecord, error: null };
+}
+
+export async function clearActivePregnancyRecords(): Promise<ApiResponse<null>> {
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
+
+  const { error } = await supabase
+    .from('pregnancy_records')
+    .delete()
+    .eq('user_id', authUser.id)
+    .is('birth_date', null);
+
+  return error ? { data: null, error: error.message } : { data: null, error: null };
 }
 
 export async function logCycleEntry(entry: Partial<DBCycleEntry>): Promise<ApiResponse<DBCycleEntry>> {

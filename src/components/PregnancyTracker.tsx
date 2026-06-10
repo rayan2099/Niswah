@@ -9,8 +9,6 @@ import {
   Baby,
   CalendarDays,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Heart,
   Moon,
   ShieldCheck,
@@ -151,9 +149,11 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth, onWeekChange }: Preg
 
   const guide = useMemo(() => getGuide(selectedWeek), [selectedWeek]);
   const trimester = Math.min(3, Math.max(1, Math.ceil(selectedWeek / 13)));
+  const trimesterRange = trimester === 1 ? '1-13' : trimester === 2 ? '14-27' : '28-40';
   const daysRemaining = Math.max(0, (40 - selectedWeek) * 7);
   const progress = Math.round((selectedWeek / 40) * 100);
   const weeksToBirth = Math.max(0, 40 - selectedWeek);
+  const nextMilestone = GUIDES.find(item => item.week > selectedWeek);
 
   const copy = {
     stage: isRTL ? guide.stageAr : guide.stageEn,
@@ -164,6 +164,11 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth, onWeekChange }: Preg
     checklist: isRTL ? guide.checklistAr : guide.checklistEn,
     daysRemaining: isRTL ? `${daysRemaining} يوم تقريباً` : `About ${daysRemaining} days`,
     weeksToBirth: isRTL ? `${weeksToBirth} أسبوع متبقٍ` : `${weeksToBirth} weeks left`,
+    trimesterRange: isRTL ? `أسابيع ${trimesterRange}` : `Weeks ${trimesterRange}`,
+    nextMilestone: nextMilestone
+      ? (isRTL ? `المحطة القادمة: أسبوع ${nextMilestone.week}` : `Next milestone: week ${nextMilestone.week}`)
+      : (isRTL ? 'أنتِ في نافذة الولادة' : 'You are in the due window'),
+    prayerMetric: isRTL ? 'حسب الاستطاعة عند المشقة' : 'As able when hardship exists',
     saved: isRTL ? 'تم حفظ الأسبوع' : 'Week saved',
   };
 
@@ -181,8 +186,9 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth, onWeekChange }: Preg
 
   return (
     <div className="w-full max-w-5xl space-y-5" dir={isRTL ? 'rtl' : 'ltr'}>
-      <section className="relative overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-xl shadow-emerald-950/5">
-        <div className="grid gap-5 p-5 md:grid-cols-[1.1fr_0.9fr] md:p-7">
+      <section className="relative overflow-hidden rounded-[30px] border border-emerald-100 bg-white shadow-xl shadow-emerald-950/5">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-rose-400 via-amber-300 to-emerald-500" />
+        <div className="grid gap-5 p-5 md:grid-cols-[1.2fr_0.8fr] md:p-7">
           <div className="space-y-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -195,9 +201,32 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth, onWeekChange }: Preg
                 <p className="mt-1 text-sm font-bold text-rose-700">
                   {copy.stage} · {copy.size}
                 </p>
+                <p className="mt-3 max-w-xl text-sm leading-7 text-gray-600">
+                  {isRTL
+                    ? 'لوحة مختصرة لما يهمك هذا الأسبوع: النمو، الرخصة عند المشقة، والتنبيهات العملية.'
+                    : 'A compact view of what matters this week: growth, prayer ease, and practical care.'}
+                </p>
               </div>
-              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-rose-50 text-rose-700">
-                <Baby className="h-8 w-8" />
+              <div className="flex flex-col items-center gap-2">
+                <div className="grid h-16 w-16 place-items-center rounded-2xl bg-rose-50 text-rose-700">
+                  <Baby className="h-8 w-8" />
+                </div>
+                <div className="flex items-center gap-1 rounded-full bg-gray-50 p-1">
+                  <button
+                    onClick={() => updateWeek(selectedWeek - 1)}
+                    className="grid h-8 w-8 place-items-center rounded-full bg-white text-sm font-bold text-emerald-900 shadow-sm transition active:scale-95"
+                    aria-label={isRTL ? 'إنقاص أسبوع' : 'Decrease week'}
+                  >
+                    -
+                  </button>
+                  <button
+                    onClick={() => updateWeek(selectedWeek + 1)}
+                    className="grid h-8 w-8 place-items-center rounded-full bg-emerald-700 text-sm font-bold text-white shadow-sm transition active:scale-95"
+                    aria-label={isRTL ? 'زيادة أسبوع' : 'Increase week'}
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -213,21 +242,10 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth, onWeekChange }: Preg
                   className="h-full rounded-full bg-gradient-to-l from-rose-500 via-amber-400 to-emerald-500"
                 />
               </div>
-              <div className="grid grid-cols-3 gap-2 pt-1 text-center">
-                {[13, 27, 40].map((week) => (
-                  <button
-                    key={week}
-                    onClick={() => updateWeek(week)}
-                    className={cn(
-                      'rounded-xl border px-2 py-2 text-[11px] font-bold transition',
-                      selectedWeek >= week
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                        : 'border-gray-100 bg-white text-gray-400'
-                    )}
-                  >
-                    {isRTL ? `أسبوع ${week}` : `Week ${week}`}
-                  </button>
-                ))}
+              <div className="grid gap-2 pt-1 sm:grid-cols-3">
+                <StatusChip label={isRTL ? 'نطاق الثلث' : 'Trimester range'} value={copy.trimesterRange} />
+                <StatusChip label={isRTL ? 'المحطة' : 'Milestone'} value={copy.nextMilestone} />
+                <StatusChip label={isRTL ? 'الحفظ' : 'Saved'} value={savingWeek ? copy.saved : (isRTL ? 'محفوظ تلقائياً' : 'Auto-saved')} />
               </div>
             </div>
           </div>
@@ -235,48 +253,10 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth, onWeekChange }: Preg
           <div className="grid gap-3 sm:grid-cols-3 md:grid-cols-1">
             <Metric icon={CalendarDays} label={isRTL ? 'حتى الموعد' : 'Until due'} value={copy.daysRemaining} tone="emerald" />
             <Metric icon={Heart} label={isRTL ? 'المتبقي' : 'Remaining'} value={copy.weeksToBirth} tone="rose" />
-            <Metric icon={ShieldCheck} label={isRTL ? 'حالة الصلاة' : 'Prayer note'} value={isRTL ? 'حسب القدرة' : 'As able'} tone="indigo" />
+            <Metric icon={ShieldCheck} label={isRTL ? 'رخصة الصلاة' : 'Prayer ease'} value={copy.prayerMetric} tone="indigo" />
           </div>
         </div>
       </section>
-
-      <section className="flex items-center justify-between gap-3">
-        <button
-          onClick={() => updateWeek(selectedWeek + (isRTL ? 1 : -1))}
-          className="grid h-12 w-12 place-items-center rounded-full border border-black/5 bg-white shadow-sm transition active:scale-95"
-          aria-label={isRTL ? 'الأسبوع السابق' : 'Previous week'}
-        >
-          {isRTL ? <ChevronRight className="h-5 w-5 text-emerald-900" /> : <ChevronLeft className="h-5 w-5 text-emerald-900" />}
-        </button>
-        <div className="flex flex-1 items-center justify-center gap-1 overflow-hidden rounded-full border border-emerald-100 bg-white px-3 py-2 shadow-sm">
-          {[...Array(9)].map((_, index) => {
-            const week = Math.min(40, Math.max(1, selectedWeek - 4 + index));
-            return (
-              <button
-                key={`${week}-${index}`}
-                onClick={() => updateWeek(week)}
-                className={cn(
-                  'h-8 min-w-8 rounded-full text-xs font-bold transition',
-                  week === selectedWeek ? 'bg-emerald-700 text-white shadow-md shadow-emerald-200' : 'text-gray-400 hover:bg-emerald-50'
-                )}
-              >
-                {week}
-              </button>
-            );
-          })}
-        </div>
-        <button
-          onClick={() => updateWeek(selectedWeek + (isRTL ? -1 : 1))}
-          className="grid h-12 w-12 place-items-center rounded-full border border-black/5 bg-white shadow-sm transition active:scale-95"
-          aria-label={isRTL ? 'الأسبوع التالي' : 'Next week'}
-        >
-          {isRTL ? <ChevronLeft className="h-5 w-5 text-emerald-900" /> : <ChevronRight className="h-5 w-5 text-emerald-900" />}
-        </button>
-      </section>
-
-      {savingWeek && (
-        <p className="text-center text-xs font-bold text-emerald-700">{copy.saved}</p>
-      )}
 
       <section className="grid gap-3 md:grid-cols-2">
         <InfoCard icon={Stethoscope} title={t('medical')} text={copy.medical} tone="emerald" />
@@ -327,6 +307,13 @@ const Metric = ({ icon: Icon, label, value, tone }: { icon: any; label: string; 
       <span>{label}</span>
     </div>
     <p className="text-lg font-serif font-bold leading-tight">{value}</p>
+  </div>
+);
+
+const StatusChip = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
+    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</p>
+    <p className="mt-1 text-xs font-bold leading-5 text-gray-800">{value}</p>
   </div>
 );
 

@@ -387,6 +387,7 @@ export const Profile = ({ }: ProfileProps) => {
     if (savingHealthMode) return;
     setSavingHealthMode(mode);
 
+    const previousUser = user;
     const existingConditions = user?.conditions || [];
     const withoutModes = existingConditions.filter((c: string) => c !== 'postpartum' && c !== 'ttc');
     const nextConditions = enabled ? [...withoutModes, mode] : withoutModes;
@@ -400,11 +401,36 @@ export const Profile = ({ }: ProfileProps) => {
     setUser(optimisticUser);
 
     try {
-      await api.clearActivePregnancyRecords();
+      if (mode === 'ttc') {
+        const updated = await api.updateUser({
+          pregnant: false,
+          pregnancy_week: 0,
+          conditions: nextConditions,
+        });
+
+        if (updated.error && !updated.data) {
+          throw new Error(updated.error);
+        }
+
+        setUser(prev => ({ ...prev, ...(updated.data || {}), conditions: nextConditions, pregnant: false, pregnancy_week: 0 }));
+        await refresh();
+        return;
+      }
+
+      if (user?.pregnant) {
+        const pregnancy = await api.clearActivePregnancyRecords();
+        if (pregnancy.error) {
+          console.warn('Pregnancy cleanup failed while changing health mode:', pregnancy.error);
+        }
+      }
 
       if (mode === 'postpartum' && enabled) {
-        await api.logBirthEvent(Date.now());
-        await api.logCycleEntry({
+        const birth = await api.logBirthEvent(Date.now());
+        if (birth.error) {
+          console.warn('Nifas record creation failed, continuing with mode state:', birth.error);
+        }
+
+        const nifasEntry = await api.logCycleEntry({
           date: new Date().toISOString().split('T')[0],
           time_logged: new Date().toISOString(),
           fiqh_state: 'NIFAS',
@@ -413,10 +439,13 @@ export const Profile = ({ }: ProfileProps) => {
           blood_thickness: 'normal',
           notes: isRTL ? 'تم بدء وضع النفاس من الملف الشخصي' : 'Postpartum mode started from Profile',
         });
+        if (nifasEntry.error) {
+          console.warn('Nifas cycle entry failed, continuing with mode state:', nifasEntry.error);
+        }
       }
 
       if (mode === 'postpartum' && !enabled) {
-        await api.logCycleEntry({
+        const taharaEntry = await api.logCycleEntry({
           date: new Date().toISOString().split('T')[0],
           time_logged: new Date().toISOString(),
           fiqh_state: 'TAHARA',
@@ -425,6 +454,9 @@ export const Profile = ({ }: ProfileProps) => {
           blood_thickness: 'normal',
           notes: isRTL ? 'تم إيقاف وضع النفاس من الملف الشخصي' : 'Postpartum mode ended from Profile',
         });
+        if (taharaEntry.error) {
+          console.warn('Postpartum end cycle entry failed, continuing with mode state:', taharaEntry.error);
+        }
       }
 
       const updated = await api.updateUser({
@@ -441,6 +473,7 @@ export const Profile = ({ }: ProfileProps) => {
       await refresh();
     } catch (error) {
       console.error('Failed to save health mode', error);
+      setUser(previousUser);
       alert(isRTL ? 'تعذر حفظ الوضع الصحي. حاولي مرة أخرى.' : 'Could not save this health mode. Please try again.');
       await refresh();
     } finally {

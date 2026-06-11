@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Baby, Bot, CalendarDays, FileText, HeartHandshake, ShieldCheck, Sparkles, UsersRound } from 'lucide-react';
+import { Baby, Bot, CalendarDays, FileText, HeartHandshake, Phone, ShieldCheck, Sparkles, UsersRound } from 'lucide-react';
 import {
   sendPasswordReset,
+  sendPhoneOtp,
   signInWithEmail,
   signInWithProvider,
   signUpWithEmail,
+  verifyPhoneOtp,
 } from '../auth';
 import { useTranslation } from '../i18n/LanguageContext';
 import { PWAInstallBanner } from './PWAInstallBanner';
 
-type AuthMode = 'welcome' | 'email' | 'reset';
+type AuthMode = 'welcome' | 'email' | 'phone' | 'reset';
 
 export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   const { t, isRTL } = useTranslation();
@@ -18,6 +20,9 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneCodeSent, setPhoneCodeSent] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -175,6 +180,60 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     }
   };
 
+  const normalizePhone = (value: string) => {
+    const compact = value.replace(/[\s()-]/g, '');
+    if (compact.startsWith('00')) return `+${compact.slice(2)}`;
+    if (compact.startsWith('05')) return `+966${compact.slice(1)}`;
+    if (compact.startsWith('5') && compact.length === 9) return `+966${compact}`;
+    return compact;
+  };
+
+  const handlePhoneOtp = async () => {
+    if (!agreed) {
+      setError('يرجى الموافقة على سياسة الخصوصية وشروط الاستخدام');
+      return;
+    }
+
+    const normalizedPhone = normalizePhone(phone);
+    if (!/^\+[1-9]\d{7,14}$/.test(normalizedPhone)) {
+      setError('اكتبي رقم الجوال بصيغة دولية مثل +9665XXXXXXXX');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const { error: otpError } = await sendPhoneOtp(normalizedPhone);
+      if (otpError) throw otpError;
+      setPhone(normalizedPhone);
+      setPhoneCodeSent(true);
+    } catch (err: any) {
+      setError(getErrorMessage(err.message || err.code));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyPhone = async () => {
+    const normalizedPhone = normalizePhone(phone);
+    if (!phoneCode.trim()) {
+      setError('أدخلي رمز التحقق المرسل إلى جوالك');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const { error: verifyError } = await verifyPhoneOtp(normalizedPhone, phoneCode.trim());
+      if (verifyError) throw verifyError;
+      await onSuccess();
+    } catch (err: any) {
+      setError(getErrorMessage(err.message || err.code));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleReset = async () => {
     if (!email) { setError('يرجى إدخال بريدك الإلكتروني'); return; }
     setLoading(true);
@@ -295,13 +354,22 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               <div className="flex-1 h-px bg-gray-200"/>
             </div>
 
-            {/* Email */}
-            <button
-              onClick={() => setMode('email')}
-              className="w-full py-4 bg-rose-50 border border-rose-200 rounded-2xl font-medium text-rose-600 active:scale-95 transition-transform"
-            >
-              المتابعة بالبريد الإلكتروني
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setMode('phone')}
+                className="w-full py-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-emerald-700 active:scale-95 transition-transform flex items-center justify-center gap-2"
+              >
+                <Phone className="h-4 w-4" />
+                الجوال
+              </button>
+
+              <button
+                onClick={() => setMode('email')}
+                className="w-full py-4 bg-rose-50 border border-rose-200 rounded-2xl font-bold text-rose-600 active:scale-95 transition-transform"
+              >
+                البريد الإلكتروني
+              </button>
+            </div>
           </div>
 
           <AnimatePresence>
@@ -473,6 +541,113 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               </LegalModal>
             )}
           </AnimatePresence>
+        </motion.div>
+      )}
+
+      {/* Phone Auth */}
+      {mode === 'phone' && (
+        <motion.div
+          initial={{ x: 50, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          className="flex-1 flex flex-col p-6 pt-12"
+        >
+          <button onClick={() => {
+            setMode('welcome');
+            setPhoneCodeSent(false);
+            setPhoneCode('');
+            setError('');
+          }} className="text-gray-400 text-right mb-8">
+            → رجوع
+          </button>
+
+          <div className="mb-8 text-right">
+            <div className="mx-0 mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+              <Phone className="h-6 w-6" />
+            </div>
+            <h2 className="text-2xl font-bold mb-1">الدخول برقم الجوال</h2>
+            <p className="text-sm text-gray-400 leading-7">
+              سنرسل لكِ رمز تحقق قصير. استخدمي الصيغة الدولية أو اكتبي رقمك السعودي مباشرة.
+            </p>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              phoneCodeSent ? handleVerifyPhone() : handlePhoneOtp();
+            }}
+            className="flex flex-col gap-4"
+          >
+            <div>
+              <label className="text-sm text-gray-500 text-right block mb-1">رقم الجوال</label>
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="+9665XXXXXXXX"
+                className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-left focus:outline-none focus:border-emerald-300"
+                dir="ltr"
+                disabled={phoneCodeSent}
+                required
+              />
+            </div>
+
+            <AnimatePresence>
+              {phoneCodeSent && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  className="overflow-hidden"
+                >
+                  <label className="text-sm text-gray-500 text-right block mb-1">رمز التحقق</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={phoneCode}
+                    onChange={e => setPhoneCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                    placeholder="123456"
+                    className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-center tracking-[0.35em] focus:outline-none focus:border-emerald-300"
+                    dir="ltr"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={handlePhoneOtp}
+                    disabled={loading}
+                    className="mt-3 text-sm font-medium text-emerald-600"
+                  >
+                    إعادة إرسال الرمز
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                <p className="text-sm text-red-600 text-right">{error}</p>
+              </div>
+            )}
+
+            {!phoneCodeSent && (
+              <ConsentCheckbox
+                agreed={agreed}
+                setAgreed={setAgreed}
+                setError={setError}
+                onPrivacy={() => setShowPrivacy(true)}
+                onTerms={() => setShowTerms(true)}
+              />
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold disabled:opacity-50 active:scale-95 transition-transform mt-2"
+            >
+              {loading ? 'جارٍ التحميل...' : phoneCodeSent ? 'تأكيد الرمز' : 'إرسال رمز التحقق'}
+            </button>
+          </form>
         </motion.div>
       )}
 

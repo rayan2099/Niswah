@@ -61,6 +61,23 @@ export const signInWithProvider = async (provider: 'google' | 'apple') => {
   });
 };
 
+export const sendPhoneOtp = async (phone: string) => {
+  return supabase.auth.signInWithOtp({
+    phone,
+    options: {
+      shouldCreateUser: true,
+    },
+  });
+};
+
+export const verifyPhoneOtp = async (phone: string, token: string) => {
+  return supabase.auth.verifyOtp({
+    phone,
+    token,
+    type: 'sms',
+  });
+};
+
 export const sendPasswordReset = async (email: string) => {
   return supabase.auth.resetPasswordForEmail(email, {
     redirectTo: window.location.origin,

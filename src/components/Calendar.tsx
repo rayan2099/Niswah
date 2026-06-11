@@ -59,6 +59,7 @@ export const Calendar = () => {
   const { user, entries, cycleStats, prediction, ovulation, loading: dataLoading } = useCycleData();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarType, setCalendarType] = useState<'gregorian' | 'hijri'>('gregorian');
+  const isPregnant = Boolean(user?.pregnant);
 
   const cycleLength = cycleStats.avgCycleLength;
 
@@ -233,7 +234,7 @@ export const Calendar = () => {
       if (isTodayDay) {
         let predictedFertile = false;
         let predictedOvulation = false;
-        if (ovulation) {
+        if (!isPregnant && ovulation) {
           const fertileStart = new Date(ovulation.fertileWindowStart);
           const fertileEnd = new Date(ovulation.fertileWindowEnd);
           const ovulationDay = new Date(ovulation.predictedOvulationDate);
@@ -252,14 +253,14 @@ export const Calendar = () => {
       // Normalized dayInCycle (1-indexed)
       const dayInCycle = ((diff % cycleLength) + cycleLength) % cycleLength + 1;
       
-      const segments = logic.getCycleSegments(cycleStats, ovulation);
+      const segments = logic.getCycleSegments(cycleStats, isPregnant ? null : ovulation);
       const phaseId = logic.getPhaseForDayInCycle(dayInCycle, segments);
 
       if (phaseId === 'haid' || phaseId === 'expected') {
         return { state: 'HAID', isExpected: true };
       }
       
-      if (phaseId === 'fertile') {
+      if (!isPregnant && phaseId === 'fertile') {
         let isOvu = false;
         if (ovulation) {
           const ovulationDay = new Date(ovulation.predictedOvulationDate);
@@ -469,7 +470,7 @@ export const Calendar = () => {
               { label: isRTL ? 'حيض' : t('haid'), bg: '#b8325f', text: 'white' },
               { label: isRTL ? 'حيض متوقع' : t('expected_period'), bg: '#FBEAF0', text: '#b8325f', dashed: true },
               { label: isRTL ? 'طهارة' : t('tahara'), bg: '#E1F5EE', text: '#0F6E56' },
-              { label: isRTL ? 'خصوبة' : t('fertile_window'), bg: '#FAEEDA', text: '#633806' },
+              ...(!isPregnant ? [{ label: isRTL ? 'خصوبة' : t('fertile_window'), bg: '#FAEEDA', text: '#633806' }] : []),
             ].map(item => (
               <div
                 key={item.label}
@@ -487,6 +488,7 @@ export const Calendar = () => {
         </div>
 
         {/* Pregnancy Chance Chart */}
+        {!isPregnant && (
         <section className="bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 border border-black/5 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-gray-800">{t('chance_of_getting_pregnant')}</h3>
@@ -563,6 +565,7 @@ export const Calendar = () => {
             </p>
           )}
         </section>
+        )}
 
         {/* Stats Summary */}
         <section className="bg-emerald-50 rounded-[40px] p-8 border border-emerald-100 space-y-8">

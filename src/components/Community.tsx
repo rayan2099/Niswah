@@ -391,12 +391,12 @@ const PostCard = ({
       viewport={{ once: true }}
       className="space-y-4 rounded-[32px] bg-white p-5 shadow-sm ring-1 ring-rose-100/80"
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className={cn("flex items-start gap-3", isRTL ? "flex-row-reverse justify-start" : "justify-start")}>
         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-rose-50 text-rose-400">
           {post.is_anonymous ? <Shield className="h-5 w-5" /> : isSeed ? <Sparkles className="h-5 w-5" /> : <User className="h-5 w-5" />}
         </div>
-        <div className="min-w-0 flex-1 text-right">
-          <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className={cn("min-w-0 flex-1", isRTL ? "text-right" : "text-left")}>
+          <div className={cn("flex flex-wrap items-center gap-2", isRTL ? "justify-start flex-row-reverse" : "justify-start")}>
             <span className="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-500">
               {t(`category_${post.category}` as any) || post.category}
             </span>

@@ -25,7 +25,13 @@ import {
   MapPin,
   CheckCircle2,
   X,
-  Navigation
+  Navigation,
+  Heart,
+  Baby,
+  Droplets,
+  Moon,
+  EyeOff,
+  Trash2
 } from 'lucide-react';
 import { format, subDays, addDays } from 'date-fns';
 import * as api from '../api/index.ts';
@@ -98,30 +104,31 @@ const NiswahToggle = ({ value, onChange }: { value: boolean; onChange: (v: boole
   <button
     role="switch"
     aria-checked={value}
+    dir="ltr"
     onClick={() => onChange(!value)}
-    className={`relative inline-flex h-[31px] w-[51px] flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
+    className={`relative h-8 w-[52px] flex-shrink-0 rounded-full border border-transparent transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-100 ${
       value ? 'bg-[#34C759]' : 'bg-[#E5E5EA]'
     }`}
   >
-    <span className={`inline-block h-[27px] w-[27px] transform rounded-full bg-white shadow-md transition-transform duration-200 ${
+    <span className={`pointer-events-none absolute left-[2px] top-[2px] h-[26px] w-[26px] rounded-full bg-white shadow-[0_2px_7px_rgba(15,23,42,0.28)] ring-1 ring-black/5 transition-transform duration-200 ease-out ${
       value ? 'translate-x-[20px]' : 'translate-x-0'
     }`} />
   </button>
 );
 
 const ProgressBar = ({ current, total }: { current: number; total: number }) => {
+  const progress = Math.max(0, Math.min(100, (current / total) * 100));
   return (
-    <div className="fixed bottom-10 left-0 right-0 flex justify-center gap-2 z-50">
-      {Array.from({ length: total }).map((_, i) => (
-        <div
-          key={i}
-          className={`h-1.5 rounded-full transition-all ${
-            i + 1 === current ? 'w-6 bg-rose-500' : 
-            i + 1 < current ? 'w-1.5 bg-rose-300' : 
-            'w-1.5 bg-gray-200'
-          }`}
-        />
-      ))}
+    <div className="fixed left-0 right-0 top-0 z-40 px-5 pt-[max(18px,env(safe-area-inset-top))]">
+      <div className="mx-auto max-w-md rounded-full border border-white/80 bg-white/85 p-2 shadow-sm shadow-rose-950/5 backdrop-blur">
+        <div className="h-2 overflow-hidden rounded-full bg-rose-50">
+          <motion.div
+            initial={false}
+            animate={{ width: `${progress}%` }}
+            className="h-full rounded-full bg-gradient-to-l from-rose-500 via-pink-400 to-emerald-500"
+          />
+        </div>
+      </div>
     </div>
   );
 };
@@ -129,31 +136,53 @@ const ProgressBar = ({ current, total }: { current: number; total: number }) => 
 // --- SCREENS ---
 
 const Screen1Splash = ({ onNext }: { onNext: () => void }) => {
-  const { t } = useTranslation();
-  useEffect(() => {
-    const timer = setTimeout(onNext, 2500);
-    return () => clearTimeout(timer);
-  }, []);
+  const { t, isRTL } = useTranslation();
 
   return (
-    <div className="flex flex-col items-center justify-center space-y-8">
+    <div className="flex min-h-full flex-col items-center justify-center space-y-8 text-center">
       <div className="flex flex-col items-center justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
-          className="w-40 h-40 rounded-[40px] bg-white border border-rose-100 flex items-center justify-center overflow-hidden shadow-sm"
+          className="w-36 h-36 rounded-[38px] bg-white border border-rose-100 flex items-center justify-center overflow-hidden shadow-xl shadow-rose-950/5"
         >
           <img src="/logo.svg" alt="Niswah Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
         </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.5 }}
+          className="mt-7 space-y-3"
+        >
+          <h1 className="text-4xl font-serif font-black text-rose-900">
+            {isRTL ? 'نسوة' : 'Niswah'}
+          </h1>
+          <p className="mx-auto max-w-xs text-sm leading-7 text-gray-500">
+            {isRTL
+              ? 'تتبّع صحي وفقهي للحمل والدورة والنفاس، بخصوصية تناسبك من أول يوم.'
+              : 'A private health and fiqh companion for cycle, pregnancy, and postpartum care.'}
+          </p>
+        </motion.div>
+      </div>
+
+      <div className="grid w-full grid-cols-3 gap-2">
+        {(isRTL
+          ? ['خصوصية', 'فقه', 'صحة']
+          : ['Private', 'Fiqh-aware', 'Health']
+        ).map(item => (
+          <div key={item} className="rounded-2xl border border-rose-100 bg-white/80 px-3 py-3 text-xs font-black text-rose-700 shadow-sm">
+            {item}
+          </div>
+        ))}
       </div>
 
       <motion.button
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.2, duration: 0.6 }}
+        transition={{ delay: 0.6, duration: 0.5 }}
         onClick={onNext}
-        className="px-8 py-3 bg-rose-600 text-white rounded-full font-bold shadow-lg shadow-rose-200 hover:bg-rose-700 transition-colors"
+        className="w-full py-4 bg-rose-600 text-white rounded-2xl font-bold shadow-lg shadow-rose-200 hover:bg-rose-700 transition-colors"
       >
         {t('get_started')}
       </motion.button>
@@ -171,7 +200,6 @@ const Screen2Language = ({ data, update, onNext }: { data: OnboardingData; updat
   const handleSelect = (code: Language) => {
     update({ language: code });
     setLanguage(code);
-    setTimeout(onNext, 400); // Small delay for feedback before auto-proceeding
   };
 
   return (
@@ -184,24 +212,26 @@ const Screen2Language = ({ data, update, onNext }: { data: OnboardingData; updat
           {t('language_desc')}
         </p>
         
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {languages.map((lang) => (
             <motion.button
               key={lang.code}
-              whileTap={{ scale: 1.04 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => handleSelect(lang.code)}
               className={cn(
-                "p-6 rounded-2xl border-2 transition-all flex flex-col items-center justify-center space-y-2 relative",
+                "p-5 rounded-3xl border transition-all flex items-center justify-between relative",
                 data.language === lang.code 
-                  ? "border-rose-300 bg-rose-50 text-rose-800 shadow-sm" 
-                  : "border-black/5 bg-white text-gray-400 hover:border-rose-100"
+                  ? "border-rose-200 bg-rose-50 text-rose-800 shadow-sm" 
+                  : "border-black/5 bg-white text-gray-500 hover:border-rose-100"
               )}
             >
-              <span className="text-lg font-bold">{lang.native}</span>
-              <span className="text-xs opacity-60">{lang.label}</span>
+              <div className={cn("flex flex-col", isRTL ? "text-right" : "text-left")}>
+                <span className="text-lg font-bold">{lang.native}</span>
+                <span className="text-xs opacity-60">{lang.label}</span>
+              </div>
               {data.language === lang.code && (
-                <motion.div layoutId="lang-check" className={cn("absolute top-2", isRTL ? "left-2" : "right-2")}>
-                  <Check className="w-4 h-4 text-rose-400" />
+                <motion.div layoutId="lang-check" className="grid h-8 w-8 place-items-center rounded-full bg-white text-rose-500 shadow-sm">
+                  <Check className="w-4 h-4" />
                 </motion.div>
               )}
             </motion.button>
@@ -318,13 +348,13 @@ const Screen4Goals = ({ data, update, onNext }: { data: OnboardingData; update: 
   const [validationMsg, setValidationMsg] = useState('');
 
   const GOALS = [
-    { id: 'goal_track_cycle' },
-    { id: 'goal_understand_fiqh' },
-    { id: 'goal_postpartum' },
-    { id: 'goal_get_pregnant' },
-    { id: 'goal_irregular_bleeding' },
-    { id: 'goal_general_health' },
-    { id: 'goal_spiritual_wellness' },
+    { id: 'goal_track_cycle', icon: CalendarIcon },
+    { id: 'goal_understand_fiqh', icon: BookOpen },
+    { id: 'goal_postpartum', icon: Baby },
+    { id: 'goal_get_pregnant', icon: Heart },
+    { id: 'goal_irregular_bleeding', icon: Droplets },
+    { id: 'goal_general_health', icon: Activity },
+    { id: 'goal_spiritual_wellness', icon: Moon },
   ];
 
   const toggleGoal = (id: string) => {
@@ -349,20 +379,26 @@ const Screen4Goals = ({ data, update, onNext }: { data: OnboardingData; update: 
         <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('goals_question')}</h1>
         <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('select_all_apply')}</p>
 
-        <div className={cn("flex flex-wrap gap-3 mt-8", isRTL ? "justify-end" : "justify-start")} dir={isRTL ? "rtl" : "ltr"}>
+        <div className="grid grid-cols-1 gap-3 mt-6" dir={isRTL ? "rtl" : "ltr"}>
           {GOALS.map(goal => (
             <motion.button
               key={goal.id}
-              whileTap={{ scale: 0.95 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => toggleGoal(goal.id)}
               className={cn(
-                "px-4 py-3 rounded-full text-sm font-medium transition-all border-2",
+                "flex items-center justify-between gap-4 rounded-3xl border p-4 text-sm font-bold transition-all",
                 data.goal_flags.includes(goal.id)
-                  ? 'bg-rose-50 border-rose-400 text-rose-700'
-                  : 'bg-white border-gray-200 text-gray-700'
+                  ? 'bg-rose-50 border-rose-200 text-rose-800 shadow-sm'
+                  : 'bg-white border-black/5 text-gray-700'
               )}
             >
-              {t(goal.id as any)}
+              <div className={cn("flex items-center gap-3", isRTL ? "flex-row-reverse text-right" : "text-left")}>
+                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white text-rose-500 shadow-sm">
+                  <goal.icon className="h-5 w-5" />
+                </span>
+                <span>{t(goal.id as any)}</span>
+              </div>
+              {data.goal_flags.includes(goal.id) && <CheckCircle2 className="h-5 w-5 text-rose-500" />}
             </motion.button>
           ))}
         </div>
@@ -532,8 +568,8 @@ const ScreenLocation = ({ data, update, onNext }: { data: OnboardingData; update
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('location_title')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('location_desc')}</p>
+        <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('location_title')}</h1>
+        <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('location_desc')}</p>
 
         <div className="space-y-4 relative">
           <button
@@ -557,8 +593,8 @@ const ScreenLocation = ({ data, update, onNext }: { data: OnboardingData; update
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => setIsFocused(true)}
               placeholder={t('enter_city_name')}
-              className="w-full pl-12 pr-4 py-4 bg-white border-2 border-black/5 rounded-2xl text-sm focus:border-rose-300 outline-none transition-all text-right"
-              dir="rtl"
+              className={cn("w-full py-4 bg-white border-2 border-black/5 rounded-2xl text-sm focus:border-rose-300 outline-none transition-all", isRTL ? "pl-12 pr-4 text-right" : "pl-12 pr-4 text-left")}
+              dir={isRTL ? "rtl" : "ltr"}
             />
             {isLoading && (
               <div className="absolute right-12 top-1/2 -translate-y-1/2">
@@ -737,14 +773,20 @@ const Screen6CycleLength = ({ data, update, onNext }: { data: OnboardingData; up
         <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('cycle_length_question')}</h1>
         <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('cycle_length_desc')}</p>
 
-        <div className="flex flex-col items-center space-y-8 mt-12">
+        <div className="flex flex-col items-center space-y-7 mt-8">
           <motion.div 
             key={data.avg_cycle_length}
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="text-7xl font-serif font-bold text-rose-400"
+            className="w-full rounded-[32px] border border-rose-100 bg-white p-7 text-center shadow-xl shadow-rose-950/5"
           >
-            {data.avg_cycle_length} <span className="text-2xl text-rose-800/40">{t('days')}</span>
+            <div className="text-6xl font-serif font-bold text-rose-500">
+              {data.avg_cycle_length}
+              <span className="ms-2 text-xl text-rose-800/40">{t('days')}</span>
+            </div>
+            <p className="mt-3 text-xs font-bold text-gray-400">
+              {isRTL ? 'يمكنك تعديلها لاحقاً من الملف الشخصي' : 'You can edit this later in Profile'}
+            </p>
           </motion.div>
 
           <input 
@@ -792,14 +834,20 @@ const Screen7PeriodDuration = ({ data, update, onNext }: { data: OnboardingData;
         <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('period_duration_question')}</h1>
         <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('period_duration_desc')}</p>
 
-        <div className="flex flex-col items-center space-y-8 mt-12">
+        <div className="flex flex-col items-center space-y-7 mt-8">
           <motion.div 
             key={data.avg_haid_duration}
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="text-7xl font-serif font-bold text-rose-400"
+            className="w-full rounded-[32px] border border-rose-100 bg-white p-7 text-center shadow-xl shadow-rose-950/5"
           >
-            {data.avg_haid_duration} <span className="text-2xl text-rose-800/40">{t('days')}</span>
+            <div className="text-6xl font-serif font-bold text-rose-500">
+              {data.avg_haid_duration}
+              <span className="ms-2 text-xl text-rose-800/40">{t('days')}</span>
+            </div>
+            <p className="mt-3 text-xs font-bold text-gray-400">
+              {isRTL ? 'نستخدمها كبداية فقط ثم تتحسن التوقعات مع التسجيل' : 'This is only a starting point; predictions improve as you log'}
+            </p>
           </motion.div>
 
           <input 
@@ -872,23 +920,24 @@ const Screen8Conditions = ({ data, update, onNext }: { data: OnboardingData; upd
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 text-right mb-2 leading-tight">{t('conditions_question')}</h1>
-        <p className="text-sm text-gray-400 text-right mb-8 leading-relaxed">{t('conditions_desc')}</p>
+        <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('conditions_question')}</h1>
+        <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('conditions_desc')}</p>
 
-        <div className="flex flex-wrap gap-3 justify-center mt-8" dir="rtl">
+        <div className="grid grid-cols-1 gap-3 mt-6" dir={isRTL ? "rtl" : "ltr"}>
           {conditions.map((c) => (
             <motion.button
               key={c}
-              whileTap={{ scale: 0.95 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => toggleCondition(c)}
               className={cn(
-                "px-5 py-3 rounded-full border-2 transition-all text-sm font-medium",
+                "flex items-center justify-between rounded-3xl border p-4 transition-all text-sm font-bold",
                 data.conditions.includes(c)
-                  ? 'bg-rose-50 border-rose-400 text-rose-700'
-                  : 'bg-white border-gray-200 text-gray-700'
+                  ? 'bg-rose-50 border-rose-200 text-rose-800 shadow-sm'
+                  : 'bg-white border-black/5 text-gray-700'
               )}
             >
-              {c}
+              <span>{c}</span>
+              {data.conditions.includes(c) && <CheckCircle2 className="h-5 w-5 text-rose-500" />}
             </motion.button>
           ))}
         </div>
@@ -920,13 +969,13 @@ const Screen9Privacy = ({ data, update, onNext }: { data: OnboardingData; update
         <p className={cn("text-sm text-gray-400 mb-10 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('privacy_desc')}</p>
 
         {/* Anonymous mode — the only option */}
-        <div className="bg-rose-50 border border-rose-100 rounded-2xl p-5">
-          <div className="flex items-center justify-between">
+        <div className="bg-white border border-rose-100 rounded-[28px] p-5 shadow-xl shadow-rose-950/5">
+          <div className={cn("flex items-center justify-between gap-4", isRTL && "flex-row-reverse")}>
             <NiswahToggle 
               value={data.privacy_setup.anonymous_mode} 
               onChange={(v) => update({ privacy_setup: { ...data.privacy_setup, anonymous_mode: v } })} 
             />
-            <div className="text-right">
+            <div className={cn("flex-1", isRTL ? "text-right" : "text-left")}>
               <div className="font-bold text-gray-800">{t('anonymous_mode')}</div>
               <div className="text-sm text-gray-500 mt-1">{t('anonymous_mode_desc')}</div>
             </div>
@@ -936,12 +985,14 @@ const Screen9Privacy = ({ data, update, onNext }: { data: OnboardingData; update
         {/* Privacy assurance cards */}
         <div className="mt-6 space-y-3">
           {[
-            { icon: '🔒', title: t('privacy_assurance_1_title' as any), sub: t('privacy_assurance_1_sub' as any) },
-            { icon: '🚫', title: t('privacy_assurance_2_title' as any), sub: t('privacy_assurance_2_sub' as any) },
-            { icon: '🗑️', title: t('privacy_assurance_3_title' as any), sub: t('privacy_assurance_3_sub' as any) },
+            { icon: Lock, title: t('privacy_assurance_1_title' as any), sub: t('privacy_assurance_1_sub' as any) },
+            { icon: EyeOff, title: t('privacy_assurance_2_title' as any), sub: t('privacy_assurance_2_sub' as any) },
+            { icon: Trash2, title: t('privacy_assurance_3_title' as any), sub: t('privacy_assurance_3_sub' as any) },
           ].map(item => (
-            <div key={item.title} className={cn("flex items-center gap-3 p-3 bg-gray-50 rounded-xl", isRTL ? "flex-row-reverse" : "")}>
-              <span style={{ fontSize: '16px' }}>{item.icon}</span>
+            <div key={item.title} className={cn("flex items-center gap-3 rounded-2xl border border-black/5 bg-white p-4 shadow-sm", isRTL ? "flex-row-reverse" : "")}>
+              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
+                <item.icon className="h-5 w-5" />
+              </span>
               <div className={isRTL ? "text-right" : "text-left"}>
                 <div className="text-sm font-bold text-gray-700">{item.title}</div>
                 <div className="text-xs text-gray-400">{item.sub}</div>
@@ -990,12 +1041,12 @@ const Screen10Notifications = ({ data, update, onNext }: { data: OnboardingData;
         <h1 className={cn("text-3xl font-bold text-gray-900 mb-2", isRTL ? "text-right" : "text-left")}>{t('notifications_title')}</h1>
         <p className={cn("text-sm text-gray-400 mb-8", isRTL ? "text-right" : "text-left")}>{t('notifications_desc')}</p>
 
-        <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="space-y-3 max-h-[54vh] overflow-y-auto custom-scrollbar">
           {options.map((opt) => (
-            <div key={opt.id} className={cn("flex items-center justify-between p-2", isRTL && "flex-row-reverse")}>
+            <div key={opt.id} className={cn("flex items-center justify-between gap-4 rounded-3xl border border-black/5 bg-white p-4 shadow-sm", isRTL && "flex-row-reverse")}>
               <div className={cn("flex-1", isRTL ? "text-right" : "text-left")}>
                 <p className="font-bold text-sm text-gray-800">{opt.label}</p>
-                <p className="text-[10px] text-gray-400">{opt.sub}</p>
+                <p className="mt-1 text-[11px] leading-5 text-gray-400">{opt.sub}</p>
               </div>
               <NiswahToggle 
                 value={data.notification_prefs[opt.id]} 
@@ -1165,14 +1216,17 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
   };
 
   return (
-    <div className="fixed inset-0 bg-[#FDFCFB] flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
+    <div className="fixed inset-0 overflow-hidden bg-[#FDFCFB]" dir={isRTL ? 'rtl' : 'ltr'}>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-rose-50 via-emerald-50/50 to-transparent" />
+      <div className="pointer-events-none absolute -right-24 top-20 h-56 w-56 rounded-full bg-rose-100/40 blur-3xl" />
+      <div className="pointer-events-none absolute -left-24 bottom-20 h-56 w-56 rounded-full bg-emerald-100/50 blur-3xl" />
       {step > 2 && step < 12 && <ProgressBar current={step - 2} total={9} />}
       
       {step > 3 && step < 12 && (
         <button 
           onClick={prevStep}
           className={cn(
-            "absolute top-8 z-50 p-2 text-gray-400 hover:text-rose-400",
+            "absolute top-[max(18px,env(safe-area-inset-top))] z-50 grid h-10 w-10 place-items-center rounded-2xl bg-white/80 text-gray-400 shadow-sm backdrop-blur hover:text-rose-400",
             isRTL ? "right-6" : "left-6"
           )}
         >
@@ -1188,7 +1242,7 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
           animate={{ x: 0, opacity: 1, scale: 1 }}
           exit={{ x: direction > 0 ? (isRTL ? 100 : -100) : (isRTL ? -100 : 100), opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="flex-1 flex flex-col items-center justify-start pt-24 p-6 w-full max-w-md mx-auto h-full"
+          className="relative mx-auto flex h-full w-full max-w-md flex-col items-center overflow-y-auto px-5 pb-[max(24px,env(safe-area-inset-bottom))] pt-[max(84px,calc(env(safe-area-inset-top)+76px))] sm:px-6"
         >
           {step === 1 && <Screen1Splash onNext={nextStep} />}
           {step === 2 && <Screen2Language data={data} update={updateData} onNext={nextStep} />}

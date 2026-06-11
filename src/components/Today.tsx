@@ -1650,15 +1650,20 @@ export const Today = ({
               </div>
             </div>
             <button 
+              type="button"
+              role="switch"
+              aria-checked={isIstihadahMode}
+              aria-label={t('istihadah_mode')}
               onClick={() => setIsIstihadahMode(!isIstihadahMode)}
               className={cn(
-                "w-12 h-6 rounded-full transition-colors relative",
-                isIstihadahMode ? "bg-indigo-600" : "bg-gray-200"
+                "relative h-8 w-14 flex-shrink-0 rounded-full border transition-all duration-200 ease-out focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100",
+                isIstihadahMode ? "border-indigo-500 bg-indigo-500" : "border-gray-200 bg-[#E5E5EA]"
               )}
             >
               <motion.div 
-                animate={{ x: isIstihadahMode ? 24 : 4 }}
-                className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
+                animate={{ x: isIstihadahMode ? 24 : 0 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+                className="absolute left-0.5 top-0.5 h-7 w-7 rounded-full bg-white shadow-[0_3px_9px_rgba(15,23,42,0.24)] ring-1 ring-black/5"
               />
             </button>
           </div>

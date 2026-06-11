@@ -5,6 +5,17 @@ let cachedUser: User | null = null;
 
 export const getCachedAuthUser = () => cachedUser;
 
+export const clearLocalSessionCache = () => {
+  if (typeof localStorage === 'undefined') return;
+
+  localStorage.removeItem('niswah_local_user');
+  localStorage.removeItem('niswah_local_entries');
+
+  Object.keys(localStorage)
+    .filter(key => key.startsWith('niswah_pregnancy_dashboard_'))
+    .forEach(key => localStorage.removeItem(key));
+};
+
 export const getAuthUser = async () => {
   const { data } = await supabase.auth.getUser();
   cachedUser = data.user;
@@ -58,6 +69,6 @@ export const sendPasswordReset = async (email: string) => {
 
 export const signOut = async () => {
   cachedUser = null;
+  clearLocalSessionCache();
   return supabase.auth.signOut();
 };
-

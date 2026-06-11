@@ -39,6 +39,16 @@ function readLocal<T>(key: string, fallback: T): T {
   }
 }
 
+function getScopedLocalUser(authUser: Awaited<ReturnType<typeof getAuthUser>>): DBUser | null {
+  const localUser = readLocal<DBUser | null>('niswah_local_user', null);
+  if (!authUser) return localUser;
+  if (localUser?.id === authUser.id) return localUser;
+
+  localStorage.removeItem('niswah_local_user');
+  localStorage.removeItem('niswah_local_entries');
+  return null;
+}
+
 const normalizeNotificationPrefs = (prefs: Record<string, any> = {}) => ({
   ...prefs,
   prayer_alerts: prefs.prayer_alerts ?? prefs.prayer_updates ?? false,
@@ -150,8 +160,8 @@ async function getActivePregnancyRecordForUser(userId: string): Promise<ApiRespo
 }
 
 export async function getUser(): Promise<ApiResponse<DBUser>> {
-  const localUser = readLocal<DBUser | null>('niswah_local_user', null);
   const authUser = await ensureUser();
+  const localUser = getScopedLocalUser(authUser);
   if (!authUser) return { data: localUser, error: null };
 
   const { data, error } = await supabase.from('users').select('*').eq('id', authUser.id).maybeSingle();
@@ -160,7 +170,7 @@ export async function getUser(): Promise<ApiResponse<DBUser>> {
     return localUser ? { data: localUser, error: null } : { data: null, error: error.message };
   }
 
-  if (!data) return { data: localUser, error: null };
+  if (!data) return { data: null, error: null };
   const mapped = userFromDb(data);
   const activePregnancy = await getActivePregnancyRecordForUser(authUser.id);
   if (activePregnancy.data) {
@@ -213,7 +223,7 @@ export async function upsertUser(updates: Partial<DBUser>): Promise<ApiResponse<
 
 export async function updateUser(updates: Partial<DBUser>): Promise<ApiResponse<DBUser>> {
   const authUser = await ensureUser();
-  const localUser = readLocal<DBUser | null>('niswah_local_user', null);
+  const localUser = getScopedLocalUser(authUser);
   const nextLocal = localUser
     ? { ...localUser, ...cleanObject(updates), updated_at: new Date().toISOString() } as DBUser
     : null;

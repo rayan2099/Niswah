@@ -120,7 +120,7 @@ import { notificationService } from './services/NotificationService.ts';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 
 function AppContent() {
-  const { fiqhState, currentDay: cycleDay, user, refresh } = useCycleData();
+  const { fiqhState, currentDay: cycleDay, user, refresh, loading: cycleLoading } = useCycleData();
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [authUser, setAuthUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -138,6 +138,7 @@ function AppContent() {
       setAuthUser(user);
       setAuthLoading(false);
       if (user) {
+        setShowOnboarding(true);
         refresh();
       }
     });
@@ -157,10 +158,19 @@ function AppContent() {
   }, [refresh, authLoading]);
 
   useEffect(() => {
-    if (user?.onboarding_completed) {
-      setShowOnboarding(false);
+    if (!authUser) {
+      setShowOnboarding(true);
+      return;
     }
-  }, [user]);
+
+    if (cycleLoading) return;
+
+    if (user?.id === authUser.id && user?.onboarding_completed) {
+      setShowOnboarding(false);
+    } else {
+      setShowOnboarding(true);
+    }
+  }, [authUser, cycleLoading, user]);
 
   useEffect(() => {
     (window as any).openDreamInterpreter = () => setIsDreamInterpreterOpen(true);
@@ -182,7 +192,7 @@ function AppContent() {
     }
   }, []);
 
-  if (authLoading) {
+  if (authLoading || (authUser && cycleLoading)) {
     return (
       <div className="fixed inset-0 bg-[#FDFCFB] flex flex-col items-center justify-center gap-10">
         <motion.div

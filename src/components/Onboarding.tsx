@@ -1193,20 +1193,18 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
       if (savedUser) {
         onFinish(savedUser);
       } else {
-        // Last resort fallback
-        const local = localStorage.getItem('niswah_local_user');
-        if (local) {
-          onFinish(JSON.parse(local));
+        const { data: fallbackUser } = await api.getUser();
+        if (fallbackUser) {
+          onFinish(fallbackUser);
         } else {
           throw new Error("Critical error: User session not initialized.");
         }
       }
     } catch (err: any) {
       console.error("Non-blocking onboarding save error", err);
-      // Check if we can still finish
-      const local = localStorage.getItem('niswah_local_user');
-      if (local) {
-        onFinish(JSON.parse(local));
+      const { data: fallbackUser } = await api.getUser();
+      if (fallbackUser) {
+        onFinish(fallbackUser);
       } else {
         alert("Something went wrong. Please check your connection and try again.");
       }

@@ -4,7 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import { onAuthStateChanged } from '../auth.ts';
+import { clearLocalSessionCache, onAuthStateChanged } from '../auth.ts';
 import { supabase } from '../supabase.ts';
 import * as api from '../api/index.ts';
 import * as logic from '../logic/index.ts';
@@ -41,6 +41,12 @@ const readLocalJson = <T,>(key: string, fallback: T): T => {
     console.error(`Failed to parse ${key}`, e);
     return fallback;
   }
+};
+
+const readScopedLocalUser = (authUser: any): DBUser | null => {
+  const localUser = readLocalJson<DBUser | null>('niswah_local_user', null);
+  if (!authUser) return localUser;
+  return localUser?.id === authUser.id ? localUser : null;
 };
 
 const normalizeNotificationPrefs = (prefs: Record<string, any> = {}) => ({
@@ -88,12 +94,8 @@ const userFromSupabase = (row: any): DBUser => ({
 
 export const CycleProvider = ({ children }: { children: ReactNode }) => {
   const t = useCallback((key: string) => key, []);
-  const [dbUser, setDbUser] = useState<DBUser | null>(() => {
-    return readLocalJson<DBUser | null>('niswah_local_user', null);
-  });
-  const [entries, setEntries] = useState<DBCycleEntry[]>(() => {
-    return readLocalJson<DBCycleEntry[]>('niswah_local_entries', []);
-  });
+  const [dbUser, setDbUser] = useState<DBUser | null>(null);
+  const [entries, setEntries] = useState<DBCycleEntry[]>([]);
   const [ledger, setLedger] = useState<DBAdahLedger[]>([]);
   const [prayers, setPrayers] = useState<DBPrayerLog[]>([]);
   const [prayerTimes, setPrayerTimes] = useState<PrayerTime[]>([]);
@@ -101,6 +103,14 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
   const [prayerTimesError, setPrayerTimesError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [authUser, setAuthUser] = useState<any>(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  const clearUserState = useCallback(() => {
+    setDbUser(null);
+    setEntries([]);
+    setLedger([]);
+    setPrayers([]);
+  }, []);
 
   // Derived states using useMemo to avoid stale data and satisfy Scenario 5
   const user = useMemo(() => {
@@ -154,6 +164,11 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const loadInitialData = useCallback(async () => {
+    if (authUser) {
+      setLoading(false);
+      return;
+    }
+
     const hasLocalUser = localStorage.getItem('niswah_local_user') !== null;
     const hasLocalEntries = localStorage.getItem('niswah_local_entries') !== null;
 
@@ -174,19 +189,29 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(async (user) => {
-      setAuthUser(user);
+      setAuthUser((previousUser: any) => {
+        if (previousUser?.id !== user?.id) {
+          clearUserState();
+          if (!user) clearLocalSessionCache();
+        }
+        return user;
+      });
       if (!user) {
         setLoading(false);
+      } else {
+        setLoading(true);
       }
+      setAuthReady(true);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [clearUserState]);
 
   const loadRemoteData = useCallback(async () => {
     if (!authUser) return;
 
     try {
+      const localUser = readScopedLocalUser(authUser);
       const [{ data: userData, error: userError }, { data: entryRows, error: entriesError }, { data: ledgerRows, error: ledgerError }, { data: prayerRows, error: prayersError }] = await Promise.all([
         api.getUser(),
         supabase.from('cycle_entries').select('*').eq('user_id', authUser.id).order('date', { ascending: false }).order('time_logged', { ascending: false }),
@@ -199,11 +224,12 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
       if (ledgerError) throw ledgerError;
       if (prayersError) throw prayersError;
 
-      if (userData) {
+      if (userData?.id === authUser.id) {
         setDbUser(userData);
         localStorage.setItem('niswah_local_user', JSON.stringify(userData));
       } else {
-        setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
+        setDbUser(null);
+        if (!localUser) localStorage.removeItem('niswah_local_user');
       }
 
       const remoteEntries = (entryRows || []) as DBCycleEntry[];
@@ -213,23 +239,28 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
       setPrayers((prayerRows || []) as DBPrayerLog[]);
     } catch (error) {
       console.error('Supabase realtime bootstrap failed', error);
+      const localUser = readScopedLocalUser(authUser);
       const localEntries = readLocalJson<DBCycleEntry[]>('niswah_local_entries', []);
-      if (localEntries.length > 0) setEntries(localEntries);
-      setDbUser(readLocalJson<DBUser | null>('niswah_local_user', null));
+      setDbUser(localUser);
+      setEntries(localUser && localEntries.length > 0 ? localEntries : []);
     } finally {
       setLoading(false);
     }
   }, [authUser]);
 
   const refreshData = useCallback(async () => {
+    if (!authReady) return;
+
     if (authUser) {
       await loadRemoteData();
     } else {
       await loadInitialData();
     }
-  }, [authUser, loadInitialData, loadRemoteData]);
+  }, [authReady, authUser, loadInitialData, loadRemoteData]);
 
   useEffect(() => {
+    if (!authReady) return;
+
     if (!authUser) {
       loadInitialData();
       return;
@@ -240,7 +271,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
     const userChannel = supabase.channel(`user-${authUser.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `id=eq.${authUser.id}` }, () => {
         api.getUser().then(({ data }) => {
-          if (data) {
+          if (data?.id === authUser.id) {
             setDbUser(data);
             localStorage.setItem('niswah_local_user', JSON.stringify(data));
           }
@@ -251,7 +282,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
     const pregnancyChannel = supabase.channel(`pregnancy-records-${authUser.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pregnancy_records', filter: `user_id=eq.${authUser.id}` }, () => {
         api.getUser().then(({ data }) => {
-          if (data) {
+          if (data?.id === authUser.id) {
             setDbUser(data);
             localStorage.setItem('niswah_local_user', JSON.stringify(data));
           }
@@ -290,7 +321,7 @@ export const CycleProvider = ({ children }: { children: ReactNode }) => {
       supabase.removeChannel(ledgerChannel);
       supabase.removeChannel(prayersChannel);
     };
-  }, [authUser, loadInitialData, loadRemoteData]);
+  }, [authReady, authUser, loadInitialData, loadRemoteData]);
 
   // Update logic user and state when raw data changes
   // Derived states are now handled by useMemo above

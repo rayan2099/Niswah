@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft,
@@ -59,8 +59,12 @@ export const Calendar = () => {
   const { user, entries, cycleStats, prediction, ovulation, loading: dataLoading } = useCycleData();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarType, setCalendarType] = useState<'gregorian' | 'hijri'>('gregorian');
-  const isPregnant = Boolean(user?.pregnant);
+  const isPregnant = Boolean(user?.pregnant || user?.conditions?.includes('pregnant'));
+  const isPostpartum = Boolean(user?.conditions?.includes('postpartum'));
   const isTryingToConceive = Boolean(user?.conditions?.includes('ttc'));
+  const actualEntries = useMemo(() => entries.filter(entry => !entry.is_predicted), [entries]);
+  const numberLocale = isRTL ? 'ar-SA-u-nu-latn' : 'en-US';
+  const formatNumber = (value: number) => value.toLocaleString(numberLocale);
 
   const cycleLength = cycleStats.avgCycleLength;
 
@@ -68,24 +72,24 @@ export const Calendar = () => {
     if (calendarType === 'gregorian') {
       const month = currentDate.getMonth();
       const year = currentDate.getFullYear();
-      return entries.filter(e => {
+      return actualEntries.filter(e => {
         const d = parseISO(e.date);
         return d.getMonth() === month && d.getFullYear() === year;
       });
     } else {
       const hCurrent = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
-      return entries.filter(e => {
+      return actualEntries.filter(e => {
         const d = parseISO(e.date);
         const h = toHijri(d.getFullYear(), d.getMonth() + 1, d.getDate());
         return h.hm === hCurrent.hm && h.hy === hCurrent.hy;
       });
     }
-  }, [entries, currentDate, calendarType]);
+  }, [actualEntries, currentDate, calendarType]);
 
   const isHanafiPending = user?.madhhab === 'HANAFI' && user?.pendingBloodStart;
 
   const cycleDates = useMemo(() => {
-    if (!user || !prediction || !ovulation || !cycleStats.lastPeriodDate) return null;
+    if (!user || isPregnant || isPostpartum || !prediction || !ovulation || !cycleStats.lastPeriodDate) return null;
 
     const start = parseISO(cycleStats.lastPeriodDate);
     const ovu = new Date(ovulation.predictedOvulationDate);
@@ -104,7 +108,7 @@ export const Calendar = () => {
       fertileStart: fStart,
       fertileEnd: fEnd
     };
-  }, [user, prediction, ovulation, cycleStats.lastPeriodDate]);
+  }, [user, prediction, ovulation, cycleStats.lastPeriodDate, isPregnant, isPostpartum]);
 
   const pregnancyData = useMemo(() => {
     const safeCycleLength = Math.max(1, Math.round(cycleLength || 28));
@@ -218,10 +222,14 @@ export const Calendar = () => {
 
   const { fiqhState } = useCycleData();
 
-  const getDayState = (day: Date): { state: State | null; isExpected?: boolean; isFertile?: boolean; isOvulation?: boolean } => {
+  const getDayState = useCallback((day: Date): { state: State | null; isExpected?: boolean; isFertile?: boolean; isOvulation?: boolean } => {
     const dayString = format(day, 'yyyy-MM-dd');
-    const entry = entries.find(e => e.date === dayString);
+    const entry = actualEntries.find(e => e.date === dayString);
     if (entry) return { state: entry.fiqh_state as State };
+
+    if (isPregnant || isPostpartum) {
+      return { state: null };
+    }
 
     // Prediction logic using shared segments
     if (user && cycleStats.lastPeriodDate) {
@@ -280,44 +288,45 @@ export const Calendar = () => {
     }
 
     return { state: null };
-  };
+  }, [actualEntries, isPregnant, isPostpartum, user, cycleStats, fiqhState, isTryingToConceive, ovulation]);
 
   const monthlyStats = useMemo(() => {
-    const today = new Date();
     const periodStart = startOfMonth(currentDate);
     const periodEnd = endOfMonth(currentDate);
-    const monthDays = eachDayOfInterval({ start: periodStart, end: periodEnd });
+    const monthEntriesForSummary = actualEntries.filter(entry => {
+      const day = parseISO(entry.date);
+      return !Number.isNaN(day.getTime()) && day >= periodStart && day <= periodEnd;
+    });
 
     let haidDays = 0;
     let tuhrDays = 0;
+    let istihadahDays = 0;
+    let nifasDays = 0;
 
-    monthDays.forEach(day => {
-      // Only count days up to today (inclusive) for the summary to keep it grounded in "current reality"
-      // or count all if it's a past month
-      if (day > today && isSameMonth(currentDate, today)) return;
-
-      const { state } = getDayState(day);
-
-      // If state is HAID (logged or predicted), count as haid
-      if (state === 'HAID') {
-        haidDays++;
-      } else {
-        // Everything else (TAHARA, ISTIHADAH, or even null/none logged) counts as Tuhr for the summary progression
-        tuhrDays++;
-      }
+    const seenDays = new Set<string>();
+    monthEntriesForSummary.forEach(entry => {
+      if (seenDays.has(entry.date)) return;
+      seenDays.add(entry.date);
+      if (entry.fiqh_state === 'HAID') haidDays++;
+      if (entry.fiqh_state === 'TAHARA') tuhrDays++;
+      if (entry.fiqh_state === 'ISTIHADAH') istihadahDays++;
+      if (entry.fiqh_state === 'NIFAS') nifasDays++;
     });
 
-    // Days remaining until next period from cycleStats
-    const daysUntilNext = cycleStats?.daysUntilNext ?? null;
+    const daysUntilNext = isPregnant || isPostpartum ? null : cycleStats?.daysUntilNext ?? null;
 
-    // Cycle length from adah or user default
-    const avgCycle = cycleStats?.avgCycleLength || user?.knownAdahDays || null;
+    const avgCycle = isPregnant || isPostpartum ? null : cycleStats?.avgCycleLength || user?.knownAdahDays || null;
+    const loggedDays = seenDays.size;
+    const pregnancyWeek = Math.min(40, Math.max(1, Math.round(user?.pregnancy_week || 1)));
+    const pregnancyRemainingDays = Math.max(0, (40 - pregnancyWeek) * 7);
 
-    return { haidDays, tuhrDays, daysUntilNext, avgCycle };
-  }, [entries, currentDate, prediction, cycleStats, user, getDayState]);
+    return { haidDays, tuhrDays, istihadahDays, nifasDays, loggedDays, daysUntilNext, avgCycle, pregnancyWeek, pregnancyRemainingDays };
+  }, [actualEntries, currentDate, cycleStats, user, isPregnant, isPostpartum]);
 
   const regularity = cycleStats.regularity;
-  const regularityLabel = regularity === null ? '—'
+  const regularityLabel = isPregnant ? (isRTL ? 'حمل' : 'Pregnancy')
+    : isPostpartum ? (isRTL ? 'نفاس' : 'Nifas')
+    : regularity === null ? '—'
     : regularity > 80 ? (isRTL ? 'منتظمة' : 'Regular')
     : regularity > 50 ? (isRTL ? 'متوسطة' : 'Moderate')
     : (isRTL ? 'غير منتظمة' : 'Irregular');
@@ -469,8 +478,9 @@ export const Calendar = () => {
           <div className="flex flex-wrap gap-2 mt-6 px-2" dir={isRTL ? "rtl" : "ltr"}>
             {[
               { label: isRTL ? 'حيض' : t('haid'), bg: '#b8325f', text: 'white' },
-              { label: isRTL ? 'حيض متوقع' : t('expected_period'), bg: '#FBEAF0', text: '#b8325f', dashed: true },
+              ...(!isPregnant && !isPostpartum ? [{ label: isRTL ? 'حيض متوقع' : t('expected_period'), bg: '#FBEAF0', text: '#b8325f', dashed: true }] : []),
               { label: isRTL ? 'طهارة' : t('tahara'), bg: '#E1F5EE', text: '#0F6E56' },
+              ...(isPostpartum ? [{ label: isRTL ? 'نفاس' : 'Nifas', bg: '#D97706', text: 'white' }] : []),
               ...(!isPregnant && isTryingToConceive ? [{ label: isRTL ? 'خصوبة' : t('fertile_window'), bg: '#FAEEDA', text: '#633806' }] : []),
             ].map(item => (
               <div
@@ -590,15 +600,21 @@ export const Calendar = () => {
 
           <div className="grid grid-cols-2 gap-6">
             <div className="bg-white/50 p-4 rounded-3xl space-y-1">
-              <span className="text-[9px] font-bold text-emerald-700/40 uppercase tracking-widest">{t('total_haid_days')}</span>
+              <span className="text-[9px] font-bold text-emerald-700/40 uppercase tracking-widest">
+                {isPregnant ? (isRTL ? 'أسبوع الحمل' : 'Pregnancy week') : isPostpartum ? (isRTL ? 'أيام النفاس المسجلة' : 'Logged nifas days') : t('total_haid_days')}
+              </span>
               <div className="flex flex-col">
                 <div className="flex items-baseline space-x-1">
                   <p className={cn(
                     "text-2xl font-serif font-bold text-emerald-900"
                   )}>
-                    {monthlyStats.haidDays > 0 ? (
+                    {isPregnant ? (
+                      isRTL ? `${formatNumber(monthlyStats.pregnancyWeek)} من 40` : `${monthlyStats.pregnancyWeek} of 40`
+                    ) : isPostpartum ? (
+                      monthlyStats.nifasDays > 0 ? (isRTL ? `${formatNumber(monthlyStats.nifasDays)} ${t('days')}` : `${monthlyStats.nifasDays} ${t('days')}`) : '—'
+                    ) : monthlyStats.haidDays > 0 ? (
                       isRTL
-                        ? `${monthlyStats.haidDays.toLocaleString('ar-SA-u-nu-latn')} ${t('days')}`
+                        ? `${formatNumber(monthlyStats.haidDays)} ${t('days')}`
                         : `${monthlyStats.haidDays} ${t('days')}`
                     ) : (isRTL ? 'لم يُسجَّل حيض هذا الشهر' : 'No haid logged')}
                   </p>
@@ -606,27 +622,35 @@ export const Calendar = () => {
               </div>
             </div>
             <div className="bg-white/50 p-4 rounded-3xl space-y-1">
-              <span className="text-[9px] font-bold text-emerald-700/40 uppercase tracking-widest">{t('total_tahara_days')}</span>
+              <span className="text-[9px] font-bold text-emerald-700/40 uppercase tracking-widest">
+                {isPregnant ? (isRTL ? 'المتبقي تقريباً' : 'Approx. remaining') : t('total_tahara_days')}
+              </span>
               <div className="flex items-baseline space-x-1">
                 <p className="text-2xl font-serif font-bold text-emerald-900">
-                  {monthlyStats.tuhrDays > 0 ? (
+                  {isPregnant ? (
+                    isRTL ? `${formatNumber(monthlyStats.pregnancyRemainingDays)} ${t('days')}` : `${monthlyStats.pregnancyRemainingDays} ${t('days')}`
+                  ) : monthlyStats.tuhrDays > 0 ? (
                     isRTL
-                      ? `${monthlyStats.tuhrDays.toLocaleString('ar-SA-u-nu-latn')} ${t('days')}`
+                      ? `${formatNumber(monthlyStats.tuhrDays)} ${t('days')}`
                       : `${monthlyStats.tuhrDays} ${t('days')}`
                   ) : '—'}
                 </p>
               </div>
             </div>
             <div className="bg-white/50 p-4 rounded-3xl space-y-1">
-              <span className="text-[9px] font-bold text-emerald-700/40 uppercase tracking-widest">{t('avg_cycle_length')}</span>
+              <span className="text-[9px] font-bold text-emerald-700/40 uppercase tracking-widest">
+                {isPregnant || isPostpartum ? (isRTL ? 'أيام مسجلة' : 'Logged days') : t('avg_cycle_length')}
+              </span>
               <div className="flex flex-col">
                 <div className="flex items-baseline space-x-1">
                   <p className={cn(
                     "font-serif font-bold text-emerald-900 text-2xl"
                   )}>
-                    {monthlyStats.avgCycle ? (
+                    {isPregnant || isPostpartum ? (
+                      monthlyStats.loggedDays > 0 ? (isRTL ? `${formatNumber(monthlyStats.loggedDays)} ${t('days')}` : `${monthlyStats.loggedDays} ${t('days')}`) : '—'
+                    ) : monthlyStats.avgCycle ? (
                       isRTL
-                        ? `${Math.round(monthlyStats.avgCycle).toLocaleString('ar-SA-u-nu-latn')} ${t('days')}`
+                        ? `${formatNumber(Math.round(monthlyStats.avgCycle))} ${t('days')}`
                         : `${Math.round(monthlyStats.avgCycle)} ${t('days')}`
                     ) : (isRTL ? 'غير كافٍ للحساب' : '—')}
                   </p>
@@ -634,14 +658,20 @@ export const Calendar = () => {
               </div>
             </div>
             <div className="bg-white/50 p-4 rounded-3xl space-y-1">
-              <span className="text-[9px] font-bold text-emerald-700/40 uppercase tracking-widest">{t('next_period')}</span>
+              <span className="text-[9px] font-bold text-emerald-700/40 uppercase tracking-widest">
+                {isPregnant ? (isRTL ? 'الحالة' : 'Status') : isPostpartum ? (isRTL ? 'استئناف التوقعات' : 'Prediction resumes') : t('next_period')}
+              </span>
               <div className="flex items-baseline space-x-1">
                 <p className={cn(
                   "text-2xl font-serif font-bold text-emerald-900"
                 )}>
-                  {monthlyStats.daysUntilNext !== null ? (
+                  {isPregnant ? (
+                    isRTL ? 'الحمل نشط' : 'Pregnancy active'
+                  ) : isPostpartum ? (
+                    isRTL ? 'بعد النفاس' : 'After nifas'
+                  ) : monthlyStats.daysUntilNext !== null ? (
                     isRTL
-                      ? `${monthlyStats.daysUntilNext.toLocaleString('ar-SA-u-nu-latn')} ${t('days_left')}`
+                      ? `${formatNumber(monthlyStats.daysUntilNext)} ${t('days_left')}`
                       : `${monthlyStats.daysUntilNext} ${t('days_left')}`
                   ) : '—'}
                 </p>
@@ -653,12 +683,16 @@ export const Calendar = () => {
           <div className="space-y-2">
             <div className="flex justify-between text-[9px] font-bold text-emerald-700/40 uppercase tracking-widest">
               <span>{t('cycle_progress')}</span>
-              <span>{Math.round(cycleStats.progress).toLocaleString('en-US')}%</span>
+              <span>
+                {isPregnant
+                  ? `${formatNumber(Math.round((monthlyStats.pregnancyWeek / 40) * 100))}%`
+                  : `${formatNumber(Math.round(cycleStats.progress))}%`}
+              </span>
             </div>
             <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: `${cycleStats.progress}%` }}
+                animate={{ width: `${isPregnant ? Math.round((monthlyStats.pregnancyWeek / 40) * 100) : cycleStats.progress}%` }}
                 className="h-full bg-emerald-500"
               />
             </div>

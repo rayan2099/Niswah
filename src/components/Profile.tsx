@@ -1280,13 +1280,13 @@ const NiswahToggle = ({
       HapticService.medium();
       onChange(!value);
     }}
-    className={`relative h-8 w-[52px] flex-shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-100 disabled:opacity-40 ${
-      value ? 'bg-[#34C759]' : 'bg-[#E5E5EA]'
+    className={`relative h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border transition-all duration-200 ease-out focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-100 disabled:cursor-not-allowed disabled:opacity-50 ${
+      value ? 'border-[#34C759] bg-[#34C759]' : 'border-gray-200 bg-[#E5E5EA]'
     }`}
   >
     <span
-      className={`pointer-events-none absolute left-[2px] top-[2px] h-[26px] w-[26px] rounded-full bg-white shadow-[0_2px_7px_rgba(15,23,42,0.28)] ring-1 ring-black/5 transition-transform duration-200 ease-out ${
-        value ? 'translate-x-[20px]' : 'translate-x-0'
+      className={`pointer-events-none absolute left-0.5 top-0.5 h-7 w-7 rounded-full bg-white shadow-[0_3px_9px_rgba(15,23,42,0.24)] ring-1 ring-black/5 transition-transform duration-200 ease-out ${
+        value ? 'translate-x-6' : 'translate-x-0'
       }`}
     />
   </button>

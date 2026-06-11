@@ -101,7 +101,7 @@ export const PWAInstallBanner = () => {
           className="w-full py-3 bg-rose-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
         >
           <Download className="w-4 h-4" style={{ width: '16px', height: '16px' }} />
-          {installing ? 'جارٍ التثبيت...' : platform.isIOS || platform.isSafari ? 'طريقة الإضافة للشاشة الرئيسية' : 'تثبيت على الشاشة الرئيسية'}
+          {installing ? 'جارٍ التثبيت...' : platform.isIOS || platform.isSafari ? 'اعرضي خطوات الإضافة' : 'تثبيت على الشاشة الرئيسية'}
         </button>
 
         <p className="text-xs text-gray-400 text-center mt-2">مجاني — لا يتطلب App Store</p>

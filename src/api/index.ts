@@ -176,6 +176,9 @@ export async function getUser(): Promise<ApiResponse<DBUser>> {
   if (activePregnancy.data) {
     mapped.pregnant = true;
     mapped.pregnancy_week = calculatePregnancyWeek(activePregnancy.data, mapped.pregnancy_week || 1);
+  } else {
+    mapped.pregnant = false;
+    mapped.pregnancy_week = 0;
   }
   localStorage.setItem('niswah_local_user', JSON.stringify(mapped));
   return { data: mapped, error: null };

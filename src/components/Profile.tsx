@@ -6,29 +6,17 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  User,
-  Shield,
-  Bell,
   Globe,
-  CreditCard,
   ChevronRight,
-  LogOut,
   Trash2,
   Download,
-  Lock,
   EyeOff,
-  Fingerprint,
   Check,
   AlertCircle,
-  Sparkles,
-  BookOpen,
   Calendar,
-  Users,
-  Stethoscope,
   X,
   Share2,
   Heart,
-  Star,
   Search,
   MapPin,
   CheckCircle2,
@@ -45,7 +33,7 @@ import { Madhhab } from '../logic/types.ts';
 import { popularCities } from '../logic/constants.ts';
 import { useTranslation } from '../i18n/LanguageContext.tsx';
 import { useCycleData } from '../contexts/CycleContext.tsx';
-import { NotificationService, notificationService } from '../services/NotificationService.ts';
+import { notificationService } from '../services/NotificationService.ts';
 import { PWAInstallButton } from './PWAInstallBanner.tsx';
 
 function cn(...inputs: ClassValue[]) {
@@ -306,9 +294,6 @@ export const Profile = ({ }: ProfileProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showClinicShare, setShowClinicShare] = useState(false);
-  const [clinicCode, setClinicCode] = useState('');
-  const [shareType, setShareType] = useState<'health' | 'full'>('health');
   const [ledger, setLedger] = useState<any[]>([]);
   const [entries, setEntries] = useState<any[]>([]);
   const [isGeneratingFiqhPDF, setIsGeneratingFiqhPDF] = useState(false);
@@ -321,6 +306,10 @@ export const Profile = ({ }: ProfileProps) => {
   const [isSavingPregnancySetup, setIsSavingPregnancySetup] = useState(false);
   const [savingHealthMode, setSavingHealthMode] = useState<'pregnancy' | 'postpartum' | 'ttc' | null>(null);
   const { t, language, setLanguage, isRTL } = useTranslation();
+
+  const profileSaveError = isRTL
+    ? 'تعذر حفظ التغيير. تحققي من اتصالك وحاولي مرة أخرى.'
+    : 'Could not save this change. Please check your connection and try again.';
 
   useEffect(() => {
     if (contextUser) {
@@ -346,12 +335,24 @@ export const Profile = ({ }: ProfileProps) => {
     }
   }, [contextUser]);
 
-  const handleUpdateUser = async (updates: any) => {
-    const { data } = await api.updateUser(updates);
+  const handleUpdateUser = async (updates: any, options: { silent?: boolean } = {}) => {
+    const previousUser = user;
+    const optimisticUser = previousUser ? { ...previousUser, ...updates } : previousUser;
+    if (optimisticUser) setUser(optimisticUser);
+
+    const { data, error } = await api.updateUser(updates);
+    if (error) {
+      setUser(previousUser);
+      if (!options.silent) alert(profileSaveError);
+      await refresh();
+      return { data: null, error };
+    }
+
     if (data) {
       setUser(data);
       await refresh();
     }
+    return { data, error: null };
   };
 
   const openPregnancySetup = () => {
@@ -371,12 +372,14 @@ export const Profile = ({ }: ProfileProps) => {
       }
 
       const nextConditions = (user?.conditions || []).filter((c: string) => c !== 'ttc' && c !== 'postpartum');
-      const updated = await api.updateUser({ pregnant: true, pregnancy_week: week, conditions: nextConditions });
-      if (updated.error) {
-        console.warn('Pregnancy profile mirror update failed:', updated.error);
-      }
+      const updated = await handleUpdateUser({ pregnant: true, pregnancy_week: week, conditions: nextConditions }, { silent: true });
+      if (updated.error) throw new Error(updated.error);
       setUser(prev => prev ? { ...prev, ...(updated.data || {}), pregnant: true, pregnancy_week: week, conditions: nextConditions } : updated.data);
       setShowPregnancySetup(false);
+      await refresh();
+    } catch (error) {
+      console.error('Failed to save pregnancy setup', error);
+      alert(isRTL ? 'تعذر حفظ إعداد الحمل. حاولي مرة أخرى.' : 'Could not save pregnancy setup. Please try again.');
       await refresh();
     } finally {
       setIsSavingPregnancySetup(false);
@@ -408,7 +411,7 @@ export const Profile = ({ }: ProfileProps) => {
           conditions: nextConditions,
         });
 
-        if (updated.error && !updated.data) {
+        if (updated.error) {
           throw new Error(updated.error);
         }
 
@@ -481,27 +484,6 @@ export const Profile = ({ }: ProfileProps) => {
     }
   };
 
-  const handleInvite = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Niswah App',
-          text: 'Check out Niswah - The Fiqh-first cycle tracker for Muslim sisters.',
-          url: window.location.origin
-        });
-      } catch (e) {
-        console.error("Share failed", e);
-      }
-    } else {
-      navigator.clipboard.writeText(window.location.origin);
-      alert("Link copied to clipboard!");
-    }
-  };
-
-  const handleRate = () => {
-    window.open('https://niswah.app/rate', '_blank');
-  };
-
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
@@ -513,6 +495,7 @@ export const Profile = ({ }: ProfileProps) => {
       }
     } catch (e) {
       console.error("Delete failed", e);
+      alert(isRTL ? 'تعذر حذف الحساب. حاولي مرة أخرى.' : 'Could not delete the account. Please try again.');
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -528,12 +511,17 @@ export const Profile = ({ }: ProfileProps) => {
       }
     }
     const newPrefs = { ...(user?.notification_prefs || {}), [key]: val };
-    const { data } = await api.updateUser({ notification_prefs: newPrefs });
-    if (data) {
-      setUser(data);
-      if (user?.uid) NotificationService.savePreferences(user.uid, newPrefs);
+    const previousUser = user;
+    setUser((prev: any) => prev ? { ...prev, notification_prefs: newPrefs } : prev);
+    const { data, error } = await api.updateUser({ notification_prefs: newPrefs });
+    if (error) {
+      setUser(previousUser);
+      alert(profileSaveError);
       await refresh();
+      return;
     }
+    if (data) setUser(data);
+    await refresh();
   };
 
   const handleInviteFriend = async () => {
@@ -577,7 +565,7 @@ export const Profile = ({ }: ProfileProps) => {
     try {
       const { generateFiqhPDF } = await import('./Reports');
       const safeUser = {
-        id: user?.id ?? user?.uid ?? 'anonymous',
+        id: user?.id ?? 'anonymous',
         display_name: user?.display_name ?? 'أخت',
         madhhab: user?.madhhab ?? 'HANBALI',
         anonymous_mode: user?.anonymous_mode ?? false,
@@ -608,7 +596,7 @@ export const Profile = ({ }: ProfileProps) => {
     try {
       const { generateDoctorPDF } = await import('./Reports');
       const safeUser = {
-        id: user?.id ?? user?.uid ?? 'anonymous',
+        id: user?.id ?? 'anonymous',
         display_name: user?.display_name ?? 'أخت',
         madhhab: user?.madhhab ?? 'HANBALI',
         anonymous_mode: user?.anonymous_mode ?? false,
@@ -653,7 +641,7 @@ export const Profile = ({ }: ProfileProps) => {
     try {
       const { generateHusbandPDF } = await import('./Reports');
       const safeUser = {
-        id: user?.id ?? user?.uid ?? 'anonymous',
+        id: user?.id ?? 'anonymous',
         display_name: user?.display_name ?? 'أخت',
         madhhab: user?.madhhab ?? 'HANBALI',
         anonymous_mode: user?.anonymous_mode ?? false,
@@ -697,7 +685,7 @@ export const Profile = ({ }: ProfileProps) => {
       }
 
       const safeUser = {
-        id: user?.id ?? user?.uid ?? 'anonymous',
+        id: user?.id ?? 'anonymous',
         display_name: user?.display_name ?? 'أخت',
         anonymous_mode: user?.anonymous_mode ?? false,
         language: user?.language ?? 'ar',
@@ -810,10 +798,7 @@ export const Profile = ({ }: ProfileProps) => {
                   return;
                 }
 
-                const updated = await api.updateUser({ pregnant: false, pregnancy_week: 0 });
-                if (updated.error) {
-                  console.warn('Pregnancy profile mirror update failed:', updated.error);
-                }
+                const updated = await handleUpdateUser({ pregnant: false, pregnancy_week: 0 }, { silent: true });
                 setUser(prev => prev ? { ...prev, ...(updated.data || {}), pregnant: false, pregnancy_week: 0 } : updated.data);
                 await refresh();
                 setSavingHealthMode(null);
@@ -904,10 +889,9 @@ export const Profile = ({ }: ProfileProps) => {
             <ToggleRow
               icon={EyeOff}
               label={t('anonymous_mode')}
-              active={user?.anonymous_mode}
+              active={Boolean(user?.anonymous_mode)}
               onChange={async (val) => {
-                await api.updateUser({ anonymous_mode: val });
-                await refresh();
+                await handleUpdateUser({ anonymous_mode: val });
               }}
             />
             <LinkRow icon={Trash2} label={t('delete_account')} color="text-rose-500" onClick={() => setShowDeleteConfirm(true)} />
@@ -1256,80 +1240,6 @@ export const Profile = ({ }: ProfileProps) => {
         )}
       </AnimatePresence>
 
-      {/* Clinic Sharing Sheet */}
-      <AnimatePresence>
-        {showClinicShare && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowClinicShare(false)}
-              className="fixed inset-0 bg-black/40 z-[200] backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              className="fixed bottom-0 left-0 right-0 bg-white rounded-t-[40px] z-[201] p-8 space-y-6"
-            >
-              <div className="flex justify-between items-center">
-                <h3 className="text-2xl font-serif font-bold text-rose-800">{t('share_provider')}</h3>
-                <button onClick={() => setShowClinicShare(false)} className="p-2 bg-gray-100 rounded-full">
-                  <X className="w-5 h-5 text-gray-400" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('clinic_code')}</label>
-                  <input
-                    type="text"
-                    value={clinicCode}
-                    onChange={(e) => setClinicCode(e.target.value)}
-                    placeholder={t('enter_6_digit')}
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-black/5 text-sm focus:border-rose-300 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('share_type')}</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setShareType('health')}
-                      className={cn(
-                        "p-4 rounded-2xl border-2 text-[10px] font-bold transition-all",
-                        shareType === 'health' ? "border-rose-300 bg-rose-50 text-rose-800" : "border-black/5 text-gray-400"
-                      )}
-                    >
-                      {t('health_data_only')}
-                    </button>
-                    <button
-                      onClick={() => setShareType('full')}
-                      className={cn(
-                        "p-4 rounded-2xl border-2 text-[10px] font-bold transition-all",
-                        shareType === 'full' ? "border-rose-300 bg-rose-50 text-rose-800" : "border-black/5 text-gray-400"
-                      )}
-                    >
-                      {t('health_fiqh')}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setShowClinicShare(false);
-                  }}
-                  disabled={!clinicCode}
-                  className="w-full py-4 bg-rose-400 text-white rounded-2xl font-bold disabled:opacity-50"
-                >
-                  {t('grant_access')}
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

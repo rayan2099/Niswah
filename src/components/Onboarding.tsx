@@ -907,8 +907,7 @@ const Screen8Conditions = ({ data, update, onNext }: { data: OnboardingData; upd
 
   const handleContinue = () => {
     if (data.conditions.length === 0) {
-      setValidationMsg(t('error_select_at_least_one' as any));
-      return;
+      update({ conditions: [t('cond_none')] });
     }
     onNext();
   };
@@ -967,10 +966,10 @@ const Screen8Conditions = ({ data, update, onNext }: { data: OnboardingData; upd
         </div>
       </div>
 
-      <div className="mt-8">
+      <div className="sticky bottom-0 z-20 mt-8 bg-[#FDFCFB]/90 pb-[max(18px,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
         <button 
           onClick={handleContinue}
-          className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center"
+          className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg active:scale-95 transition-transform flex items-center justify-center shadow-xl shadow-rose-500/20"
         >
           <span>{t('continue')}</span>
           <ChevronRight className="mr-2 w-5 h-5 rtl:rotate-180" />

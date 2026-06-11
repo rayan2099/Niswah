@@ -12,7 +12,6 @@ import {
   MessageCircle,
   Heart,
   Moon,
-  ShieldCheck,
   Send,
   Sparkles,
   Stethoscope,
@@ -234,7 +233,6 @@ export const PregnancyTracker = ({ currentWeek, userId = 'local', onLogBirth }: 
     nextMilestone: nextMilestone
       ? (isRTL ? `المحطة القادمة: أسبوع ${nextMilestone.week}` : `Next milestone: week ${nextMilestone.week}`)
       : (isRTL ? 'أنتِ في نافذة الولادة' : 'You are in the due window'),
-    prayerMetric: isRTL ? 'حسب الاستطاعة عند المشقة' : 'As able when hardship exists',
   };
 
   const logMovement = () => {
@@ -385,7 +383,6 @@ Structure answers: 1) what it may mean 2) what to do now 3) when to contact clin
           <div className="grid gap-3">
             <Metric icon={CalendarDays} label={isRTL ? 'حتى الموعد' : 'Until due'} value={copy.daysRemaining} tone="emerald" />
             <Metric icon={Heart} label={isRTL ? 'المتبقي' : 'Remaining'} value={copy.weeksToBirth} tone="rose" />
-            <Metric icon={ShieldCheck} label={isRTL ? 'الصلاة' : 'Prayer'} value={copy.prayerMetric} tone="indigo" />
           </div>
         </div>
       </section>

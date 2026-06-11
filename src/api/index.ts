@@ -39,6 +39,14 @@ function readLocal<T>(key: string, fallback: T): T {
   }
 }
 
+const normalizeNotificationPrefs = (prefs: Record<string, any> = {}) => ({
+  ...prefs,
+  prayer_alerts: prefs.prayer_alerts ?? prefs.prayer_updates ?? false,
+  haid_prediction_alerts: prefs.haid_prediction_alerts ?? prefs.period_prediction ?? false,
+  ghusl_reminders: prefs.ghusl_reminders ?? prefs.ghusl_reminder ?? false,
+  daily_insight_alerts: prefs.daily_insight_alerts ?? prefs.daily_insights ?? false,
+});
+
 const userFromDb = (row: any): DBUser => ({
   id: row.id,
   email_hash: row.email_hash || '',
@@ -56,7 +64,7 @@ const userFromDb = (row: any): DBUser => ({
   adah_confidence: row.adah_confidence || 0,
   goal_flags: row.goal_flags || [],
   conditions: row.conditions || [],
-  notification_prefs: row.notification_prefs || {},
+  notification_prefs: normalizeNotificationPrefs(row.notification_prefs || {}),
   pregnant: row.pregnant || false,
   pregnancy_week: row.pregnancy_week || 0,
   reflect_health: row.reflect_health || false,

@@ -421,7 +421,7 @@ export const Profile = ({ }: ProfileProps) => {
       const granted = await notificationService.requestPermission();
       if (!granted) {
         alert(t('notif_permission_required'));
-        // We still save the preference, but notifications won't work
+        return;
       }
     }
     const newPrefs = { ...(user?.notification_prefs || {}), [key]: val };
@@ -584,6 +584,8 @@ export const Profile = ({ }: ProfileProps) => {
 
   if (loading) return null;
 
+  const isPregnant = Boolean(user?.pregnant);
+
   return (
     <div className="min-h-screen bg-[#FDFCFB] pb-32">
       {/* Header */}
@@ -648,7 +650,7 @@ export const Profile = ({ }: ProfileProps) => {
           <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
             <ToggleRow 
               label={t('currently_pregnant')} 
-              active={user?.pregnant} 
+              active={isPregnant} 
               onChange={async (val) => {
                 if (val) {
                   openPregnancySetup();
@@ -670,28 +672,38 @@ export const Profile = ({ }: ProfileProps) => {
                 await refresh();
               }} 
             />
-            <ToggleRow 
-              label={t('postpartum_mode')} 
-              active={user?.conditions?.includes('postpartum')} 
-              onChange={async (val) => {
-                const conditions = user?.conditions || [];
-                await api.updateUser({ 
-                  conditions: val ? [...conditions, 'postpartum'] : conditions.filter((c: string) => c !== 'postpartum')
-                });
-                await refresh();
-              }} 
-            />
-            <ToggleRow 
-              label={t('ttc_mode')} 
-              active={user?.conditions?.includes('ttc')} 
-              onChange={async (val) => {
-                const conditions = user?.conditions || [];
-                await api.updateUser({ 
-                  conditions: val ? [...conditions, 'ttc'] : conditions.filter((c: string) => c !== 'ttc')
-                });
-                await refresh();
-              }} 
-            />
+            {isPregnant ? (
+              <div className="px-5 py-4 bg-emerald-50 border-t border-emerald-100 text-xs leading-6 text-emerald-800">
+                {isRTL
+                  ? 'أثناء الحمل نخفي وضع التخطيط للحمل والنفاس. بعد تسجيل الولادة سيبدأ وضع النفاس تلقائياً.'
+                  : 'While pregnancy is active, TTC and postpartum modes are hidden. After logging birth, nifas/postpartum starts automatically.'}
+              </div>
+            ) : (
+              <>
+                <ToggleRow 
+                  label={t('postpartum_mode')} 
+                  active={user?.conditions?.includes('postpartum')} 
+                  onChange={async (val) => {
+                    const conditions = user?.conditions || [];
+                    await api.updateUser({ 
+                      conditions: val ? [...conditions, 'postpartum'] : conditions.filter((c: string) => c !== 'postpartum')
+                    });
+                    await refresh();
+                  }} 
+                />
+                <ToggleRow 
+                  label={t('ttc_mode')} 
+                  active={user?.conditions?.includes('ttc')} 
+                  onChange={async (val) => {
+                    const conditions = user?.conditions || [];
+                    await api.updateUser({ 
+                      conditions: val ? [...conditions, 'ttc'] : conditions.filter((c: string) => c !== 'ttc')
+                    });
+                    await refresh();
+                  }} 
+                />
+              </>
+            )}
           </div>
         </section>
 
@@ -748,24 +760,35 @@ export const Profile = ({ }: ProfileProps) => {
           <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
             <ToggleRow 
               label={t('prayer_alerts')} 
-              active={user?.notification_prefs?.prayer_alerts ?? true} 
+              active={Boolean(user?.notification_prefs?.prayer_alerts)} 
               onChange={(val) => handleTogglePreference('prayer_alerts', val)} 
             />
-            <ToggleRow 
-              label={t('haid_prediction_alerts')} 
-              active={user?.notification_prefs?.haid_prediction_alerts ?? true} 
-              onChange={(val) => handleTogglePreference('haid_prediction_alerts', val)} 
-            />
-            <ToggleRow 
-              label={t('ghusl_reminders')} 
-              active={user?.notification_prefs?.ghusl_reminders ?? true} 
-              onChange={(val) => handleTogglePreference('ghusl_reminders', val)} 
-            />
+            {!isPregnant && (
+              <>
+                <ToggleRow 
+                  label={t('haid_prediction_alerts')} 
+                  active={Boolean(user?.notification_prefs?.haid_prediction_alerts)} 
+                  onChange={(val) => handleTogglePreference('haid_prediction_alerts', val)} 
+                />
+                <ToggleRow 
+                  label={t('ghusl_reminders')} 
+                  active={Boolean(user?.notification_prefs?.ghusl_reminders)} 
+                  onChange={(val) => handleTogglePreference('ghusl_reminders', val)} 
+                />
+              </>
+            )}
             <ToggleRow 
               label={t('daily_insight_alerts')} 
-              active={user?.notification_prefs?.daily_insight_alerts ?? true} 
+              active={Boolean(user?.notification_prefs?.daily_insight_alerts)} 
               onChange={(val) => handleTogglePreference('daily_insight_alerts', val)} 
             />
+            {isPregnant && (
+              <div className="px-5 py-4 bg-rose-50 border-t border-rose-100 text-xs leading-6 text-rose-800">
+                {isRTL
+                  ? 'تم إخفاء تنبيهات توقع الحيض والغسل أثناء الحمل لأنها لا تنطبق الآن.'
+                  : 'Period prediction and ghusl reminders are hidden during pregnancy because they do not apply right now.'}
+              </div>
+            )}
           </div>
         </section>
 

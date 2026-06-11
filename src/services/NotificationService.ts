@@ -10,6 +10,7 @@ import { User, PrayerTime } from '../logic/types.ts';
 class NotificationService {
   private static instance: NotificationService;
   private permission: NotificationPermission = 'default';
+  private scheduledTags = new Set<string>();
 
   private constructor() {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -75,11 +76,14 @@ class NotificationService {
           const delay = reminderTime.getTime() - now.getTime();
           // Avoid setting ultra-long timeouts that could overflow (capped at 24.8 days usually, but let's be safe)
           if (delay > 2147483647) return; 
+          const tag = `prayer-${prayer.name}-${prayer.time}`;
+          if (this.scheduledTags.has(tag)) return;
+          this.scheduledTags.add(tag);
 
           setTimeout(() => {
             this.notify(t('notif_prayer_title', { name: prayer.name }), {
               body: t('notif_prayer_body', { name: prayer.name }),
-              tag: `prayer-${prayer.name}-${prayer.time}`
+              tag
             });
           }, delay);
         }
@@ -90,7 +94,7 @@ class NotificationService {
   }
 
   public scheduleCycleReminders(user: User, prediction: any, t: (key: string) => string) {
-    if (!user.notification_prefs?.haid_prediction_alerts || !prediction) return;
+    if (user.pregnant || !user.notification_prefs?.haid_prediction_alerts || !prediction) return;
 
     try {
       const startInput = prediction.predictedStartDate;
@@ -114,11 +118,14 @@ class NotificationService {
       if (isAfter(reminderTime, now)) {
         const delay = reminderTime.getTime() - now.getTime();
         if (delay > 2147483647) return;
+        const tag = `cycle-prediction-${format(startDate, 'yyyy-MM-dd')}`;
+        if (this.scheduledTags.has(tag)) return;
+        this.scheduledTags.add(tag);
 
         setTimeout(() => {
           this.notify(t('notif_cycle_title'), {
             body: t('notif_cycle_body'),
-            tag: "cycle-prediction"
+            tag
           });
         }, delay);
       }
@@ -137,6 +144,29 @@ class NotificationService {
         tag: "ghusl-reminder"
       });
     }, 30 * 60 * 1000);
+  }
+
+  public scheduleDailyInsight(user: User, t: (key: string) => string) {
+    if (!user.notification_prefs?.daily_insight_alerts) return;
+
+    const now = new Date();
+    const reminder = new Date();
+    reminder.setHours(9, 0, 0, 0);
+    if (isBefore(reminder, now)) reminder.setDate(reminder.getDate() + 1);
+
+    const tag = `daily-insight-${format(reminder, 'yyyy-MM-dd')}`;
+    if (this.scheduledTags.has(tag)) return;
+    this.scheduledTags.add(tag);
+
+    const delay = reminder.getTime() - now.getTime();
+    if (delay > 2147483647) return;
+
+    setTimeout(() => {
+      this.notify(t('notif_daily_title'), {
+        body: user.pregnant ? t('notif_daily_pregnancy_body') : t('notif_daily_body'),
+        tag
+      });
+    }, delay);
   }
 }
 

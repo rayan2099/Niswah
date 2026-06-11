@@ -16,6 +16,7 @@ import {
   Sparkles,
   Stethoscope,
   Utensils,
+  X,
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -180,6 +181,7 @@ export const PregnancyTracker = ({ currentWeek, userId = 'local', onLogBirth }: 
   const [doctorInput, setDoctorInput] = useState('');
   const [isDoctorTyping, setIsDoctorTyping] = useState(false);
   const [doctorError, setDoctorError] = useState('');
+  const [showDoctorChat, setShowDoctorChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -413,90 +415,174 @@ Structure answers: 1) what it may mean 2) what to do now 3) when to contact clin
           </button>
         </article>
 
-        <article className="rounded-[28px] border border-rose-100 bg-white p-5 shadow-xl shadow-rose-950/5">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-rose-500">{isRTL ? 'طبيبة الحمل الذكية' : 'AI pregnancy doctor'}</p>
-              <h3 className="mt-1 text-xl font-serif font-bold text-rose-950">{isRTL ? 'اسألي عن أي شيء يخص حملك' : 'Ask anything about your pregnancy'}</h3>
-              <p className="mt-2 text-xs leading-6 text-gray-500">
-                {isRTL
-                  ? 'تجيب عن الأعراض، الحركة، التغذية، القلق، الصلاة، الصيام، والاستعداد للولادة. ليست بديلاً عن الطبيبة.'
-                  : 'Answers symptoms, movement, nutrition, anxiety, prayer, fasting, and birth prep. Not a replacement for your clinician.'}
-              </p>
-            </div>
-            <MessageCircle className="h-7 w-7 text-rose-600" />
-          </div>
+        <article className="relative overflow-hidden rounded-[28px] border border-rose-100 bg-gradient-to-br from-white via-rose-50/35 to-emerald-50/50 p-5 shadow-xl shadow-rose-950/5">
+          <div className="absolute -left-16 -top-16 h-40 w-40 rounded-full bg-rose-100/50" />
+          <div className="absolute -bottom-20 right-10 h-48 w-48 rounded-full bg-emerald-100/45" />
 
-          <div className="mb-3 flex flex-wrap gap-2">
-            {quickPrompts.map((prompt) => (
-              <button
-                key={prompt}
-                onClick={() => askPregnancyDoctor(prompt)}
-                className="rounded-full border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-800 transition active:scale-[0.98]"
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-
-          <div className="max-h-[360px] space-y-3 overflow-y-auto rounded-3xl bg-gray-50 p-3">
-            {doctorMessages.map((message, index) => (
-              <div
-                key={`${message.timestamp}-${index}`}
-                className={cn(
-                  'max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 shadow-sm',
-                  message.role === 'user'
-                    ? 'ms-auto bg-rose-600 text-white'
-                    : 'me-auto bg-white text-gray-700'
-                )}
-              >
-                {message.text}
-              </div>
-            ))}
-            {isDoctorTyping && (
-              <div className="me-auto rounded-2xl bg-white px-4 py-3 text-sm font-bold text-gray-500 shadow-sm">
-                {isRTL ? 'تكتب الرد...' : 'Writing...'}
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {doctorError && (
-            <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800">
-              {doctorError}
-            </div>
-          )}
-
-          <form
-            className="mt-4 flex items-center gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm"
-            onSubmit={(event) => {
-              event.preventDefault();
-              askPregnancyDoctor(doctorInput);
-            }}
-          >
-            <input
-              value={doctorInput}
-              onChange={(event) => setDoctorInput(event.target.value)}
-              placeholder={isRTL ? 'اكتبي سؤالك هنا...' : 'Write your question...'}
-              className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none"
-            />
+          <div className="relative grid gap-5 md:grid-cols-[0.85fr_1.15fr] md:items-center">
             <button
-              type="submit"
-              disabled={!doctorInput.trim() || isDoctorTyping}
-              className="grid h-10 w-10 place-items-center rounded-xl bg-rose-600 text-white transition active:scale-95 disabled:bg-gray-200 disabled:text-gray-400"
-              aria-label={isRTL ? 'إرسال' : 'Send'}
+              type="button"
+              onClick={() => setShowDoctorChat(true)}
+              className="group mx-auto flex w-full max-w-[220px] flex-col items-center rounded-[30px] border border-white/80 bg-white/80 p-5 text-center shadow-lg shadow-rose-950/5 transition hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.99]"
+              aria-label={isRTL ? 'فتح طبيبة الحمل' : 'Open pregnancy doctor'}
             >
-              <Send className="h-4 w-4" />
+              <div className="relative grid h-28 w-28 place-items-center rounded-[32px] bg-gradient-to-br from-rose-100 to-emerald-50 shadow-inner">
+                <div className="absolute top-4 h-10 w-14 rounded-t-full bg-rose-700/90" />
+                <div className="relative mt-2 grid h-16 w-16 place-items-center rounded-full bg-rose-50 ring-4 ring-white">
+                  <Stethoscope className="absolute -left-3 top-8 h-8 w-8 text-emerald-700" />
+                  <div className="h-8 w-8 rounded-full border-2 border-rose-500 bg-white">
+                    <div className="mx-auto mt-2 h-1 w-1 rounded-full bg-rose-700 shadow-[10px_0_0_#be123c]" />
+                    <div className="mx-auto mt-3 h-1.5 w-4 rounded-b-full border-b-2 border-rose-600" />
+                  </div>
+                </div>
+                <div className="absolute bottom-4 h-8 w-20 rounded-t-3xl bg-white shadow-sm">
+                  <div className="mx-auto mt-2 h-3 w-3 rounded-full border-2 border-emerald-600" />
+                </div>
+              </div>
+              <span className="mt-3 text-xs font-black text-rose-700">
+                {isRTL ? 'اضغطي لفتح الدردشة' : 'Tap to open chat'}
+              </span>
             </button>
-          </form>
 
-          <p className="mt-3 text-[11px] leading-5 text-gray-400">
-            {isRTL
-              ? 'للنزيف، الألم الشديد، نقص حركة الجنين، صداع شديد مع زغللة، ألم صدر أو ضيق نفس شديد: تواصلي مع الرعاية الطبية فوراً.'
-              : 'For bleeding, severe pain, reduced baby movement, severe headache with vision changes, chest pain, or severe shortness of breath: contact medical care now.'}
-          </p>
+            <div className="relative text-right">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-rose-500">
+                {isRTL ? 'طبيبة الحمل الذكية' : 'AI pregnancy doctor'}
+              </p>
+              <h3 className="mt-1 text-2xl font-serif font-bold leading-tight text-rose-950">
+                {isRTL ? 'طبيبة نسوة معك عند السؤال' : 'Niswah doctor is here when you need her'}
+              </h3>
+              <p className="mt-3 text-sm leading-7 text-gray-600">
+                {isRTL
+                  ? 'اسألي عن الأعراض، حركة الجنين، التغذية، القلق، الصلاة أو الصيام أثناء الحمل. الدردشة محفوظة لك وتفتح فقط عندما تحتاجينها.'
+                  : 'Ask about symptoms, baby movement, nutrition, anxiety, prayer, or fasting during pregnancy. Your chat stays saved and opens only when you need it.'}
+              </p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {(isRTL
+                  ? ['إجابات مطمئنة', 'تنبيه عند علامات الخطر', 'مراعاة الصلاة والصيام', 'ليست بديلاً عن الطبيبة']
+                  : ['Reassuring answers', 'Danger-sign guidance', 'Prayer and fasting aware', 'Not a clinician replacement']
+                ).map(item => (
+                  <div key={item} className="rounded-2xl border border-white bg-white/70 px-3 py-2 text-xs font-bold text-gray-600 shadow-sm">
+                    {item}
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDoctorChat(true)}
+                className="mt-5 inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-rose-200 transition active:scale-[0.98]"
+              >
+                <MessageCircle className="h-4 w-4" />
+                <span>{isRTL ? 'افتحي الدردشة' : 'Open chat'}</span>
+              </button>
+            </div>
+          </div>
         </article>
       </section>
+
+      {showDoctorChat && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-3 backdrop-blur-sm md:items-center">
+          <motion.article
+            initial={{ opacity: 0, y: 32, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-[30px] border border-rose-100 bg-white shadow-2xl shadow-black/20"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-rose-50 bg-rose-50/60 p-4">
+              <div className="flex items-center gap-3">
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-rose-700 shadow-sm">
+                  <Stethoscope className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-rose-500">
+                    {isRTL ? 'طبيبة الحمل الذكية' : 'AI pregnancy doctor'}
+                  </p>
+                  <h3 className="font-serif text-xl font-bold text-rose-950">
+                    {isRTL ? 'اسألي عن حملك' : 'Ask about your pregnancy'}
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDoctorChat(false)}
+                className="grid h-10 w-10 place-items-center rounded-2xl bg-white text-gray-500 shadow-sm transition active:scale-95"
+                aria-label={isRTL ? 'إغلاق' : 'Close'}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-4">
+              <div className="mb-3 flex flex-wrap gap-2">
+                {quickPrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => askPregnancyDoctor(prompt)}
+                    className="rounded-full border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-800 transition active:scale-[0.98]"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+
+              <div className="max-h-[48vh] space-y-3 overflow-y-auto rounded-3xl bg-gray-50 p-3">
+                {doctorMessages.map((message, index) => (
+                  <div
+                    key={`${message.timestamp}-${index}`}
+                    className={cn(
+                      'max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 shadow-sm',
+                      message.role === 'user'
+                        ? 'ms-auto bg-rose-600 text-white'
+                        : 'me-auto bg-white text-gray-700'
+                    )}
+                  >
+                    {message.text}
+                  </div>
+                ))}
+                {isDoctorTyping && (
+                  <div className="me-auto rounded-2xl bg-white px-4 py-3 text-sm font-bold text-gray-500 shadow-sm">
+                    {isRTL ? 'تكتب الرد...' : 'Writing...'}
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {doctorError && (
+                <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800">
+                  {doctorError}
+                </div>
+              )}
+
+              <form
+                className="mt-4 flex items-center gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  askPregnancyDoctor(doctorInput);
+                }}
+              >
+                <input
+                  value={doctorInput}
+                  onChange={(event) => setDoctorInput(event.target.value)}
+                  placeholder={isRTL ? 'اكتبي سؤالك هنا...' : 'Write your question...'}
+                  className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={!doctorInput.trim() || isDoctorTyping}
+                  className="grid h-10 w-10 place-items-center rounded-xl bg-rose-600 text-white transition active:scale-95 disabled:bg-gray-200 disabled:text-gray-400"
+                  aria-label={isRTL ? 'إرسال' : 'Send'}
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </form>
+
+              <p className="mt-3 text-[11px] leading-5 text-gray-400">
+                {isRTL
+                  ? 'للنزيف، الألم الشديد، نقص حركة الجنين، صداع شديد مع زغللة، ألم صدر أو ضيق نفس شديد: تواصلي مع الرعاية الطبية فوراً.'
+                  : 'For bleeding, severe pain, reduced baby movement, severe headache with vision changes, chest pain, or severe shortness of breath: contact medical care now.'}
+              </p>
+            </div>
+          </motion.article>
+        </div>
+      )}
 
       <button
         onClick={onLogBirth}

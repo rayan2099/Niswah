@@ -1,4 +1,5 @@
 import type { User } from '@supabase/supabase-js';
+import SHA256 from 'crypto-js/sha256';
 import { supabase } from './supabase';
 
 let cachedUser: User | null = null;
@@ -51,6 +52,33 @@ export const signInWithEmail = async (email: string, password: string) => {
   return supabase.auth.signInWithPassword({ email, password });
 };
 
+const phoneToPrivateLoginEmail = (phone: string) => {
+  const hash = SHA256(phone).toString().slice(0, 40);
+  return `phone.${hash}@niswah.local`;
+};
+
+export const signUpWithPhonePassword = async (phone: string, password: string, displayName: string) => {
+  return supabase.auth.signUp({
+    email: phoneToPrivateLoginEmail(phone),
+    password,
+    options: {
+      data: {
+        display_name: displayName,
+        phone_login: true,
+        phone_last4: phone.slice(-4),
+      },
+      emailRedirectTo: window.location.origin,
+    },
+  });
+};
+
+export const signInWithPhonePassword = async (phone: string, password: string) => {
+  return supabase.auth.signInWithPassword({
+    email: phoneToPrivateLoginEmail(phone),
+    password,
+  });
+};
+
 export const signInWithProvider = async (provider: 'google' | 'apple') => {
   return supabase.auth.signInWithOAuth({
     provider,
@@ -58,23 +86,6 @@ export const signInWithProvider = async (provider: 'google' | 'apple') => {
       redirectTo: window.location.origin,
       queryParams: provider === 'google' ? { prompt: 'select_account' } : undefined,
     },
-  });
-};
-
-export const sendPhoneOtp = async (phone: string) => {
-  return supabase.auth.signInWithOtp({
-    phone,
-    options: {
-      shouldCreateUser: true,
-    },
-  });
-};
-
-export const verifyPhoneOtp = async (phone: string, token: string) => {
-  return supabase.auth.verifyOtp({
-    phone,
-    token,
-    type: 'sms',
   });
 };
 

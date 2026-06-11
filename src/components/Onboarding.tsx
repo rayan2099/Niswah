@@ -48,6 +48,7 @@ type Language = 'ar' | 'en';
 interface OnboardingData {
   language: Language;
   madhhab: Madhhab | null;
+  birth_year: number;
   goal_flags: string[];
   last_period_date: string | null;
   avg_cycle_length: number;
@@ -68,9 +69,12 @@ interface OnboardingData {
   };
 }
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 const INITIAL_DATA: OnboardingData = {
   language: 'en',
   madhhab: null,
+  birth_year: CURRENT_YEAR - 28,
   goal_flags: [],
   last_period_date: null,
   avg_cycle_length: 28,
@@ -880,6 +884,7 @@ const Screen7PeriodDuration = ({ data, update, onNext }: { data: OnboardingData;
 const Screen8Conditions = ({ data, update, onNext }: { data: OnboardingData; update: (d: Partial<OnboardingData>) => void; onNext: () => void }) => {
   const { t, isRTL } = useTranslation();
   const [validationMsg, setValidationMsg] = useState('');
+  const age = Math.max(12, Math.min(60, CURRENT_YEAR - data.birth_year));
   const conditions = [
     t('cond_pcos'),
     t('cond_endo'),
@@ -913,6 +918,34 @@ const Screen8Conditions = ({ data, update, onNext }: { data: OnboardingData; upd
       <div className="flex-1">
         <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('conditions_question')}</h1>
         <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('conditions_desc')}</p>
+
+        <div className="mb-6 rounded-[28px] border border-emerald-100 bg-emerald-50/70 p-5 shadow-sm" dir={isRTL ? 'rtl' : 'ltr'}>
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div className={cn(isRTL ? 'text-right' : 'text-left')}>
+              <p className="text-sm font-bold text-emerald-700">{isRTL ? 'العمر' : 'Age'}</p>
+              <p className="mt-1 text-xs leading-6 text-emerald-900/55">
+                {isRTL ? 'يساعدنا في جعل النصائح الصحية والتقارير أكثر دقة.' : 'This helps tailor health guidance and reports.'}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white px-4 py-3 text-center shadow-sm">
+              <span className="block text-2xl font-black text-emerald-800">{age}</span>
+              <span className="text-[11px] font-bold text-emerald-600/70">{isRTL ? 'سنة' : 'years'}</span>
+            </div>
+          </div>
+          <input
+            type="range"
+            min="12"
+            max="60"
+            value={age}
+            onChange={(e) => update({ birth_year: CURRENT_YEAR - Number(e.target.value) })}
+            className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white accent-emerald-600"
+            aria-label={isRTL ? 'العمر' : 'Age'}
+          />
+          <div className="mt-2 flex justify-between text-[11px] font-bold text-emerald-900/35">
+            <span>12</span>
+            <span>60</span>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 gap-3 mt-6" dir={isRTL ? "rtl" : "ltr"}>
           {conditions.map((c) => (
@@ -1156,6 +1189,7 @@ export const Onboarding = ({ onFinish }: { onFinish: (userData: DBUser) => void 
       const { data: savedUser } = await api.upsertUser({
         madhhab: data.madhhab as Madhhab,
         language: data.language,
+        birth_year: data.birth_year,
         avg_cycle_length: data.avg_cycle_length,
         avg_haid_duration: data.avg_haid_duration,
         goal_flags: data.goal_flags,

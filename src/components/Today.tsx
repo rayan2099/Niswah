@@ -1428,6 +1428,7 @@ export const Today = ({
             {isPregnant ? (
               <PregnancyTracker 
                 currentWeek={user?.pregnancy_week || 1} 
+                userId={user?.id}
                 onLogBirth={async () => {
                   await api.logBirthEvent(Date.now());
                   await api.clearActivePregnancyRecords();

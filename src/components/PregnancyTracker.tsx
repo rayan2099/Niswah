@@ -3,11 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
+  Activity,
   Baby,
   CalendarDays,
+  CheckCircle2,
   Heart,
   ShieldCheck,
   Sparkles,
@@ -23,6 +25,7 @@ function cn(...inputs: ClassValue[]) {
 
 interface PregnancyTrackerProps {
   currentWeek: number;
+  userId?: string;
   onLogBirth: () => void;
 }
 
@@ -75,10 +78,11 @@ const GUIDES: WeekGuide[] = [
 const clampWeek = (week: number) => Math.min(40, Math.max(1, Math.round(week || 1)));
 const getGuide = (week: number) => [...GUIDES].reverse().find(item => week >= item.week) || GUIDES[0];
 
-export const PregnancyTracker = ({ currentWeek, onLogBirth }: PregnancyTrackerProps) => {
+export const PregnancyTracker = ({ currentWeek, userId = 'local', onLogBirth }: PregnancyTrackerProps) => {
   const { t, language } = useTranslation();
   const isRTL = language === 'ar';
   const week = clampWeek(currentWeek);
+  const storageKey = `niswah_pregnancy_dashboard_${userId}`;
   const guide = useMemo(() => getGuide(week), [week]);
   const trimester = Math.min(3, Math.max(1, Math.ceil(week / 13)));
   const trimesterRange = trimester === 1 ? '1-13' : trimester === 2 ? '14-27' : '28-40';
@@ -86,6 +90,67 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth }: PregnancyTrackerPr
   const progress = Math.round((week / 40) * 100);
   const weeksToBirth = Math.max(0, 40 - week);
   const nextMilestone = GUIDES.find(item => item.week > week);
+  const [lastMovementAt, setLastMovementAt] = useState<string | null>(null);
+  const [completedPrep, setCompletedPrep] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      setLastMovementAt(saved.lastMovementAt || null);
+      setCompletedPrep(Array.isArray(saved.completedPrep) ? saved.completedPrep : []);
+    } catch {
+      setLastMovementAt(null);
+      setCompletedPrep([]);
+    }
+  }, [storageKey]);
+
+  const saveDashboardState = (next: { lastMovementAt?: string | null; completedPrep?: string[] }) => {
+    const state = {
+      lastMovementAt,
+      completedPrep,
+      ...next,
+    };
+    localStorage.setItem(storageKey, JSON.stringify(state));
+  };
+
+  const markMovement = () => {
+    const now = new Date().toISOString();
+    setLastMovementAt(now);
+    saveDashboardState({ lastMovementAt: now });
+  };
+
+  const togglePrep = (id: string) => {
+    const next = completedPrep.includes(id)
+      ? completedPrep.filter(item => item !== id)
+      : [...completedPrep, id];
+    setCompletedPrep(next);
+    saveDashboardState({ completedPrep: next });
+  };
+
+  const movementLabel = lastMovementAt
+    ? new Intl.DateTimeFormat(isRTL ? 'ar-SA' : 'en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date(lastMovementAt))
+    : (isRTL ? 'لم تُسجل اليوم' : 'Not logged today');
+
+  const appointmentWindow = week < 28
+    ? (isRTL ? 'زيارة كل 4 أسابيع تقريباً' : 'About every 4 weeks')
+    : week < 36
+      ? (isRTL ? 'زيارة كل أسبوعين تقريباً' : 'About every 2 weeks')
+      : (isRTL ? 'متابعة أسبوعية غالباً' : 'Often weekly check-ins');
+
+  const prepItems = [
+    {
+      id: 'provider',
+      label: isRTL ? 'سؤال الطبيبة عن الحركة والنزيف والألم' : 'Ask about movement, bleeding, and pain',
+    },
+    {
+      id: 'ibadah',
+      label: isRTL ? 'سؤال فقهي عن الصلاة والصيام عند المشقة' : 'Prepare prayer and fasting questions',
+    },
+    {
+      id: 'nifas',
+      label: isRTL ? 'تجهيز خطة النفاس بعد الولادة' : 'Prepare the nifas plan after birth',
+    },
+  ];
 
   const copy = {
     stage: isRTL ? guide.stageAr : guide.stageEn,
@@ -154,6 +219,62 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth }: PregnancyTrackerPr
           </div>
         </div>
 
+        <div className="grid gap-3 border-t border-emerald-50 bg-gradient-to-b from-white to-emerald-50/40 p-5 md:grid-cols-3 md:p-7">
+          <ActionPanel
+            icon={Activity}
+            title={isRTL ? 'حركة الجنين' : 'Baby movement'}
+            value={week < 20 ? (isRTL ? 'قريباً' : 'Soon') : movementLabel}
+            description={
+              week < 20
+                ? (isRTL ? 'تظهر الحركة عادةً في الثلث الثاني، وستصبح أوضح لاحقاً.' : 'Movement often becomes noticeable in the second trimester.')
+                : (isRTL ? 'راقبي النمط المعتاد، واتصلي بالطبيبة عند نقص واضح.' : 'Notice the usual pattern and call your clinician if movement clearly drops.')
+            }
+            actionLabel={isRTL ? 'سجلت حركة الآن' : 'Log movement now'}
+            onAction={markMovement}
+            disabled={week < 20}
+            tone="emerald"
+          />
+
+          <ActionPanel
+            icon={CalendarDays}
+            title={isRTL ? 'الزيارة القادمة' : 'Next visit'}
+            value={appointmentWindow}
+            description={
+              isRTL
+                ? 'حضري أسئلة الدم، الألم، الحركة، الأدوية، وما يؤثر على العبادة.'
+                : 'Prepare questions about bleeding, pain, movement, medicine, and worship needs.'
+            }
+            actionLabel={isRTL ? 'راجعي الأسئلة' : 'Review questions'}
+            tone="amber"
+          />
+
+          <div className={cn('rounded-2xl border p-4', toneClasses.rose)}>
+            <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest opacity-70">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>{isRTL ? 'جاهزية الولادة والنفاس' : 'Birth and nifas prep'}</span>
+            </div>
+            <div className="space-y-2">
+              {prepItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => togglePrep(item.id)}
+                  className={cn(
+                    'flex w-full items-center justify-between gap-3 rounded-xl border bg-white/70 px-3 py-2 text-start text-xs font-bold leading-5 transition',
+                    completedPrep.includes(item.id) ? 'border-rose-200 text-rose-800' : 'border-white/80 text-gray-600'
+                  )}
+                >
+                  <span>{item.label}</span>
+                  <span className={cn(
+                    'grid h-5 w-5 flex-none place-items-center rounded-full border text-[10px]',
+                    completedPrep.includes(item.id) ? 'border-rose-400 bg-rose-500 text-white' : 'border-gray-200 text-transparent'
+                  )}>
+                    ✓
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </section>
 
       <button
@@ -189,4 +310,40 @@ const StatusChip = ({ label, value }: { label: string; value: string }) => (
     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</p>
     <p className="mt-1 text-xs font-bold leading-5 text-gray-800">{value}</p>
   </div>
+);
+
+const ActionPanel = ({
+  icon: Icon,
+  title,
+  value,
+  description,
+  actionLabel,
+  onAction,
+  disabled = false,
+  tone,
+}: {
+  icon: any;
+  title: string;
+  value: string;
+  description: string;
+  actionLabel: string;
+  onAction?: () => void;
+  disabled?: boolean;
+  tone: keyof typeof toneClasses;
+}) => (
+  <article className={cn('rounded-2xl border p-4', toneClasses[tone])}>
+    <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest opacity-70">
+      <Icon className="h-4 w-4" />
+      <span>{title}</span>
+    </div>
+    <p className="font-serif text-lg font-bold leading-tight">{value}</p>
+    <p className="mt-2 min-h-[48px] text-xs leading-6 opacity-80">{description}</p>
+    <button
+      onClick={onAction}
+      disabled={disabled || !onAction}
+      className="mt-3 w-full rounded-xl bg-white/80 px-3 py-2 text-xs font-bold shadow-sm transition active:scale-[0.98] disabled:opacity-50"
+    >
+      {actionLabel}
+    </button>
+  </article>
 );

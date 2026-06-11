@@ -156,7 +156,7 @@ const Screen1Splash = ({ onNext }: { onNext: () => void }) => {
           className="mt-7 space-y-3"
         >
           <h1 className="text-4xl font-serif font-black text-rose-900">
-            {isRTL ? 'نسوة' : 'Niswah'}
+            {isRTL ? 'ابدئي بثقة' : 'Begin with clarity'}
           </h1>
           <p className="mx-auto max-w-xs text-sm leading-7 text-gray-500">
             {isRTL
@@ -164,17 +164,6 @@ const Screen1Splash = ({ onNext }: { onNext: () => void }) => {
               : 'A private health and fiqh companion for cycle, pregnancy, and postpartum care.'}
           </p>
         </motion.div>
-      </div>
-
-      <div className="grid w-full grid-cols-3 gap-2">
-        {(isRTL
-          ? ['خصوصية', 'فقه', 'صحة']
-          : ['Private', 'Fiqh-aware', 'Health']
-        ).map(item => (
-          <div key={item} className="rounded-2xl border border-rose-100 bg-white/80 px-3 py-3 text-xs font-black text-rose-700 shadow-sm">
-            {item}
-          </div>
-        ))}
       </div>
 
       <motion.button
@@ -263,8 +252,10 @@ const Screen3Madhhab = ({ data, update, onNext }: { data: OnboardingData; update
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1">
-        <h1 className={cn("text-3xl font-bold text-gray-900 mb-2 leading-tight", isRTL ? "text-right" : "text-left")}>{t('madhhab_question')}</h1>
-        <p className={cn("text-sm text-gray-400 mb-8 leading-relaxed", isRTL ? "text-right" : "text-left")}>{t('madhhab_desc')}</p>
+        <div className={cn("mb-6", isRTL ? "text-right" : "text-left")}>
+          <h1 className="text-3xl font-bold text-gray-900 leading-tight">{t('madhhab_question')}</h1>
+          <p className="mt-2 text-sm text-gray-400 leading-6">{t('madhhab_desc')}</p>
+        </div>
         
         <div className="grid grid-cols-2 gap-4">
           {madhhabs.map((m) => (
@@ -273,7 +264,7 @@ const Screen3Madhhab = ({ data, update, onNext }: { data: OnboardingData; update
               whileTap={{ scale: 1.04 }}
               onClick={() => update({ madhhab: m.id })}
               className={cn(
-                "p-5 rounded-2xl border-2 transition-all flex flex-col justify-between h-32",
+                "p-4 rounded-2xl border-2 transition-all flex flex-col justify-between min-h-28",
                 isRTL ? "text-right" : "text-left",
                 data.madhhab === m.id 
                   ? "border-rose-300 bg-rose-50 shadow-sm" 
@@ -281,7 +272,7 @@ const Screen3Madhhab = ({ data, update, onNext }: { data: OnboardingData; update
               )}
             >
               <span className={cn("text-lg font-bold", data.madhhab === m.id ? "text-rose-800" : "text-gray-700")}>{m.label}</span>
-              <span className="text-[10px] leading-tight text-gray-400 uppercase tracking-wider font-semibold">{m.rule}</span>
+              <span className="text-[11px] leading-5 text-gray-400 font-semibold">{m.rule}</span>
             </motion.button>
           ))}
         </div>
@@ -989,11 +980,11 @@ const Screen9Privacy = ({ data, update, onNext }: { data: OnboardingData; update
             { icon: EyeOff, title: t('privacy_assurance_2_title' as any), sub: t('privacy_assurance_2_sub' as any) },
             { icon: Trash2, title: t('privacy_assurance_3_title' as any), sub: t('privacy_assurance_3_sub' as any) },
           ].map(item => (
-            <div key={item.title} className={cn("flex items-center gap-3 rounded-2xl border border-black/5 bg-white p-4 shadow-sm", isRTL ? "flex-row-reverse" : "")}>
+            <div key={item.title} dir={isRTL ? "rtl" : "ltr"} className="flex items-center gap-3 rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
               <span className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
                 <item.icon className="h-5 w-5" />
               </span>
-              <div className={isRTL ? "text-right" : "text-left"}>
+              <div className={cn("min-w-0 flex-1", isRTL ? "text-right" : "text-left")}>
                 <div className="text-sm font-bold text-gray-700">{item.title}</div>
                 <div className="text-xs text-gray-400">{item.sub}</div>
               </div>
@@ -1079,29 +1070,34 @@ const Screen10Notifications = ({ data, update, onNext }: { data: OnboardingData;
 const Screen11Welcome = ({ onComplete, isCompleting }: { onComplete: () => void; isCompleting: boolean }) => {
   const { t, isRTL } = useTranslation();
   return (
-    <div className="w-full space-y-8 text-center">
-      <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
+    <div className="w-full space-y-7 text-center">
+      <div className="w-20 h-20 bg-rose-50 rounded-[28px] flex items-center justify-center mx-auto mb-2">
         <Sparkles className="w-10 h-10 text-rose-400" />
       </div>
       <div className="space-y-2">
-        <h2 className="text-3xl font-serif font-bold text-rose-800">{t('welcome_to_plus')}</h2>
+        <h2 className="text-3xl font-serif font-bold text-rose-800">
+          {isRTL ? 'أصبحتِ جاهزة للبدء' : 'You are ready to begin'}
+        </h2>
         <p className="text-sm text-gray-500 leading-relaxed">
-          {t('freemium_desc')}
+          {isRTL
+            ? 'جهزنا تجربتك حسب مذهبك وبياناتك الصحية، ويمكنك تعديل كل شيء لاحقاً من الملف الشخصي.'
+            : 'Your experience is now set around your fiqh preference and health profile. You can edit everything later.'}
         </p>
       </div>
 
-      <div className="bg-rose-50 rounded-[32px] p-6 border border-rose-100 space-y-4">
-          <h3 className="text-[10px] font-bold text-rose-400 uppercase">{t('included_features')}</h3>
-        <div className="grid grid-cols-2 gap-3">
+      <div className="rounded-[28px] border border-rose-100 bg-white p-5 shadow-xl shadow-rose-950/5">
+        <div className="grid grid-cols-1 gap-3">
           {[
             { icon: Sparkles, label: t('feat_nisa_ai') },
             { icon: Activity, label: t('feat_insights') },
             { icon: BookOpen, label: t('feat_journeys') },
             { icon: ShieldCheck, label: t('feat_privacy') }
           ].map((feat, i) => (
-            <div key={i} className="flex items-center space-x-2 rtl:space-x-reverse text-left rtl:text-right">
-              <feat.icon className="w-4 h-4 text-rose-400" />
-              <span className="text-[10px] font-bold text-rose-800">{feat.label}</span>
+            <div key={i} dir={isRTL ? "rtl" : "ltr"} className="flex items-center gap-3 rounded-2xl bg-rose-50/60 px-4 py-3">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-rose-500 shadow-sm">
+                <feat.icon className="w-4 h-4" />
+              </span>
+              <span className="flex-1 text-right text-xs font-bold text-rose-800">{feat.label}</span>
             </div>
           ))}
         </div>

@@ -162,7 +162,10 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               <img src="/logo.svg" alt="Niswah Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
             <div className="text-center px-6">
-              <h1 className="text-3xl font-bold text-rose-900 mb-3">نسوة</h1>
+              <h1 className="text-3xl font-bold text-rose-900 mb-3">
+                <span className="sr-only">نسوة</span>
+                ابدئي بثقة
+              </h1>
               <p className="text-sm text-gray-400 max-w-xs text-center leading-relaxed">
                 تتبع دورتك بوعي فقهي وعناية صحية — خصوصيتك محمية تماماً
               </p>

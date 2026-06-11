@@ -3,329 +3,327 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  MessageSquare, 
-  Heart, 
-  Share2, 
-  MoreHorizontal, 
-  Plus, 
-  Search, 
-  Users, 
-  TrendingUp,
+import React, { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  Heart,
+  MessageSquare,
+  Plus,
+  Search,
+  Send,
   Shield,
+  Sparkles,
   User,
-  Image as ImageIcon,
-  Send
+  X,
 } from 'lucide-react';
-import { useTranslation } from '../i18n/LanguageContext.tsx';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useTranslation } from '../i18n/LanguageContext.tsx';
+import { useCycleData } from '../contexts/CycleContext.tsx';
+import {
+  addCommunityComment,
+  createCommunityPost,
+  getCommunityPosts,
+  toggleCommunityPostLike,
+} from '../api/index.ts';
+import { DBCommunityPost } from '../api/db-types.ts';
+import { getAuthUser } from '../auth.ts';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-interface Comment {
-  id: string;
-  author: string;
-  content: string;
-  timestamp: string;
-  isExpert?: boolean;
-}
+const formatRelativeTime = (dateValue: string, isRTL: boolean) => {
+  const date = new Date(dateValue);
+  const diffMinutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
+  if (diffMinutes < 1) return isRTL ? 'الآن' : 'Now';
+  if (diffMinutes < 60) return isRTL ? `قبل ${diffMinutes} د` : `${diffMinutes}m ago`;
+  const hours = Math.floor(diffMinutes / 60);
+  if (hours < 24) return isRTL ? `قبل ${hours} س` : `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return isRTL ? `قبل ${days} يوم` : `${days}d ago`;
+};
 
-interface Post {
-  id: string;
-  author: string;
-  avatar: string;
-  content: string;
-  timestamp: string;
-  likes: number;
-  comments: number;
-  isAnonymous: boolean;
-  category: 'health' | 'fiqh' | 'mental' | 'general';
-  isExpert?: boolean;
-  commentsList?: Comment[];
-}
-
-const MOCK_POSTS: Post[] = [
+const seedPosts = (isRTL: boolean): DBCommunityPost[] => [
   {
-    id: '1',
-    author: 'مريم أحمد',
-    avatar: 'https://picsum.photos/seed/user1/100/100',
-    content: 'السلام عليكم يا أخوات، هل من نصيحة لتخفيف آلام الدورة الشهرية بطرق طبيعية؟ جربت شاي الزنجبيل ولكن أحتاج للمزيد من الاقتراحات.',
-    timestamp: '2h ago',
-    likes: 24,
-    comments: 2,
-    isAnonymous: false,
-    category: 'health',
-    commentsList: [
-      { id: 'c1', author: 'د. سارة أحمد', content: 'وعليكم السلام، أنصحكِ أيضاً بالقرفة والكمادات الدافئة.', timestamp: '1h ago', isExpert: true },
-      { id: 'c2', author: 'فاطمة علي', content: 'جربي المشي الخفيف، يساعد كثيراً.', timestamp: '30m ago' }
-    ]
+    id: 'seed-privacy',
+    author_id: 'seed',
+    author_name: isRTL ? 'فريق نسوة' : 'Niswah Team',
+    category: 'general',
+    content: isRTL
+      ? 'مساحة المجتمع للتجارب العامة والدعم الهادئ. تجنبي مشاركة الاسم الكامل، رقم الهاتف، أو أي تفاصيل تكشف هويتك.'
+      : 'A calm community space for lived experience and support. Avoid sharing your full name, phone number, or details that reveal your identity.',
+    is_anonymous: false,
+    like_user_ids: [],
+    comments: [],
+    created_at: new Date(Date.now() - 60 * 60000).toISOString(),
+    updated_at: new Date(Date.now() - 60 * 60000).toISOString(),
   },
   {
-    id: '2',
-    author: 'أخت مجهولة',
-    avatar: '',
-    content: 'أشعر بضيق شديد خلال هذه الأيام من دورتي، هل هذا طبيعي؟ كيف تتعاملون مع التغيرات المزاجية الحادة؟',
-    timestamp: '4h ago',
-    likes: 45,
-    comments: 1,
-    isAnonymous: true,
-    category: 'mental',
-    commentsList: [
-      { id: 'c3', author: 'ليلى محمود', content: 'نعم طبيعي جداً بسبب الهرمونات، حاولي الاسترخاء والقراءة.', timestamp: '2h ago' }
-    ]
+    id: 'seed-fiqh',
+    author_id: 'seed',
+    author_name: isRTL ? 'تنبيه فقهي' : 'Fiqh note',
+    category: 'fiqh',
+    content: isRTL
+      ? 'الأسئلة الفقهية الحساسة يُفضّل عرضها بصيغة عامة. المجتمع للمساندة، وليس بديلاً عن سؤال أهل العلم عند الحاجة.'
+      : 'Sensitive fiqh questions are best shared generally. Community support does not replace asking qualified scholars when needed.',
+    is_anonymous: false,
+    like_user_ids: [],
+    comments: [],
+    created_at: new Date(Date.now() - 4 * 60 * 60000).toISOString(),
+    updated_at: new Date(Date.now() - 4 * 60 * 60000).toISOString(),
   },
-  {
-    id: '3',
-    author: 'فاطمة علي',
-    avatar: 'https://picsum.photos/seed/user3/100/100',
-    content: 'الحمد لله، أكملت اليوم أول رحلة إرشادية في التطبيق عن فقه الطهارة. أنصح الجميع بها، المعلومات قيمة جداً ومبسطة.',
-    timestamp: '6h ago',
-    likes: 89,
-    comments: 0,
-    isAnonymous: false,
-    category: 'fiqh'
-  }
 ];
-
-import { useCycleData } from '../contexts/CycleContext.tsx';
 
 export const Community = () => {
   const { t, isRTL } = useTranslation();
   const { user } = useCycleData();
-  const [posts, setPosts] = useState<Post[]>(MOCK_POSTS);
+  const [authUserId, setAuthUserId] = useState('');
+  const [posts, setPosts] = useState<DBCommunityPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saveError, setSaveError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
-  const [newPostCategory, setNewPostCategory] = useState<Post['category']>('general');
-  const [isAnonymous, setIsAnonymous] = useState(user?.anonymous_mode || false);
+  const [newPostCategory, setNewPostCategory] = useState<DBCommunityPost['category']>('general');
+  const [isAnonymous, setIsAnonymous] = useState(Boolean(user?.anonymous_mode));
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [savingPost, setSavingPost] = useState(false);
 
-  const handleCreatePost = () => {
-    if (!newPostContent.trim()) return;
-    
-    const authorName = isAnonymous ? t('guest_user') : (user?.display_name || 'أنا');
-    
-    const newPost: Post = {
-      id: Date.now().toString(),
-      author: authorName,
-      avatar: isAnonymous ? '' : (user?.avatar || 'https://picsum.photos/seed/me/100/100'),
-      content: newPostContent,
-      timestamp: 'Just now',
-      likes: 0,
-      comments: 0,
-      isAnonymous,
-      category: newPostCategory,
-      commentsList: []
+  const categories = useMemo(() => [
+    { id: 'all', label: t('category_all') },
+    { id: 'general', label: isRTL ? 'عام' : 'General' },
+    { id: 'health', label: t('category_health') },
+    { id: 'fiqh', label: t('category_fiqh') },
+    { id: 'mental', label: t('category_mental') },
+  ], [isRTL, t]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadPosts = async () => {
+      setLoading(true);
+      setSaveError('');
+      const authUser = await getAuthUser();
+      if (mounted) setAuthUserId(authUser?.id || '');
+      const { data, error } = await getCommunityPosts();
+      if (!mounted) return;
+      if (error) {
+        setSaveError(isRTL ? 'تعذر تحميل المجتمع. حاولي مرة أخرى.' : 'Could not load the community. Please try again.');
+        setPosts([]);
+      } else {
+        setPosts(data || []);
+      }
+      setLoading(false);
     };
 
-    setPosts([newPost, ...posts]);
-    setNewPostContent('');
-    setNewPostCategory('general');
-    setIsCreating(false);
-    setIsAnonymous(false);
-  };
+    loadPosts();
+    return () => {
+      mounted = false;
+    };
+  }, [isRTL]);
 
-  const filteredPosts = posts.filter(post => {
+  const visiblePosts = posts.length ? posts : seedPosts(isRTL);
+  const filteredPosts = visiblePosts.filter(post => {
     const matchesCategory = activeCategory === 'all' || post.category === activeCategory;
-    const matchesSearch = post.content.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         post.author.toLowerCase().includes(searchQuery.toLowerCase());
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch = !query
+      || post.content.toLowerCase().includes(query)
+      || (post.author_name || '').toLowerCase().includes(query);
     return matchesCategory && matchesSearch;
   });
 
-  const categories = [
-    { id: 'all', label: t('category_all') },
-    { id: 'health', label: t('category_health') },
-    { id: 'fiqh', label: t('category_fiqh') },
-    { id: 'mental', label: t('category_mental') }
-  ];
+  const updatePostInList = (updatedPost: DBCommunityPost) => {
+    setPosts(current => current.map(post => post.id === updatedPost.id ? updatedPost : post));
+  };
+
+  const handleCreatePost = async () => {
+    const content = newPostContent.trim();
+    if (!content || savingPost) return;
+    setSavingPost(true);
+    setSaveError('');
+
+    const { data, error } = await createCommunityPost({
+      content,
+      category: newPostCategory,
+      is_anonymous: isAnonymous,
+    });
+
+    if (error || !data) {
+      setSaveError(isRTL ? 'تعذر نشر المشاركة. تحققي من اتصالك وحاولي مرة أخرى.' : 'Could not publish the post. Please check your connection and try again.');
+    } else {
+      setPosts(current => [data, ...current]);
+      setNewPostContent('');
+      setNewPostCategory('general');
+      setIsCreating(false);
+      setIsAnonymous(Boolean(user?.anonymous_mode));
+    }
+    setSavingPost(false);
+  };
 
   return (
-    <div className="min-h-screen bg-[#FDFCFB] pb-32">
-      {/* Header */}
-      <header className="px-6 pt-12 pb-6 bg-white border-b border-black/5 sticky top-0 z-20">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-serif font-bold text-rose-800">{t('community')}</h1>
-          <div className="flex items-center space-x-3 rtl:space-x-reverse">
-            <div className="relative">
-              <input 
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t('search')}
-                className="w-40 h-10 bg-rose-50 rounded-full px-10 text-xs text-rose-900 outline-none border border-transparent focus:border-rose-200 transition-all"
-              />
-              <Search className="w-4 h-4 text-rose-300 absolute left-4 top-1/2 -translate-y-1/2" />
+    <div className="min-h-screen bg-[#FDFCFB] pb-32" dir={isRTL ? 'rtl' : 'ltr'}>
+      <header className="sticky top-0 z-20 border-b border-rose-100/70 bg-[#FDFCFB]/95 px-4 pb-4 pt-8 backdrop-blur-xl sm:px-6">
+        <div className="mx-auto max-w-3xl space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1 text-right">
+              <span className="text-[11px] font-bold text-rose-400">{isRTL ? 'مساحة آمنة' : 'Safe space'}</span>
+              <h1 className="text-3xl font-serif font-bold text-rose-900">{t('community')}</h1>
+              <p className="max-w-md text-xs leading-6 text-slate-500">
+                {isRTL
+                  ? 'شاركي سؤالاً أو تجربة بدون كشف هويتك. المحتوى هنا للدعم، وليس بديلاً عن الطبيب أو المفتي.'
+                  : 'Share a question or experience without revealing your identity. Support here does not replace medical or fiqh care.'}
+              </p>
             </div>
-            <button className="w-10 h-10 bg-rose-50 rounded-full flex items-center justify-center text-rose-400">
-              <Users className="w-5 h-5" />
+            <button
+              onClick={() => setIsCreating(true)}
+              className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-200 transition active:scale-95"
+              aria-label={t('create_post')}
+            >
+              <Plus className="h-5 w-5" />
             </button>
           </div>
-        </div>
-        
-        {/* Category Tabs */}
-        <div className="flex space-x-2 rtl:space-x-reverse overflow-x-auto no-scrollbar pb-2">
-          {categories.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
+
+          <div className="relative">
+            <Search className={cn("absolute top-1/2 h-4 w-4 -translate-y-1/2 text-rose-300", isRTL ? "right-4" : "left-4")} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder={t('search')}
               className={cn(
-                "px-6 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap",
-                activeCategory === cat.id 
-                  ? "bg-rose-600 text-white shadow-lg shadow-rose-200" 
-                  : "bg-rose-50 text-rose-400 hover:bg-rose-100"
+                "h-12 w-full rounded-2xl border border-rose-100 bg-white text-sm text-rose-950 outline-none transition focus:border-rose-300 focus:ring-4 focus:ring-rose-100",
+                isRTL ? "pr-11 pl-4 text-right" : "pl-11 pr-4 text-left"
               )}
-            >
-              {cat.label}
-            </button>
-          ))}
+            />
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {categories.map(category => (
+              <button
+                key={category.id}
+                onClick={() => setActiveCategory(category.id)}
+                className={cn(
+                  "shrink-0 rounded-full px-4 py-2 text-xs font-bold transition",
+                  activeCategory === category.id
+                    ? "bg-rose-600 text-white shadow-md shadow-rose-100"
+                    : "bg-white text-rose-500 ring-1 ring-rose-100"
+                )}
+              >
+                {category.label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
-      <div className="p-6 space-y-8">
-        {/* Create Post Trigger */}
-        <motion.div 
-          whileTap={{ scale: 0.98 }}
-          onClick={() => setIsCreating(true)}
-          className="p-4 bg-white rounded-[32px] border border-black/5 shadow-sm flex items-center space-x-4 rtl:space-x-reverse cursor-pointer"
-        >
-          <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-200">
-            <User className="w-5 h-5" />
+      <main className="mx-auto max-w-3xl space-y-4 px-4 py-5 sm:px-6">
+        {saveError && (
+          <div className="rounded-3xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+            {saveError}
           </div>
-          <span className="text-sm text-gray-400">{t('post_placeholder')}</span>
-          <div className="flex-1" />
-          <div className="w-10 h-10 bg-rose-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-rose-200">
-            <Plus className="w-5 h-5" />
-          </div>
-        </motion.div>
+        )}
 
-        {/* Trending Topics */}
-        <section className="space-y-4">
-          <div className="flex items-center space-x-2 rtl:space-x-reverse">
-            <TrendingUp className="w-4 h-4 text-rose-400" />
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('trending_topics')}</h3>
-          </div>
-          <div className={cn("flex overflow-x-auto no-scrollbar space-x-3", isRTL && "space-x-reverse")}>
-            {['#فقه_الطهارة', '#صحة_المرأة', '#رمضان_٢٠٢٤', '#تكيس_المبايض'].map((tag) => (
-              <span key={tag} className="px-4 py-2 bg-rose-50 text-rose-800 text-xs font-bold rounded-full border border-rose-100 whitespace-nowrap">
-                {tag}
-              </span>
+        {loading ? (
+          <div className="space-y-3">
+            {[0, 1, 2].map(item => (
+              <div key={item} className="h-44 animate-pulse rounded-[32px] bg-white ring-1 ring-rose-50" />
             ))}
           </div>
-        </section>
-
-        {/* Posts Feed */}
-        <div className="space-y-6">
-          {filteredPosts.length > 0 ? (
-            filteredPosts.map((post) => (
-              <PostCard key={post.id} post={post} onAddComment={(content) => {
-                const newComment: Comment = {
-                  id: Date.now().toString(),
-                  author: user?.display_name || 'أنا',
-                  content,
-                  timestamp: 'Just now'
-                };
-                setPosts(posts.map(p => p.id === post.id ? {
-                  ...p,
-                  comments: p.comments + 1,
-                  commentsList: [...(p.commentsList || []), newComment]
-                } : p));
-              }} />
-            ))
-          ) : (
-            <div className="py-20 text-center space-y-4">
-              <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center text-rose-200 mx-auto">
-                <Search className="w-8 h-8" />
-              </div>
-              <p className="text-sm text-gray-400">{t('no_results')}</p>
+        ) : filteredPosts.length > 0 ? (
+          filteredPosts.map(post => (
+            <PostCard
+              key={post.id}
+              post={post}
+              authUserId={authUserId}
+              isSeed={post.author_id === 'seed'}
+              onPostUpdated={updatePostInList}
+            />
+          ))
+        ) : (
+          <div className="rounded-[32px] bg-white p-10 text-center ring-1 ring-rose-100">
+            <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-rose-50 text-rose-400">
+              <MessageSquare className="h-7 w-7" />
             </div>
-          )}
-        </div>
-      </div>
+            <p className="text-sm font-bold text-rose-900">{t('no_results')}</p>
+          </div>
+        )}
+      </main>
 
-      {/* Create Post Modal */}
       <AnimatePresence>
         {isCreating && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[400] bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+            className="fixed inset-0 z-[400] flex items-end justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:items-center"
           >
-            <motion.div 
-              initial={{ y: 100 }}
+            <motion.div
+              initial={{ y: 80 }}
               animate={{ y: 0 }}
-              exit={{ y: 100 }}
-              className="w-full max-w-lg bg-white rounded-[40px] overflow-hidden shadow-2xl"
+              exit={{ y: 80 }}
+              className="w-full max-w-lg overflow-hidden rounded-[32px] bg-white shadow-2xl"
             >
-              <div className="p-6 border-b border-black/5 flex items-center justify-between">
-                <h3 className="text-lg font-serif font-bold text-rose-900">{t('create_post')}</h3>
-                <button onClick={() => setIsCreating(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                  <X className="w-5 h-5 text-gray-400" />
+              <div className="flex items-center justify-between border-b border-rose-50 p-5">
+                <button onClick={() => setIsCreating(false)} className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-50 text-slate-400">
+                  <X className="h-5 w-5" />
                 </button>
+                <div className="text-right">
+                  <h3 className="text-lg font-serif font-bold text-rose-900">{t('create_post')}</h3>
+                  <p className="text-xs text-slate-400">{isRTL ? 'اكتبي باحترام وبدون معلومات شخصية' : 'Write kindly and avoid personal details'}</p>
+                </div>
               </div>
-              <div className="p-6 space-y-6">
-                <div className="flex space-x-2 rtl:space-x-reverse overflow-x-auto no-scrollbar">
-                  {categories.filter(c => c.id !== 'all').map(cat => (
+
+              <div className="space-y-5 p-5">
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                  {categories.filter(category => category.id !== 'all').map(category => (
                     <button
-                      key={cat.id}
-                      onClick={() => setNewPostCategory(cat.id as Post['category'])}
+                      key={category.id}
+                      onClick={() => setNewPostCategory(category.id as DBCommunityPost['category'])}
                       className={cn(
-                        "px-4 py-2 rounded-xl text-[10px] font-bold transition-all whitespace-nowrap border",
-                        newPostCategory === cat.id 
-                          ? "bg-rose-600 text-white border-rose-600" 
-                          : "bg-white text-gray-400 border-gray-100"
+                        "shrink-0 rounded-2xl px-4 py-2 text-xs font-bold ring-1 transition",
+                        newPostCategory === category.id
+                          ? "bg-rose-600 text-white ring-rose-600"
+                          : "bg-white text-slate-500 ring-slate-100"
                       )}
                     >
-                      {cat.label}
+                      {category.label}
                     </button>
                   ))}
                 </div>
 
-                <textarea 
+                <textarea
                   autoFocus
                   value={newPostContent}
-                  onChange={(e) => setNewPostContent(e.target.value)}
+                  onChange={(event) => setNewPostContent(event.target.value)}
                   placeholder={t('post_placeholder')}
-                  className="w-full h-40 bg-transparent border-none outline-none text-rose-900 placeholder:text-gray-300 resize-none text-lg leading-relaxed"
+                  maxLength={1200}
+                  className="h-40 w-full resize-none rounded-3xl border border-rose-100 bg-rose-50/40 p-4 text-right text-base leading-8 text-rose-950 outline-none focus:border-rose-300"
                 />
-                
-                <div className="flex items-center justify-between pt-4 border-t border-black/5">
-                  <div className="flex items-center space-x-4 rtl:space-x-reverse">
-                    <button className="p-2 text-rose-400 hover:bg-rose-50 rounded-xl transition-colors">
-                      <ImageIcon className="w-6 h-6" />
+
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                    <button
+                      type="button"
+                      onClick={() => setIsAnonymous(value => !value)}
+                      className={cn(
+                        "relative h-8 w-14 rounded-full transition",
+                        isAnonymous ? "bg-rose-600" : "bg-slate-200"
+                      )}
+                    >
+                      <span className={cn(
+                        "absolute top-1 h-6 w-6 rounded-full bg-white shadow transition",
+                        isAnonymous ? (isRTL ? "right-7" : "left-7") : (isRTL ? "right-1" : "left-1")
+                      )} />
                     </button>
-                <div className="flex items-center gap-2 rtl:flex-row-reverse">
-                  <button 
-                    onClick={() => setIsAnonymous(!isAnonymous)}
-                    className={cn(
-                      "w-10 h-5 rounded-full relative transition-colors shrink-0",
-                      isAnonymous ? "bg-rose-600" : "bg-gray-200"
-                    )}
-                  >
-                    <div className={cn(
-                      "absolute top-1 w-3 h-3 bg-white rounded-full transition-all",
-                      isAnonymous 
-                        ? (isRTL ? "left-1" : "right-1") 
-                        : (isRTL ? "right-1" : "left-1")
-                    )} />
-                  </button>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">{t('post_anonymous')}</span>
-                </div>
-                  </div>
-                  <button 
+                    {t('post_anonymous')}
+                  </label>
+
+                  <button
                     onClick={handleCreatePost}
-                    disabled={!newPostContent.trim()}
-                    className={cn(
-                      "px-8 py-3 rounded-2xl font-bold text-sm transition-all shadow-lg",
-                      newPostContent.trim() ? "bg-rose-600 text-white shadow-rose-200" : "bg-gray-100 text-gray-300 shadow-none"
-                    )}
+                    disabled={!newPostContent.trim() || savingPost}
+                    className="rounded-2xl bg-rose-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-rose-100 transition disabled:bg-slate-100 disabled:text-slate-300"
                   >
-                    {t('post_button')}
+                    {savingPost ? (isRTL ? 'جارٍ النشر...' : 'Posting...') : t('post_button')}
                   </button>
                 </div>
               </div>
@@ -337,149 +335,143 @@ export const Community = () => {
   );
 };
 
-const PostCard = ({ post, onAddComment }: { post: Post; onAddComment: (content: string) => void }) => {
+const PostCard = ({
+  post,
+  authUserId,
+  isSeed,
+  onPostUpdated,
+}: {
+  post: DBCommunityPost;
+  authUserId: string;
+  isSeed: boolean;
+  onPostUpdated: (post: DBCommunityPost) => void;
+}) => {
   const { t, isRTL } = useTranslation();
-  const [liked, setLiked] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleAddComment = () => {
-    if (!commentText.trim()) return;
-    onAddComment(commentText);
-    setCommentText('');
+  const liked = Boolean(authUserId && post.like_user_ids?.includes(authUserId));
+  const authorName = post.is_anonymous ? t('guest_user') : (post.author_name || t('guest_user'));
+
+  const handleLike = async () => {
+    if (isSeed || busy) return;
+    setBusy(true);
+    setError('');
+    const { data, error: apiError } = await toggleCommunityPostLike(post);
+    if (apiError || !data) {
+      setError(isRTL ? 'تعذر حفظ الإعجاب.' : 'Could not save like.');
+    } else {
+      onPostUpdated(data);
+    }
+    setBusy(false);
+  };
+
+  const handleComment = async () => {
+    const content = commentText.trim();
+    if (!content || isSeed || busy) return;
+    setBusy(true);
+    setError('');
+    const { data, error: apiError } = await addCommunityComment(post, content);
+    if (apiError || !data) {
+      setError(isRTL ? 'تعذر إضافة التعليق.' : 'Could not add comment.');
+    } else {
+      onPostUpdated(data);
+      setCommentText('');
+      setShowComments(true);
+    }
+    setBusy(false);
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
+    <motion.article
+      initial={{ opacity: 0, y: 16 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      className="bg-white rounded-[40px] p-6 border border-black/5 shadow-sm space-y-4"
+      className="space-y-4 rounded-[32px] bg-white p-5 shadow-sm ring-1 ring-rose-100/80"
     >
-      <div className="flex items-center justify-between">
-        <div className={cn("flex items-center gap-3", isRTL && "flex-row-reverse")}>
-          <div className="w-10 h-10 rounded-2xl overflow-hidden bg-rose-50 flex items-center justify-center relative shrink-0">
-            {post.isAnonymous ? (
-              <Shield className="w-5 h-5 text-rose-200" />
-            ) : (
-              <img src={post.avatar} alt={post.author} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            )}
-            {post.isExpert && (
-              <div className={cn(
-                "absolute -bottom-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center",
-                isRTL ? "-left-1" : "-right-1"
-              )}>
-                <Shield className="w-2 h-2 text-white" />
-              </div>
-            )}
-          </div>
-          <div className={isRTL ? "text-right" : "text-left"}>
-            <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
-              <h4 className="text-sm font-bold text-rose-900">{post.isAnonymous ? t('guest_user') : post.author}</h4>
-              {post.isExpert && (
-                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[8px] font-bold rounded-full border border-emerald-100 whitespace-nowrap">
-                  {t('verified_expert')}
-                </span>
-              )}
-            </div>
-            <p className="text-[10px] text-gray-400 font-medium">{post.timestamp} · {t(`category_${post.category}` as any)}</p>
-          </div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-rose-50 text-rose-400">
+          {post.is_anonymous ? <Shield className="h-5 w-5" /> : isSeed ? <Sparkles className="h-5 w-5" /> : <User className="h-5 w-5" />}
         </div>
-        <button className="p-2 text-gray-300 hover:text-rose-400 transition-colors shrink-0">
-          <MoreHorizontal className="w-5 h-5" />
+        <div className="min-w-0 flex-1 text-right">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-500">
+              {t(`category_${post.category}` as any) || post.category}
+            </span>
+            <h4 className="truncate text-sm font-bold text-rose-950">{authorName}</h4>
+          </div>
+          <p className="mt-1 text-[11px] text-slate-400">{formatRelativeTime(post.created_at, isRTL)}</p>
+        </div>
+      </div>
+
+      <p className="whitespace-pre-wrap text-right text-[15px] leading-8 text-slate-700">{post.content}</p>
+
+      {error && <p className="rounded-2xl bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{error}</p>}
+
+      <div className="flex items-center justify-between border-t border-rose-50 pt-3">
+        <button
+          onClick={() => setShowComments(value => !value)}
+          className="flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold text-slate-400 transition hover:bg-slate-50"
+        >
+          <MessageSquare className="h-5 w-5" />
+          <span>{post.comments?.length || 0}</span>
+        </button>
+        <button
+          onClick={handleLike}
+          disabled={isSeed || busy}
+          className={cn(
+            "flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold transition",
+            liked ? "bg-rose-50 text-rose-600" : "text-slate-400 hover:bg-slate-50",
+            isSeed && "opacity-50"
+          )}
+        >
+          <Heart className={cn("h-5 w-5", liked && "fill-current")} />
+          <span>{post.like_user_ids?.length || 0}</span>
         </button>
       </div>
 
-      <p className="text-sm text-rose-900 leading-relaxed">
-        {post.content}
-      </p>
-
-      <div className="pt-4 border-t border-black/5 flex items-center justify-between">
-        <div className={cn("flex items-center gap-6", isRTL && "flex-row-reverse")}>
-          <button 
-            onClick={() => setLiked(!liked)}
-            className={cn(
-              "flex items-center gap-2 transition-colors",
-              liked ? "text-rose-600" : "text-gray-400",
-              isRTL && "flex-row-reverse"
-            )}
-          >
-            <Heart className={cn("w-5 h-5", liked && "fill-rose-600")} />
-            <span className="text-xs font-bold">{post.likes + (liked ? 1 : 0)}</span>
-          </button>
-          <button 
-            onClick={() => setShowComments(!showComments)}
-            className={cn(
-              "flex items-center gap-2 transition-colors",
-              showComments ? "text-rose-600" : "text-gray-400",
-              isRTL && "flex-row-reverse"
-            )}
-          >
-            <MessageSquare className="w-5 h-5" />
-            <span className="text-xs font-bold">{post.comments}</span>
-          </button>
-        </div>
-        <button className="p-2 text-gray-400 hover:text-rose-600 transition-colors">
-          <Share2 className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Comments Section */}
       <AnimatePresence>
         {showComments && (
-          <motion.div 
+          <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden space-y-4"
+            className="overflow-hidden"
           >
-            <div className="space-y-4 pt-4">
-              {post.commentsList?.map(comment => (
-                <div key={comment.id} className="flex space-x-3 rtl:space-x-reverse bg-rose-50/30 p-3 rounded-2xl">
-                  <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center flex-shrink-0">
-                    <User className="w-4 h-4 text-rose-300" />
+            <div className="space-y-3 pt-2">
+              {(post.comments || []).map(comment => (
+                <div key={comment.id} className="rounded-3xl bg-rose-50/60 p-3 text-right">
+                  <div className="mb-1 flex items-center justify-end gap-2">
+                    <span className="text-[10px] text-slate-400">{formatRelativeTime(comment.created_at, isRTL)}</span>
+                    <span className="text-xs font-bold text-rose-900">{comment.is_anonymous ? t('guest_user') : comment.author_name}</span>
                   </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                      <span className="text-xs font-bold text-rose-900">{comment.author}</span>
-                      {comment.isExpert && (
-                        <span className="text-[8px] text-emerald-600 font-bold bg-emerald-50 px-1.5 rounded-full border border-emerald-100">
-                          {t('verified_expert')}
-                        </span>
-                      )}
-                      <span className="text-[8px] text-gray-400">{comment.timestamp}</span>
-                    </div>
-                    <p className="text-xs text-rose-800 leading-relaxed">{comment.content}</p>
-                  </div>
+                  <p className="text-xs leading-6 text-slate-600">{comment.content}</p>
                 </div>
               ))}
-            </div>
 
-            <div className="flex items-center space-x-2 rtl:space-x-reverse pt-2">
-              <input 
-                type="text"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder={t('add_comment')}
-                className="flex-1 h-10 bg-rose-50 rounded-2xl px-4 text-xs text-rose-900 outline-none border border-transparent focus:border-rose-200"
-              />
-              <button 
-                onClick={handleAddComment}
-                disabled={!commentText.trim()}
-                className="w-10 h-10 bg-rose-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-rose-200 disabled:opacity-50"
-              >
-                <Send className="w-4 h-4" />
-              </button>
+              {!isSeed && (
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={handleComment}
+                    disabled={!commentText.trim() || busy}
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-100 transition disabled:bg-slate-100 disabled:text-slate-300"
+                  >
+                    <Send className="h-4 w-4" />
+                  </button>
+                  <input
+                    value={commentText}
+                    onChange={(event) => setCommentText(event.target.value)}
+                    placeholder={t('add_comment')}
+                    className="h-11 flex-1 rounded-2xl border border-rose-100 bg-white px-4 text-right text-sm outline-none focus:border-rose-300"
+                  />
+                </div>
+              )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </motion.article>
   );
 };
-
-const X = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 6L6 18M6 6l12 12" />
-  </svg>
-);

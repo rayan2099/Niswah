@@ -179,10 +179,34 @@ create table if not exists public.chat_history (
 create table if not exists public.community_posts (
   id uuid primary key default gen_random_uuid(),
   author_id uuid not null references public.users(id) on delete cascade,
+  author_name text,
+  category text not null default 'general' check (category in ('health', 'fiqh', 'mental', 'general')),
   content text not null check (char_length(content) < 5000),
+  is_anonymous boolean not null default false,
+  like_user_ids jsonb not null default '[]'::jsonb,
+  comments jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.community_posts add column if not exists author_name text;
+alter table public.community_posts add column if not exists category text not null default 'general';
+alter table public.community_posts add column if not exists is_anonymous boolean not null default false;
+alter table public.community_posts add column if not exists like_user_ids jsonb not null default '[]'::jsonb;
+alter table public.community_posts add column if not exists comments jsonb not null default '[]'::jsonb;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'community_posts_category_check'
+  ) then
+    alter table public.community_posts
+      add constraint community_posts_category_check
+      check (category in ('health', 'fiqh', 'mental', 'general'));
+  end if;
+end $$;
 
 create or replace function public.create_user_profile()
 returns trigger

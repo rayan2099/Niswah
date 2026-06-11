@@ -164,3 +164,25 @@ export interface DBChatMessage {
   content?: string;
   timestamp: string;
 }
+
+export interface DBCommunityComment {
+  id: string;
+  author_id: string;
+  author_name: string;
+  is_anonymous: boolean;
+  content: string;
+  created_at: string;
+}
+
+export interface DBCommunityPost {
+  id: string;
+  author_id: string;
+  author_name?: string;
+  category: 'health' | 'fiqh' | 'mental' | 'general';
+  content: string;
+  is_anonymous: boolean;
+  like_user_ids: string[];
+  comments: DBCommunityComment[];
+  created_at: string;
+  updated_at: string;
+}

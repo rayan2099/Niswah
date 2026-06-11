@@ -110,6 +110,39 @@ export const Calendar = () => {
     };
   }, [user, prediction, ovulation, cycleStats.lastPeriodDate, isPregnant, isPostpartum]);
 
+  const fertilityInsight = useMemo(() => {
+    if (!cycleDates) return null;
+
+    const formatter = new Intl.DateTimeFormat(numberLocale, { day: 'numeric', month: 'long' });
+    const today = startOfDay(new Date());
+    const fertileStart = startOfDay(cycleDates.fertileStart);
+    const fertileEnd = startOfDay(cycleDates.fertileEnd);
+    const daysUntilStart = differenceInDays(fertileStart, today);
+    const daysUntilEnd = differenceInDays(fertileEnd, today);
+
+    const windowText = isRTL
+      ? `نافذة الخصوبة المتوقعة تبدأ من ${formatter.format(cycleDates.fertileStart)} إلى ${formatter.format(cycleDates.fertileEnd)}.`
+      : `Your estimated fertile window runs from ${formatter.format(cycleDates.fertileStart)} to ${formatter.format(cycleDates.fertileEnd)}.`;
+
+    const ovulationText = isRTL
+      ? `أعلى فرصة تكون غالباً حول يوم التبويض المتوقع: ${formatter.format(cycleDates.ovulation)}.`
+      : `The highest chance is usually around expected ovulation on ${formatter.format(cycleDates.ovulation)}.`;
+
+    const timingText = today < fertileStart
+      ? (isRTL
+        ? `تبدأ هذه النافذة بعد ${formatNumber(Math.max(0, daysUntilStart))} يوم تقريباً.`
+        : `This window starts in about ${Math.max(0, daysUntilStart)} days.`)
+      : today <= fertileEnd
+        ? (isRTL
+          ? `أنتِ داخل نافذة الخصوبة الآن، وتنتهي بعد ${formatNumber(Math.max(0, daysUntilEnd))} يوم تقريباً.`
+          : `You are currently inside the fertile window; it ends in about ${Math.max(0, daysUntilEnd)} days.`)
+        : (isRTL
+          ? 'نافذة الخصوبة المتوقعة لهذه الدورة انتهت حسب البيانات الحالية.'
+          : 'This cycle’s estimated fertile window has passed based on the current data.');
+
+    return { windowText, ovulationText, timingText };
+  }, [cycleDates, formatNumber, isRTL, numberLocale]);
+
   const pregnancyData = useMemo(() => {
     const safeCycleLength = Math.max(1, Math.round(cycleLength || 28));
     const peakDay = safeCycleLength - 14;
@@ -574,6 +607,29 @@ export const Calendar = () => {
             <p className="text-[9px] text-amber-600 font-bold text-center bg-amber-50 py-2 rounded-xl border border-amber-100 italic">
               {t('prediction_improves_with_more_data')}
             </p>
+          )}
+
+          {fertilityInsight && (
+            <div className="rounded-3xl border border-sky-100 bg-sky-50/70 p-4 text-right space-y-3" dir={isRTL ? 'rtl' : 'ltr'}>
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-sky-500 shadow-sm">
+                  <Info className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <h4 className="text-sm font-bold text-sky-950">
+                    {isRTL ? 'كيف تقرئين الرسم؟' : 'How to read this graph'}
+                  </h4>
+                  <p className="text-sm leading-7 text-slate-700">{fertilityInsight.windowText}</p>
+                  <p className="text-sm leading-7 text-slate-700">{fertilityInsight.ovulationText}</p>
+                  <p className="text-sm font-bold leading-7 text-emerald-700">{fertilityInsight.timingText}</p>
+                </div>
+              </div>
+              <p className="rounded-2xl bg-white/80 px-4 py-3 text-xs leading-6 text-slate-500">
+                {isRTL
+                  ? 'هذه التواريخ تقديرية وليست ضماناً للحمل. تتحسن الدقة كلما سجلتِ دورتك أكثر.'
+                  : 'These dates are estimates, not a guarantee of pregnancy. Accuracy improves as you log more cycles.'}
+              </p>
+            </div>
           )}
         </section>
         )}

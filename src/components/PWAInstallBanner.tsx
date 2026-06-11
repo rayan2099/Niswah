@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { X, Download, CheckCircle2, Share, PlusSquare, WifiOff, Bell, Zap } from 'lucide-react';
+import { X, Download, CheckCircle2, Share, PlusSquare, WifiOff, Bell, Zap, ArrowDown } from 'lucide-react';
 import { useTranslation } from '../i18n/LanguageContext.tsx';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -105,6 +105,23 @@ export const PWAInstallBanner = () => {
         </button>
 
         <p className="text-xs text-gray-400 text-center mt-2">مجاني — لا يتطلب App Store</p>
+
+        {(platform.isIOS || platform.isSafari) && showManualSteps && (
+          <motion.div
+            aria-hidden="true"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: [0, 10, 0] }}
+            transition={{ opacity: { duration: 0.2 }, y: { repeat: Infinity, duration: 1.3, ease: 'easeInOut' } }}
+            className="pointer-events-none fixed bottom-8 left-1/2 z-[151] -translate-x-1/2 text-rose-500 drop-shadow-[0_8px_12px_rgba(244,63,94,0.35)]"
+          >
+            <div className="flex flex-col items-center">
+              <span className="mb-1 rounded-full bg-white/90 px-3 py-1 text-[11px] font-bold text-rose-600 shadow-sm">
+                زر المشاركة هنا
+              </span>
+              <ArrowDown className="h-14 w-14 stroke-[2.5]" />
+            </div>
+          </motion.div>
+        )}
       </motion.div>
     </AnimatePresence>
   );

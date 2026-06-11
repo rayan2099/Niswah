@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { X, Download, CheckCircle2, Share, PlusSquare, WifiOff, Bell, Zap, ArrowDown } from 'lucide-react';
 import { useTranslation } from '../i18n/LanguageContext.tsx';
-import { useCycleData } from '../contexts/CycleContext.tsx';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -11,12 +10,11 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const PWAInstallBanner = () => {
+export const PWAInstallBanner = ({ placement = 'app', userId }: { placement?: 'auth' | 'app'; userId?: string }) => {
   const { isInstalled, triggerInstall, shouldShowBanner, platform } = usePWAInstall();
-  const { user } = useCycleData();
   const dismissalKey = useMemo(
-    () => `niswah_install_dismissed_v3_${user?.id || 'guest'}`,
-    [user?.id]
+    () => `niswah_install_dismissed_v3_${userId || 'guest'}`,
+    [userId]
   );
   const isRecentlyDismissed = (key: string) => {
     const t = localStorage.getItem(key);
@@ -37,10 +35,13 @@ export const PWAInstallBanner = () => {
     localStorage.setItem(dismissalKey, Date.now().toString());
   };
 
+  const isManualInstallPlatform = platform.isIOS || platform.isSafari;
+
   if (isInstalled || dismissed || !shouldShowBanner) return null;
+  if (placement === 'app' && isManualInstallPlatform) return null;
 
   const handleInstall = async () => {
-    if (platform.isIOS || platform.isSafari) {
+    if (isManualInstallPlatform) {
       setShowManualSteps(true);
       return;
     }
@@ -115,12 +116,12 @@ export const PWAInstallBanner = () => {
           className="w-full py-3 bg-rose-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
         >
           <Download className="w-4 h-4" style={{ width: '16px', height: '16px' }} />
-          {installing ? 'جارٍ التثبيت...' : platform.isIOS || platform.isSafari ? 'اعرضي خطوات الإضافة' : 'تثبيت على الشاشة الرئيسية'}
+          {installing ? 'جارٍ التثبيت...' : isManualInstallPlatform ? 'اعرضي خطوات الإضافة' : 'تثبيت على الشاشة الرئيسية'}
         </button>
 
         <p className="text-xs text-gray-400 text-center mt-2">مجاني — لا يتطلب App Store</p>
 
-        {(platform.isIOS || platform.isSafari) && showManualSteps && (
+        {isManualInstallPlatform && showManualSteps && (
           <motion.div
             aria-hidden="true"
             initial={{ opacity: 0, y: -8 }}

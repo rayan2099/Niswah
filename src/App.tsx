@@ -348,7 +348,7 @@ function AppContent() {
 
       {/* Premium Welcome Paywall removed */}
 
-      <PWAInstallBanner />
+      <PWAInstallBanner userId={user?.id || authUser?.id} />
     </div>
   );
 }

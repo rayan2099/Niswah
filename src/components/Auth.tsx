@@ -7,6 +7,7 @@ import {
   signUpWithEmail,
 } from '../auth';
 import { useTranslation } from '../i18n/LanguageContext';
+import { PWAInstallBanner } from './PWAInstallBanner';
 
 type AuthMode = 'welcome' | 'email' | 'reset';
 
@@ -147,6 +148,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
 
   return (
     <div className="min-h-screen bg-[#FDFCFB] flex flex-col" dir="rtl">
+      <PWAInstallBanner placement="auth" />
       
       {/* Welcome Screen */}
       {mode === 'welcome' && (

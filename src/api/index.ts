@@ -224,6 +224,40 @@ export async function upsertUser(updates: Partial<DBUser>): Promise<ApiResponse<
   return { data: userData, error: null };
 }
 
+async function buildUserProfileFromAuth(authUser: NonNullable<Awaited<ReturnType<typeof getAuthUser>>>, updates: Partial<DBUser>): Promise<DBUser> {
+  const defaults: Partial<DBUser> = {
+    birth_year: 1995,
+    display_name: authUser.user_metadata?.display_name || authUser.user_metadata?.full_name || 'Sister',
+    anonymous_mode: false,
+    onboarding_completed: false,
+    premium_status: true,
+    avg_cycle_length: 28,
+    avg_haid_duration: 5,
+    adah_confidence: 0,
+    prayerCity: '',
+    prayerCountry: '',
+    prayerCityAr: '',
+    prayerCountryAr: '',
+    prayerLat: 0,
+    prayerLon: 0,
+    goal_flags: [],
+    conditions: [],
+    notification_prefs: {},
+    pregnant: false,
+    pregnancy_week: 0,
+    reflect_health: false,
+    created_at: new Date().toISOString(),
+  };
+
+  return {
+    ...defaults,
+    ...cleanObject(updates),
+    id: authUser.id,
+    email_hash: hashEmail(authUser.email || 'anonymous'),
+    updated_at: new Date().toISOString(),
+  } as DBUser;
+}
+
 export async function updateUser(updates: Partial<DBUser>): Promise<ApiResponse<DBUser>> {
   const authUser = await ensureUser();
   const localUser = getScopedLocalUser(authUser);
@@ -241,9 +275,22 @@ export async function updateUser(updates: Partial<DBUser>): Promise<ApiResponse<
     .select('*')
     .maybeSingle();
 
-  if (error) {
-    console.warn('Supabase updateUser failed, falling back to local:', error.message);
-    return { data: nextLocal, error: error.message };
+  if (error || !data) {
+    const repairedUser = nextLocal || await buildUserProfileFromAuth(authUser, updates);
+    const { data: upserted, error: upsertError } = await supabase
+      .from('users')
+      .upsert(userToDb(repairedUser), { onConflict: 'id' })
+      .select('*')
+      .single();
+
+    if (upsertError) {
+      console.warn('Supabase updateUser failed:', upsertError.message || error?.message);
+      return { data: nextLocal, error: upsertError.message || error?.message || 'Profile update failed' };
+    }
+
+    const mapped = userFromDb(upserted);
+    localStorage.setItem('niswah_local_user', JSON.stringify(mapped));
+    return { data: mapped, error: null };
   }
 
   const mapped = data ? userFromDb(data) : nextLocal;

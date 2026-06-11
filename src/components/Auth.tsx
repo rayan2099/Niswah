@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Baby, CalendarDays, HeartHandshake } from 'lucide-react';
 import {
   sendPasswordReset,
   signInWithEmail,
@@ -24,6 +25,23 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   const [agreed, setAgreed] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const welcomeFeatures = [
+    {
+      icon: CalendarDays,
+      title: 'تتبع الدورة',
+      copy: 'حيض وطهارة وتنبيهات فقهية'
+    },
+    {
+      icon: HeartHandshake,
+      title: 'تخطيط للحمل',
+      copy: 'نافذة الخصوبة والتبويض المتوقع'
+    },
+    {
+      icon: Baby,
+      title: 'تتبع الحمل',
+      copy: 'أسابيع الحمل وطبيبة ذكية'
+    }
+  ];
 
   // Loading timeout to prevent getting stuck
   React.useEffect(() => {
@@ -155,27 +173,41 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex-1 flex flex-col items-center justify-between p-8 pb-16"
+          className="flex-1 flex flex-col items-center justify-between px-8 pb-12 pt-10"
         >
           {/* Logo area */}
-          <div className="flex-1 flex flex-col items-center justify-center gap-8">
-            <div className="w-32 h-32 rounded-[40px] bg-white border border-rose-100 flex items-center justify-center shadow-sm relative overflow-hidden group">
+          <div className="w-full flex flex-col items-center gap-5">
+            <div className="w-24 h-24 rounded-[32px] bg-white border border-rose-100 flex items-center justify-center shadow-sm relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-rose-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <img src="/logo.svg" alt="Niswah Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
-            <div className="text-center px-6">
-              <h1 className="text-3xl font-bold text-rose-900 mb-3">
+            <div className="text-center px-2">
+              <h1 className="text-[34px] leading-tight font-bold text-rose-900 mb-2">
                 <span className="sr-only">نسوة</span>
                 ابدئي بثقة
               </h1>
-              <p className="text-sm text-gray-400 max-w-xs text-center leading-relaxed">
-                تتبع دورتك بوعي فقهي وعناية صحية — خصوصيتك محمية تماماً
+              <p className="text-sm text-gray-500 max-w-xs text-center leading-7">
+                رفيقتك للحيض والطهارة والحمل، بوعي صحي وفقهي وخصوصية كاملة.
               </p>
+            </div>
+
+            <div className="w-full rounded-[28px] border border-rose-100 bg-white/80 p-3 shadow-sm shadow-rose-100/40">
+              <div className="grid grid-cols-3 gap-2">
+                {welcomeFeatures.map(({ icon: Icon, title, copy }) => (
+                  <div key={title} className="min-h-[116px] rounded-3xl bg-rose-50/70 px-2.5 py-3 text-center">
+                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-rose-500 shadow-sm">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="text-[12px] font-bold leading-5 text-rose-900">{title}</div>
+                    <div className="mt-1 text-[10px] leading-4 text-gray-500">{copy}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Auth buttons */}
-          <div className="w-full flex flex-col gap-3">
+          <div className="w-full flex flex-col gap-3 mt-6">
             
             {/* Consent — required for ALL auth methods */}
             <ConsentCheckbox 

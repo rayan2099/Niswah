@@ -24,6 +24,7 @@ export type ApiResponse<T> = { data: T | null; error: string | null };
 
 const hashEmail = (email: string) => CryptoJS.SHA256(email).toString();
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const dayMs = 24 * 60 * 60 * 1000;
 
 function cleanObject<T extends object>(obj: T): T {
   return Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined)) as T;
@@ -114,6 +115,20 @@ const ensureUser = async () => {
   return user;
 };
 
+const toDateInputValue = (date: Date) => date.toISOString().split('T')[0];
+
+const estimateLmpFromWeek = (week: number) => {
+  const clampedWeek = Math.min(40, Math.max(1, Math.round(week || 1)));
+  return new Date(Date.now() - (clampedWeek - 1) * 7 * dayMs);
+};
+
+const calculatePregnancyWeek = (record: DBPregnancyRecord, fallbackWeek = 1) => {
+  if (!record.lmp_date) return Math.min(40, Math.max(1, record.current_week || fallbackWeek || 1));
+  const lmp = new Date(record.lmp_date);
+  if (Number.isNaN(lmp.getTime())) return Math.min(40, Math.max(1, record.current_week || fallbackWeek || 1));
+  return Math.min(40, Math.max(1, Math.floor((Date.now() - lmp.getTime()) / (7 * dayMs)) + 1));
+};
+
 async function getActivePregnancyRecordForUser(userId: string): Promise<ApiResponse<DBPregnancyRecord>> {
   const { data, error } = await supabase
     .from('pregnancy_records')
@@ -142,7 +157,7 @@ export async function getUser(): Promise<ApiResponse<DBUser>> {
   const activePregnancy = await getActivePregnancyRecordForUser(authUser.id);
   if (activePregnancy.data) {
     mapped.pregnant = true;
-    mapped.pregnancy_week = activePregnancy.data.current_week || mapped.pregnancy_week || 1;
+    mapped.pregnancy_week = calculatePregnancyWeek(activePregnancy.data, mapped.pregnancy_week || 1);
   }
   localStorage.setItem('niswah_local_user', JSON.stringify(mapped));
   return { data: mapped, error: null };
@@ -219,16 +234,33 @@ export async function ensurePregnancyRecord(currentWeek = 1): Promise<ApiRespons
   const authUser = await ensureUser();
   if (!authUser) return { data: null, error: 'Not authenticated' };
 
+  const lmpDate = estimateLmpFromWeek(currentWeek);
+  const dueDate = new Date(lmpDate.getTime() + 280 * dayMs);
+  const payload = {
+    current_week: Math.min(40, Math.max(1, Math.round(currentWeek || 1))),
+    lmp_date: toDateInputValue(lmpDate),
+    due_date: toDateInputValue(dueDate),
+    weekly_notes: {},
+  };
+
   const existing = await getActivePregnancyRecordForUser(authUser.id);
   if (existing.error) return existing;
-  if (existing.data) return existing;
+  if (existing.data) {
+    const { data, error } = await supabase
+      .from('pregnancy_records')
+      .update(payload)
+      .eq('id', existing.data.id)
+      .select('*')
+      .single();
+
+    return error ? { data: null, error: error.message } : { data: data as DBPregnancyRecord, error: null };
+  }
 
   const { data, error } = await supabase
     .from('pregnancy_records')
     .insert({
       user_id: authUser.id,
-      current_week: Math.max(1, currentWeek || 1),
-      weekly_notes: {},
+      ...payload,
     })
     .select('*')
     .single();

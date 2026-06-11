@@ -31,7 +31,8 @@ import {
   Star,
   Search,
   MapPin,
-  CheckCircle2
+  CheckCircle2,
+  ShieldCheck
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -312,6 +313,9 @@ export const Profile = ({ }: ProfileProps) => {
   const [isGeneratingDoctorPDF, setIsGeneratingDoctorPDF] = useState(false);
   const [isGeneratingHusbandPDF, setIsGeneratingHusbandPDF] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [showPregnancySetup, setShowPregnancySetup] = useState(false);
+  const [pregnancySetupWeek, setPregnancySetupWeek] = useState(1);
+  const [isSavingPregnancySetup, setIsSavingPregnancySetup] = useState(false);
   const { t, language, setLanguage, isRTL } = useTranslation();
 
   useEffect(() => {
@@ -343,6 +347,34 @@ export const Profile = ({ }: ProfileProps) => {
     if (data) {
       setUser(data);
       await refresh();
+    }
+  };
+
+  const openPregnancySetup = () => {
+    setPregnancySetupWeek(Math.min(40, Math.max(1, Math.round(user?.pregnancy_week || 1))));
+    setShowPregnancySetup(true);
+  };
+
+  const handleConfirmPregnancySetup = async () => {
+    const week = Math.min(40, Math.max(1, Math.round(Number(pregnancySetupWeek) || 1)));
+    setIsSavingPregnancySetup(true);
+    try {
+      const pregnancy = await api.ensurePregnancyRecord(week);
+      if (pregnancy.error) {
+        alert(isRTL ? 'تعذر حفظ إعداد الحمل. حاولي مرة أخرى.' : 'Could not save pregnancy setup. Please try again.');
+        await refresh();
+        return;
+      }
+
+      const updated = await api.updateUser({ pregnant: true, pregnancy_week: week });
+      if (updated.error) {
+        console.warn('Pregnancy profile mirror update failed:', updated.error);
+      }
+      setUser(prev => prev ? { ...prev, ...(updated.data || {}), pregnant: true, pregnancy_week: week } : updated.data);
+      setShowPregnancySetup(false);
+      await refresh();
+    } finally {
+      setIsSavingPregnancySetup(false);
     }
   };
 
@@ -619,25 +651,22 @@ export const Profile = ({ }: ProfileProps) => {
               active={user?.pregnant} 
               onChange={async (val) => {
                 if (val) {
-                  const pregnancy = await api.ensurePregnancyRecord(user?.pregnancy_week || 1);
-                  if (pregnancy.error) {
-                    alert(isRTL ? 'تعذر حفظ سجل الحمل. حاولي مرة أخرى.' : 'Could not save pregnancy record. Please try again.');
-                    await refresh();
-                    return;
-                  }
-                } else {
-                  const pregnancy = await api.clearActivePregnancyRecords();
-                  if (pregnancy.error) {
-                    alert(isRTL ? 'تعذر إيقاف وضع الحمل. حاولي مرة أخرى.' : 'Could not turn off pregnancy mode. Please try again.');
-                    await refresh();
-                    return;
-                  }
+                  openPregnancySetup();
+                  return;
                 }
-                const updated = await api.updateUser({ pregnant: val, pregnancy_week: val ? (user?.pregnancy_week || 1) : 0 });
+
+                const pregnancy = await api.clearActivePregnancyRecords();
+                if (pregnancy.error) {
+                  alert(isRTL ? 'تعذر إيقاف وضع الحمل. حاولي مرة أخرى.' : 'Could not turn off pregnancy mode. Please try again.');
+                  await refresh();
+                  return;
+                }
+
+                const updated = await api.updateUser({ pregnant: false, pregnancy_week: 0 });
                 if (updated.error) {
                   console.warn('Pregnancy profile mirror update failed:', updated.error);
                 }
-                setUser(prev => prev ? { ...prev, ...(updated.data || {}), pregnant: val, pregnancy_week: val ? (prev.pregnancy_week || 1) : 0 } : updated.data);
+                setUser(prev => prev ? { ...prev, ...(updated.data || {}), pregnant: false, pregnancy_week: 0 } : updated.data);
                 await refresh();
               }} 
             />
@@ -886,6 +915,138 @@ export const Profile = ({ }: ProfileProps) => {
                 </button>
                 <button 
                   onClick={() => setShowMadhhabConfirm(null)}
+                  className="w-full py-4 bg-gray-50 text-rose-800 rounded-2xl font-bold"
+                >
+                  {t('cancel')}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Pregnancy Setup Sheet */}
+      <AnimatePresence>
+        {showPregnancySetup && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowPregnancySetup(false)}
+              className="fixed inset-0 bg-black/40 z-[200] backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              className="fixed bottom-0 left-0 right-0 bg-white rounded-t-[40px] z-[201] p-6 md:p-8 space-y-6"
+            >
+              <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto" />
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="w-14 h-14 rounded-3xl bg-rose-50 flex items-center justify-center">
+                    <Heart className="w-7 h-7 text-rose-600" />
+                  </div>
+                  <h3 className="text-2xl font-serif font-bold text-rose-900">
+                    {isRTL ? 'إعداد تتبع الحمل' : 'Pregnancy setup'}
+                  </h3>
+                  <p className="max-w-xl text-sm leading-7 text-gray-500">
+                    {isRTL
+                      ? 'اختاري أسبوع الحمل الحالي مرة واحدة، وبعدها ستتحدث رحلة الحمل تلقائياً من يوم التفعيل.'
+                      : 'Choose your current pregnancy week once. After that, Niswah updates the journey automatically from today.'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowPregnancySetup(false)}
+                  className="p-2 bg-gray-100 rounded-full"
+                  aria-label={t('cancel')}
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="rounded-[28px] border border-rose-100 bg-rose-50/40 p-5 space-y-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-rose-500">
+                      {isRTL ? 'السؤال الأساسي' : 'Main question'}
+                    </p>
+                    <h4 className="mt-1 text-lg font-bold text-gray-900">
+                      {isRTL ? 'في أي أسبوع أنتِ الآن؟' : 'Which week are you on now?'}
+                    </h4>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-full bg-white p-1 shadow-sm">
+                    <button
+                      onClick={() => setPregnancySetupWeek(prev => Math.max(1, prev - 1))}
+                      className="grid h-10 w-10 place-items-center rounded-full bg-gray-50 text-lg font-bold text-gray-700"
+                      aria-label={isRTL ? 'إنقاص أسبوع' : 'Decrease week'}
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      max={40}
+                      value={pregnancySetupWeek}
+                      onChange={(event) => setPregnancySetupWeek(Math.min(40, Math.max(1, Number(event.target.value) || 1)))}
+                      className="h-10 w-16 bg-transparent text-center text-xl font-serif font-bold text-rose-900 outline-none"
+                    />
+                    <button
+                      onClick={() => setPregnancySetupWeek(prev => Math.min(40, prev + 1))}
+                      className="grid h-10 w-10 place-items-center rounded-full bg-rose-600 text-lg font-bold text-white"
+                      aria-label={isRTL ? 'زيادة أسبوع' : 'Increase week'}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-5 gap-2">
+                  {[4, 8, 12, 20, 32].map((week) => (
+                    <button
+                      key={week}
+                      onClick={() => setPregnancySetupWeek(week)}
+                      className={cn(
+                        "rounded-2xl border px-2 py-3 text-xs font-bold transition",
+                        pregnancySetupWeek === week
+                          ? "border-rose-300 bg-white text-rose-800 shadow-sm"
+                          : "border-white/80 bg-white/60 text-gray-500"
+                      )}
+                    >
+                      {isRTL ? `أسبوع ${week}` : `Week ${week}`}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl bg-white p-4 text-sm leading-7 text-gray-600">
+                    <Calendar className="mb-2 h-5 w-5 text-emerald-600" />
+                    {isRTL
+                      ? 'سنقدّر بداية الحمل من الأسبوع المختار، ثم نحسب الأسبوع تلقائياً بعد كل تحديث.'
+                      : 'We estimate the pregnancy start date from your selected week, then update it automatically.'}
+                  </div>
+                  <div className="rounded-2xl bg-white p-4 text-sm leading-7 text-gray-600">
+                    <ShieldCheck className="mb-2 h-5 w-5 text-indigo-600" />
+                    {isRTL
+                      ? 'يمكنكِ إيقاف وضع الحمل لاحقاً من الملف الشخصي في أي وقت.'
+                      : 'You can turn pregnancy mode off later from Profile at any time.'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleConfirmPregnancySetup}
+                  disabled={isSavingPregnancySetup}
+                  className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold shadow-lg shadow-rose-100 disabled:opacity-60"
+                >
+                  {isSavingPregnancySetup
+                    ? (isRTL ? 'جارٍ الحفظ...' : 'Saving...')
+                    : (isRTL ? 'تفعيل تتبع الحمل' : 'Start pregnancy tracking')}
+                </button>
+                <button
+                  onClick={() => setShowPregnancySetup(false)}
                   className="w-full py-4 bg-gray-50 text-rose-800 rounded-2xl font-bold"
                 >
                   {t('cancel')}

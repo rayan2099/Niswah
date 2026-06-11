@@ -3,18 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Baby,
   CalendarDays,
-  CheckCircle2,
   Heart,
-  Moon,
   ShieldCheck,
   Sparkles,
   Stethoscope,
   Utensils,
+  Moon,
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -28,7 +27,6 @@ function cn(...inputs: ClassValue[]) {
 interface PregnancyTrackerProps {
   currentWeek: number;
   onLogBirth: () => void;
-  onWeekChange?: (week: number) => void | Promise<void>;
 }
 
 type WeekGuide = {
@@ -43,9 +41,6 @@ type WeekGuide = {
   nutritionEn: string;
   prayerAr: string;
   prayerEn: string;
-  dua: string;
-  checklistAr: string[];
-  checklistEn: string[];
 };
 
 const GUIDES: WeekGuide[] = [
@@ -59,11 +54,8 @@ const GUIDES: WeekGuide[] = [
     medicalEn: 'Implantation begins. Watch for heavy bleeding or severe pain and seek care if worried.',
     nutritionAr: 'ركزي على حمض الفوليك: السبانخ، العدس، الحمضيات، والحبوب المدعمة.',
     nutritionEn: 'Prioritize folate: spinach, lentils, citrus, and fortified grains.',
-    prayerAr: 'الصلاة المعتادة مناسبة، وخذي الراحة عند الغثيان أو الدوخة.',
-    prayerEn: 'Standard prayer is fine; rest if nausea or dizziness appears.',
-    dua: 'Rabbi hab li min ladunka dhurriyyatan tayyibatan',
-    checklistAr: ['تأكيد موعد أول زيارة', 'بدء فيتامين الحمل', 'تسجيل أي أعراض غير معتادة'],
-    checklistEn: ['Schedule first visit', 'Start prenatal vitamin', 'Log unusual symptoms'],
+    prayerAr: 'الأصل الصلاة المعتادة، ومع الغثيان أو الدوخة خذي الهيئة الأيسر بحسب الاستطاعة.',
+    prayerEn: 'Standard prayer remains the default; with nausea or dizziness, use the easiest posture you can.',
   },
   {
     week: 12,
@@ -71,15 +63,12 @@ const GUIDES: WeekGuide[] = [
     stageEn: 'Alaqah stage',
     sizeAr: 'بحجم ليمونة',
     sizeEn: 'Lime size',
-    medicalAr: 'تتشكل الأعضاء الأساسية وتبدأ المؤشرات الحيوية بالاستقرار غالباً.',
-    medicalEn: 'Major organs are forming and early pregnancy often starts to stabilize.',
+    medicalAr: 'تتشكل الأعضاء الأساسية وغالباً تبدأ أعراض البداية بالاستقرار.',
+    medicalEn: 'Major organs are forming and early pregnancy symptoms often begin to settle.',
     nutritionAr: 'ادعمي الكالسيوم والبروتين: الزبادي، البيض، البقول، والمكسرات.',
     nutritionEn: 'Support calcium and protein: yogurt, eggs, legumes, and nuts.',
-    prayerAr: 'إن زاد التعب، يجوز أداء الصلاة بالهيئة الأرفق حسب الحاجة.',
-    prayerEn: 'If fatigue increases, pray in the position that is easiest as needed.',
-    dua: "Rabbi ij'alni muqima as-salati wa min dhurriyyati",
-    checklistAr: ['مراجعة نتائج التحاليل', 'تجهيز أسئلة الزيارة', 'متابعة الماء والنوم'],
-    checklistEn: ['Review lab results', 'Prepare visit questions', 'Track water and sleep'],
+    prayerAr: 'عند التعب الواضح، اختاري هيئة صلاة أرفق مع المحافظة على الطمأنينة قدر القدرة.',
+    prayerEn: 'When fatigue is strong, choose an easier prayer posture while keeping calmness as able.',
   },
   {
     week: 20,
@@ -91,11 +80,8 @@ const GUIDES: WeekGuide[] = [
     medicalEn: 'Movement may be clearer. This is an important growth and scan window.',
     nutritionAr: 'الحديد مهم الآن: اللحوم الخفيفة، الفاصوليا، التمر، والمشمش المجفف.',
     nutritionEn: 'Iron matters now: lean meats, beans, dates, and dried apricots.',
-    prayerAr: 'اختاري وضعية ثابتة ومريحة إذا تأثر التوازن أو الظهر.',
-    prayerEn: 'Choose a stable, comfortable posture if balance or back pain is affected.',
-    dua: 'Allahumma barik lana fi ma razaqtana',
-    checklistAr: ['متابعة حركة الجنين', 'مراجعة الحديد', 'تخفيف الوقوف الطويل'],
-    checklistEn: ['Notice movement', 'Check iron intake', 'Reduce long standing'],
+    prayerAr: 'إذا تأثر التوازن أو الظهر، اختاري وضعية ثابتة ومريحة بحسب الاستطاعة.',
+    prayerEn: 'If balance or back pain is affected, choose a steady, comfortable posture as able.',
   },
   {
     week: 32,
@@ -107,11 +93,8 @@ const GUIDES: WeekGuide[] = [
     medicalEn: 'Back and breathing pressure can rise. Watch sudden swelling or severe headache.',
     nutritionAr: 'وجبات أصغر ومتكررة قد تساعد مع الحموضة وثقل المعدة.',
     nutritionEn: 'Smaller frequent meals may help with reflux and heaviness.',
-    prayerAr: 'الصلاة جلوساً خيار رحيم عند المشقة أو ثقل الحركة.',
-    prayerEn: 'Sitting prayer is a merciful option when movement is difficult.',
-    dua: 'Rabbi yassir wa la tu’assir',
-    checklistAr: ['تجهيز حقيبة الولادة', 'مراجعة خطة المستشفى', 'الراحة بين الأعمال'],
-    checklistEn: ['Prepare hospital bag', 'Review birth plan', 'Rest between tasks'],
+    prayerAr: 'عند المشقة، الصلاة جلوساً أو بالهيئة الأيسر تكون بحسب القدرة والحاجة.',
+    prayerEn: 'When hardship exists, sitting or easier prayer postures are based on ability and need.',
   },
   {
     week: 40,
@@ -119,41 +102,29 @@ const GUIDES: WeekGuide[] = [
     stageEn: 'Due window',
     sizeAr: 'اكتمل النمو غالباً',
     sizeEn: 'Likely full term',
-    medicalAr: 'الجنين جاهز غالباً. تابعي علامات المخاض وحركة الجنين حسب إرشادات الطبيبة.',
-    medicalEn: 'Baby is likely ready. Track labor signs and movement as advised by your clinician.',
+    medicalAr: 'تابعي علامات المخاض وحركة الجنين حسب إرشادات الطبيبة.',
+    medicalEn: 'Track labor signs and baby movement as advised by your clinician.',
     nutritionAr: 'التمر والسوائل والوجبات الخفيفة تساعد على الطاقة إن كانت مناسبة لك.',
     nutritionEn: 'Dates, fluids, and light meals can support energy if suitable for you.',
     prayerAr: 'اختاري الوضعية الأيسر، ومع الولادة يبدأ النفاس بعد نزول الدم.',
     prayerEn: 'Use the easiest posture; nifas begins after postpartum bleeding starts.',
-    dua: "Rabbi yassir wa la tu'assir",
-    checklistAr: ['الاتصال عند علامات المخاض', 'متابعة حركة الجنين', 'تجهيز بداية النفاس'],
-    checklistEn: ['Call for labor signs', 'Track movement', 'Prepare for nifas'],
   },
 ];
 
-const getGuide = (week: number) => {
-  return [...GUIDES].reverse().find(item => week >= item.week) || GUIDES[0];
-};
+const clampWeek = (week: number) => Math.min(40, Math.max(1, Math.round(week || 1)));
+const getGuide = (week: number) => [...GUIDES].reverse().find(item => week >= item.week) || GUIDES[0];
 
-const clampWeek = (week: number) => Math.min(40, Math.max(1, week || 1));
-
-export const PregnancyTracker = ({ currentWeek, onLogBirth, onWeekChange }: PregnancyTrackerProps) => {
+export const PregnancyTracker = ({ currentWeek, onLogBirth }: PregnancyTrackerProps) => {
   const { t, language } = useTranslation();
   const isRTL = language === 'ar';
-  const [selectedWeek, setSelectedWeek] = useState(clampWeek(currentWeek));
-  const [savingWeek, setSavingWeek] = useState(false);
-
-  useEffect(() => {
-    setSelectedWeek(clampWeek(currentWeek));
-  }, [currentWeek]);
-
-  const guide = useMemo(() => getGuide(selectedWeek), [selectedWeek]);
-  const trimester = Math.min(3, Math.max(1, Math.ceil(selectedWeek / 13)));
+  const week = clampWeek(currentWeek);
+  const guide = useMemo(() => getGuide(week), [week]);
+  const trimester = Math.min(3, Math.max(1, Math.ceil(week / 13)));
   const trimesterRange = trimester === 1 ? '1-13' : trimester === 2 ? '14-27' : '28-40';
-  const daysRemaining = Math.max(0, (40 - selectedWeek) * 7);
-  const progress = Math.round((selectedWeek / 40) * 100);
-  const weeksToBirth = Math.max(0, 40 - selectedWeek);
-  const nextMilestone = GUIDES.find(item => item.week > selectedWeek);
+  const daysRemaining = Math.max(0, (40 - week) * 7);
+  const progress = Math.round((week / 40) * 100);
+  const weeksToBirth = Math.max(0, 40 - week);
+  const nextMilestone = GUIDES.find(item => item.week > week);
 
   const copy = {
     stage: isRTL ? guide.stageAr : guide.stageEn,
@@ -161,7 +132,6 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth, onWeekChange }: Preg
     medical: isRTL ? guide.medicalAr : guide.medicalEn,
     nutrition: isRTL ? guide.nutritionAr : guide.nutritionEn,
     prayer: isRTL ? guide.prayerAr : guide.prayerEn,
-    checklist: isRTL ? guide.checklistAr : guide.checklistEn,
     daysRemaining: isRTL ? `${daysRemaining} يوم تقريباً` : `About ${daysRemaining} days`,
     weeksToBirth: isRTL ? `${weeksToBirth} أسبوع متبقٍ` : `${weeksToBirth} weeks left`,
     trimesterRange: isRTL ? `أسابيع ${trimesterRange}` : `Weeks ${trimesterRange}`,
@@ -169,26 +139,34 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth, onWeekChange }: Preg
       ? (isRTL ? `المحطة القادمة: أسبوع ${nextMilestone.week}` : `Next milestone: week ${nextMilestone.week}`)
       : (isRTL ? 'أنتِ في نافذة الولادة' : 'You are in the due window'),
     prayerMetric: isRTL ? 'حسب الاستطاعة عند المشقة' : 'As able when hardship exists',
-    saved: isRTL ? 'تم حفظ الأسبوع' : 'Week saved',
   };
 
-  const updateWeek = async (nextWeek: number) => {
-    const week = clampWeek(nextWeek);
-    setSelectedWeek(week);
-    if (!onWeekChange) return;
-    setSavingWeek(true);
-    try {
-      await onWeekChange(week);
-    } finally {
-      setSavingWeek(false);
-    }
-  };
+  const insights = [
+    {
+      icon: Stethoscope,
+      label: isRTL ? 'صحة' : 'Health',
+      text: copy.medical,
+      tone: 'emerald' as const,
+    },
+    {
+      icon: Utensils,
+      label: isRTL ? 'تغذية' : 'Nutrition',
+      text: copy.nutrition,
+      tone: 'amber' as const,
+    },
+    {
+      icon: Moon,
+      label: isRTL ? 'الصلاة' : 'Prayer',
+      text: copy.prayer,
+      tone: 'indigo' as const,
+    },
+  ];
 
   return (
     <div className="w-full max-w-5xl space-y-5" dir={isRTL ? 'rtl' : 'ltr'}>
       <section className="relative overflow-hidden rounded-[30px] border border-emerald-100 bg-white shadow-xl shadow-emerald-950/5">
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-rose-400 via-amber-300 to-emerald-500" />
-        <div className="grid gap-5 p-5 md:grid-cols-[1.2fr_0.8fr] md:p-7">
+        <div className="grid gap-6 p-5 md:grid-cols-[1.05fr_0.95fr] md:p-7">
           <div className="space-y-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -196,37 +174,19 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth, onWeekChange }: Preg
                   {isRTL ? 'رحلة الحمل' : 'Pregnancy Journey'}
                 </p>
                 <h2 className="mt-1 text-4xl font-serif font-bold leading-tight text-emerald-950 md:text-5xl">
-                  {t('week')} {selectedWeek}
+                  {t('week')} {week}
                 </h2>
                 <p className="mt-1 text-sm font-bold text-rose-700">
                   {copy.stage} · {copy.size}
                 </p>
                 <p className="mt-3 max-w-xl text-sm leading-7 text-gray-600">
                   {isRTL
-                    ? 'لوحة مختصرة لما يهمك هذا الأسبوع: النمو، الرخصة عند المشقة، والتنبيهات العملية.'
-                    : 'A compact view of what matters this week: growth, prayer ease, and practical care.'}
+                    ? 'يتم حساب الأسبوع تلقائياً من تاريخ بداية الحمل الذي اخترته في الإعداد.'
+                    : 'Your week updates automatically from the pregnancy start date saved in setup.'}
                 </p>
               </div>
-              <div className="flex flex-col items-center gap-2">
-                <div className="grid h-16 w-16 place-items-center rounded-2xl bg-rose-50 text-rose-700">
-                  <Baby className="h-8 w-8" />
-                </div>
-                <div className="flex items-center gap-1 rounded-full bg-gray-50 p-1">
-                  <button
-                    onClick={() => updateWeek(selectedWeek - 1)}
-                    className="grid h-8 w-8 place-items-center rounded-full bg-white text-sm font-bold text-emerald-900 shadow-sm transition active:scale-95"
-                    aria-label={isRTL ? 'إنقاص أسبوع' : 'Decrease week'}
-                  >
-                    -
-                  </button>
-                  <button
-                    onClick={() => updateWeek(selectedWeek + 1)}
-                    className="grid h-8 w-8 place-items-center rounded-full bg-emerald-700 text-sm font-bold text-white shadow-sm transition active:scale-95"
-                    aria-label={isRTL ? 'زيادة أسبوع' : 'Increase week'}
-                  >
-                    +
-                  </button>
-                </div>
+              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-rose-50 text-rose-700">
+                <Baby className="h-8 w-8" />
               </div>
             </div>
 
@@ -245,40 +205,30 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth, onWeekChange }: Preg
               <div className="grid gap-2 pt-1 sm:grid-cols-3">
                 <StatusChip label={isRTL ? 'نطاق الثلث' : 'Trimester range'} value={copy.trimesterRange} />
                 <StatusChip label={isRTL ? 'المحطة' : 'Milestone'} value={copy.nextMilestone} />
-                <StatusChip label={isRTL ? 'الحفظ' : 'Saved'} value={savingWeek ? copy.saved : (isRTL ? 'محفوظ تلقائياً' : 'Auto-saved')} />
+                <StatusChip label={isRTL ? 'التتبع' : 'Tracking'} value={isRTL ? 'تلقائي من يوم التفعيل' : 'Automatic from setup'} />
               </div>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 md:grid-cols-1">
+          <div className="grid gap-3">
             <Metric icon={CalendarDays} label={isRTL ? 'حتى الموعد' : 'Until due'} value={copy.daysRemaining} tone="emerald" />
             <Metric icon={Heart} label={isRTL ? 'المتبقي' : 'Remaining'} value={copy.weeksToBirth} tone="rose" />
-            <Metric icon={ShieldCheck} label={isRTL ? 'رخصة الصلاة' : 'Prayer ease'} value={copy.prayerMetric} tone="indigo" />
+            <Metric icon={ShieldCheck} label={isRTL ? 'الصلاة' : 'Prayer'} value={copy.prayerMetric} tone="indigo" />
           </div>
         </div>
-      </section>
 
-      <section className="grid gap-3 md:grid-cols-2">
-        <InfoCard icon={Stethoscope} title={t('medical')} text={copy.medical} tone="emerald" />
-        <InfoCard icon={Utensils} title={t('nutrition')} text={copy.nutrition} tone="amber" />
-      </section>
-
-      <section className="grid gap-3 md:grid-cols-[1fr_1fr]">
-        <InfoCard icon={Moon} title={t('prayer_modification')} text={copy.prayer} tone="indigo" />
-        <InfoCard icon={Heart} title={t('dua_for_baby')} text={`"${guide.dua}"`} tone="rose" italic />
-      </section>
-
-      <section className="rounded-[24px] border border-gray-100 bg-white p-5 shadow-lg shadow-black/5">
-        <div className="mb-4 flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-          <h3 className="text-sm font-bold text-gray-900">{isRTL ? 'قائمة هذا الأسبوع' : 'This Week Checklist'}</h3>
-        </div>
-        <div className="grid gap-2 md:grid-cols-3">
-          {copy.checklist.map((item) => (
-            <div key={item} className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-700">
-              {item}
-            </div>
-          ))}
+        <div className="border-t border-emerald-50 bg-gradient-to-b from-emerald-50/40 to-white p-5 md:p-7">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-bold text-emerald-950">{isRTL ? 'مهم هذا الأسبوع' : 'This Week Matters'}</h3>
+            <span className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-emerald-700 shadow-sm">
+              {isRTL ? 'مختصر وعملي' : 'Short and practical'}
+            </span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {insights.map((item) => (
+              <Insight key={item.label} {...item} />
+            ))}
+          </div>
         </div>
       </section>
 
@@ -317,12 +267,12 @@ const StatusChip = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-const InfoCard = ({ icon: Icon, title, text, tone, italic = false }: { icon: any; title: string; text: string; tone: keyof typeof toneClasses; italic?: boolean }) => (
-  <article className={cn('min-h-[132px] rounded-[24px] border p-5 shadow-sm', toneClasses[tone])}>
-    <div className="mb-3 flex items-center gap-2">
-      <Icon className="h-5 w-5" />
-      <h3 className="text-sm font-bold">{title}</h3>
+const Insight = ({ icon: Icon, label, text, tone }: { icon: any; label: string; text: string; tone: keyof typeof toneClasses }) => (
+  <article className={cn('rounded-2xl border p-4 shadow-sm', toneClasses[tone])}>
+    <div className="mb-2 flex items-center gap-2">
+      <Icon className="h-4 w-4" />
+      <h4 className="text-xs font-bold">{label}</h4>
     </div>
-    <p className={cn('text-sm leading-7', italic && 'italic')}>{text}</p>
+    <p className="text-xs leading-6">{text}</p>
   </article>
 );

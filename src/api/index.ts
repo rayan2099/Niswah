@@ -594,17 +594,31 @@ export async function deleteAccount(): Promise<ApiResponse<boolean>> {
   return { data: true, error: null };
 }
 
+function mapChatMessage(row: any): DBChatMessage {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    chat_type: row.chat_type,
+    role: row.role,
+    text: row.text || row.content || '',
+    content: row.content,
+    timestamp: row.timestamp,
+  };
+}
+
 export async function saveChatMessage(message: Omit<DBChatMessage, 'id' | 'user_id'>): Promise<ApiResponse<DBChatMessage>> {
   const authUser = await ensureUser();
   if (!authUser) return { data: null, error: 'Not authenticated' };
 
   const messageData = {
-    ...cleanObject(message),
+    chat_type: message.chat_type,
+    role: message.role,
+    content: message.text,
     user_id: authUser.id,
     timestamp: new Date().toISOString(),
   };
   const { data, error } = await supabase.from('chat_history').insert(messageData).select('*').single();
-  return error ? { data: null, error: error.message } : { data: data as DBChatMessage, error: null };
+  return error ? { data: null, error: error.message } : { data: mapChatMessage(data), error: null };
 }
 
 export async function getChatHistory(chatType: DBChatMessage['chat_type']): Promise<ApiResponse<DBChatMessage[]>> {
@@ -617,5 +631,5 @@ export async function getChatHistory(chatType: DBChatMessage['chat_type']): Prom
     .eq('user_id', authUser.id)
     .eq('chat_type', chatType)
     .order('timestamp', { ascending: true });
-  return error ? { data: null, error: error.message } : { data: data as DBChatMessage[], error: null };
+  return error ? { data: null, error: error.message } : { data: (data || []).map(mapChatMessage), error: null };
 }

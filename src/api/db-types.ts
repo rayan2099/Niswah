@@ -161,5 +161,6 @@ export interface DBChatMessage {
   chat_type: 'dream' | 'doctor' | 'niswah';
   role: 'user' | 'model';
   text: string;
+  content?: string;
   timestamp: string;
 }

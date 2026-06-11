@@ -331,7 +331,7 @@ Structure answers: 1) what it may mean 2) what to do now 3) when to contact clin
     <div className="w-full max-w-5xl space-y-5" dir={isRTL ? 'rtl' : 'ltr'}>
       <section className="relative overflow-hidden rounded-[30px] border border-emerald-100 bg-white shadow-xl shadow-emerald-950/5">
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-rose-400 via-amber-300 to-emerald-500" />
-        <div className="grid gap-6 p-5 md:grid-cols-[1.08fr_0.92fr] md:p-7">
+        <div className="grid gap-5 p-4 sm:p-5 md:grid-cols-[1.08fr_0.92fr] md:gap-6 md:p-7">
           <div className="space-y-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -382,7 +382,7 @@ Structure answers: 1) what it may mean 2) what to do now 3) when to contact clin
             </div>
           </div>
 
-          <div className="grid gap-3">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-1 md:gap-3">
             <Metric icon={CalendarDays} label={isRTL ? 'حتى الموعد' : 'Until due'} value={copy.daysRemaining} tone="emerald" />
             <Metric icon={Heart} label={isRTL ? 'المتبقي' : 'Remaining'} value={copy.weeksToBirth} tone="rose" />
           </div>
@@ -603,12 +603,17 @@ const toneClasses = {
 };
 
 const Metric = ({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone: keyof typeof toneClasses }) => (
-  <div className={cn('rounded-2xl border p-4', toneClasses[tone])}>
-    <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest opacity-70">
-      <Icon className="h-4 w-4" />
-      <span>{label}</span>
+  <div className={cn('relative overflow-hidden rounded-3xl border p-3 shadow-sm sm:p-4', toneClasses[tone])}>
+    <div className="absolute -top-8 start-1/2 h-20 w-20 rounded-full bg-white/45 blur-xl" />
+    <div className="relative flex min-h-[86px] flex-col justify-between gap-3 sm:min-h-[104px]">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-widest opacity-65 sm:text-[11px]">{label}</span>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-2xl bg-white/70 shadow-sm sm:h-9 sm:w-9">
+          <Icon className="h-4 w-4" />
+        </span>
+      </div>
+      <p className="text-balance text-xl font-serif font-bold leading-tight sm:text-2xl md:text-3xl">{value}</p>
     </div>
-    <p className="text-lg font-serif font-bold leading-tight">{value}</p>
   </div>
 );
 

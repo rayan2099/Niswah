@@ -1304,8 +1304,10 @@ export const Today = ({
 }) => {
   const { t, isRTL } = useTranslation();
   const { user, fiqhState, currentDay, cycleStats, prediction, ovulation, entries, loading: dataLoading, refresh } = useCycleData();
-  
-  const isFirstTime = !dataLoading && (!entries || entries.filter(e => !e.is_predicted).length === 0);
+  const isPregnant = Boolean(user?.pregnant || user?.conditions?.includes('pregnant'));
+  const isPostpartum = Boolean(user?.conditions?.includes('postpartum'));
+  const hasActualCycleEntries = Boolean(entries?.some(e => !e.is_predicted));
+  const isFirstTime = !dataLoading && !isPregnant && !isPostpartum && !hasActualCycleEntries;
 
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [isHealthDoctorOpen, setIsHealthDoctorOpen] = useState(false);
@@ -1338,24 +1340,26 @@ export const Today = ({
       const newState = (logData.intensity === 'none' ? 'TAHARA' : 'HAID') as State;
       
       const entry: Partial<api.DBCycleEntry> = {
+        id: todayEntry?.id,
         date: format(new Date(), 'yyyy-MM-dd'),
-        time_logged: logData.timestamp,
+        time_logged: logData.timestamp || new Date().toISOString(),
         fiqh_state: newState,
         flow_intensity: logData.intensity as any,
-        blood_color: logData.color as any,
-        blood_thickness: logData.thickness as any,
-        kursuf_used: logData.kursuf,
-        discharge_internal: logData.internal,
-        symptoms: logData.symptoms,
-        sleep_quality: logData.sleep_quality,
-        energy_level: logData.energy_level,
-        mood: logData.mood,
-        feeling: logData.feeling,
-        notes: logData.notes,
+        blood_color: (logData.intensity === 'none' ? 'other' : (logData.color || 'red')) as any,
+        blood_thickness: (logData.thickness || 'normal') as any,
+        kursuf_used: Boolean(logData.kursuf),
+        discharge_internal: Boolean(logData.internal),
+        symptoms: logData.symptoms || {},
+        sleep_quality: logData.sleep_quality ?? todayEntry?.sleep_quality ?? 3,
+        energy_level: logData.energy_level ?? todayEntry?.energy_level ?? 3,
+        mood: logData.mood ?? todayEntry?.mood ?? 2,
+        feeling: logData.feeling ?? todayEntry?.feeling ?? '',
+        notes: logData.notes ?? todayEntry?.notes ?? null,
         is_predicted: false
       };
 
-      await api.logCycleEntry(entry);
+      const { error } = await api.logCycleEntry(entry);
+      if (error) throw new Error(error);
       
       await refresh();
       
@@ -1373,10 +1377,10 @@ export const Today = ({
       }
     } catch (err) {
       console.error("Failed to save log", err);
+      alert(isRTL ? 'تعذر حفظ تسجيل اليوم. حاولي مرة أخرى.' : 'Could not save today’s log. Please try again.');
     }
   };
 
-  const isPregnant = user?.pregnant || false;
   const hasPCOS = user?.conditions?.includes('PCOS');
   const hasEndo = user?.conditions?.includes('Endometriosis');
 
@@ -1413,12 +1417,12 @@ export const Today = ({
           <p className="text-[10px] text-emerald-700/60 font-bold tracking-widest uppercase">{t('ahlan')}, {user?.anonymous_mode ? t('sister') : (user?.display_name || t('sister'))}</p>
         </div>
         <div className="flex items-center space-x-4">
-          <div className="relative cursor-pointer">
+          <button className="relative cursor-pointer" onClick={onOpenSettings} aria-label={isRTL ? 'إعدادات التنبيهات' : 'Notification settings'}>
             <Bell className="w-6 h-6 text-emerald-900" />
-          </div>
-          <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center border-2 border-white shadow-sm overflow-hidden">
+          </button>
+          <button onClick={onOpenSettings} className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center border-2 border-white shadow-sm overflow-hidden" aria-label={isRTL ? 'فتح الملف الشخصي' : 'Open profile'}>
             <span className="text-emerald-700 font-bold text-sm uppercase">{(user?.display_name || 'AN').substring(0, 2)}</span>
-          </div>
+          </button>
         </div>
       </header>
 
@@ -1670,7 +1674,34 @@ export const Today = ({
             >
               <IstihadahMode 
                 madhhab={user?.madhhab || 'HANAFI'} 
-                onLogClassification={(isHaid) => {}}
+                onLogClassification={async (isHaid) => {
+                  const state = isHaid ? 'HAID' : 'ISTIHADAH';
+                  const { error } = await api.logCycleEntry({
+                    id: todayEntry?.id,
+                    date: format(new Date(), 'yyyy-MM-dd'),
+                    time_logged: new Date().toISOString(),
+                    fiqh_state: state,
+                    flow_intensity: isHaid ? 'medium' : 'spotting',
+                    blood_color: isHaid ? 'dark' : 'brown',
+                    blood_thickness: isHaid ? 'thick' : 'thin',
+                    kursuf_used: false,
+                    discharge_internal: false,
+                    symptoms: todayEntry?.symptoms || {},
+                    sleep_quality: todayEntry?.sleep_quality ?? 3,
+                    energy_level: todayEntry?.energy_level ?? 3,
+                    mood: todayEntry?.mood ?? 2,
+                    feeling: todayEntry?.feeling || '',
+                    notes: isRTL
+                      ? (isHaid ? 'تم التصنيف من وضع الاستحاضة: دم قوي يُحسب حيضاً.' : 'تم التصنيف من وضع الاستحاضة: دم ضعيف يُحسب استحاضة.')
+                      : (isHaid ? 'Classified from istihadah mode: strong blood counted as haid.' : 'Classified from istihadah mode: weak blood counted as istihadah.'),
+                    is_predicted: false
+                  } as Partial<api.DBCycleEntry>);
+                  if (error) {
+                    alert(isRTL ? 'تعذر حفظ تصنيف الاستحاضة. حاولي مرة أخرى.' : 'Could not save istihadah classification. Please try again.');
+                    return;
+                  }
+                  await refresh();
+                }}
               />
             </motion.div>
           )}
@@ -1685,13 +1716,15 @@ export const Today = ({
         )}
 
         {/* Fiqh State Banner */}
-        <FiqhStateBanner 
-          fiqhState={fiqhState} 
-          madhhab={user?.madhhab || 'HANAFI'} 
-          currentDay={currentDay}
-          cycleLength={cycleLength}
-          haidDuration={haidDuration}
-        />
+        {!isPregnant && (
+          <FiqhStateBanner 
+            fiqhState={fiqhState} 
+            madhhab={user?.madhhab || 'HANAFI'} 
+            currentDay={currentDay}
+            cycleLength={cycleLength}
+            haidDuration={haidDuration}
+          />
+        )}
 
         {/* Dynamic Widgets */}
         <div className="space-y-4">

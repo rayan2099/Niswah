@@ -22,8 +22,13 @@ export const usePWAInstall = () => {
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     setPlatform({ isIOS, isSafari });
 
-    const count = parseInt(localStorage.getItem('niswah_session_count') || '0') + 1;
-    localStorage.setItem('niswah_session_count', count.toString());
+    const hasCountedThisPage = sessionStorage.getItem('niswah_session_counted') === 'true';
+    const previousCount = parseInt(localStorage.getItem('niswah_session_count') || '0');
+    const count = hasCountedThisPage ? previousCount : previousCount + 1;
+    if (!hasCountedThisPage) {
+      localStorage.setItem('niswah_session_count', count.toString());
+      sessionStorage.setItem('niswah_session_counted', 'true');
+    }
     setSessionCount(count);
 
     const handler = (e: Event) => {
@@ -32,14 +37,19 @@ export const usePWAInstall = () => {
       setCanInstall(true);
     };
 
-    window.addEventListener('beforeinstallprompt', handler);
-    window.addEventListener('appinstalled', () => {
+    const installedHandler = () => {
       setIsInstalled(true);
       setCanInstall(false);
       setInstallPrompt(null);
-    });
+    };
 
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', installedHandler);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', installedHandler);
+    };
   }, []);
 
   const triggerInstall = async (): Promise<'accepted' | 'dismissed' | 'unavailable'> => {
@@ -53,7 +63,7 @@ export const usePWAInstall = () => {
     return outcome;
   };
 
-  const shouldShowBanner = canInstall && !isInstalled && sessionCount >= 3;
+  const shouldShowBanner = !isInstalled && sessionCount >= 1 && (canInstall || platform.isIOS || platform.isSafari);
 
   return { canInstall, isInstalled, triggerInstall, shouldShowBanner, sessionCount, platform };
 };

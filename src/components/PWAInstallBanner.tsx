@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { X, Download, CheckCircle2 } from 'lucide-react';
+import { X, Download, CheckCircle2, Share, PlusSquare, WifiOff, Bell, Zap } from 'lucide-react';
 import { useTranslation } from '../i18n/LanguageContext.tsx';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -11,21 +11,28 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export const PWAInstallBanner = () => {
-  const { isInstalled, triggerInstall, shouldShowBanner } = usePWAInstall();
+  const { isInstalled, triggerInstall, shouldShowBanner, platform } = usePWAInstall();
   const [dismissed, setDismissed] = useState(() => {
-    const t = localStorage.getItem('niswah_install_dismissed');
+    const t = localStorage.getItem('niswah_install_dismissed_v2');
     if (!t) return false;
     return Date.now() - parseInt(t) < 7 * 24 * 60 * 60 * 1000;
   });
   const [installing, setInstalling] = useState(false);
+  const [showManualSteps, setShowManualSteps] = useState(false);
 
   if (isInstalled || dismissed || !shouldShowBanner) return null;
 
   const handleInstall = async () => {
+    if (platform.isIOS || platform.isSafari) {
+      setShowManualSteps(true);
+      return;
+    }
+
     setInstalling(true);
     const outcome = await triggerInstall();
     setInstalling(false);
     if (outcome === 'accepted') setDismissed(true);
+    if (outcome === 'unavailable') setShowManualSteps(true);
   };
 
   return (
@@ -41,7 +48,7 @@ export const PWAInstallBanner = () => {
         <button
           onClick={() => {
             setDismissed(true);
-            localStorage.setItem('niswah_install_dismissed', Date.now().toString());
+            localStorage.setItem('niswah_install_dismissed_v2', Date.now().toString());
           }}
           className="absolute top-3 left-3 w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center"
         >
@@ -58,18 +65,35 @@ export const PWAInstallBanner = () => {
           </div>
         </div>
 
-        <div className="flex gap-2 mb-3">
+        <div className="grid grid-cols-3 gap-2 mb-3">
           {[
-            { icon: '⚡', text: 'أسرع بكثير' },
-            { icon: '📴', text: 'بلا إنترنت' },
-            { icon: '🔔', text: 'إشعارات' },
-          ].map((f, i) => (
+            { icon: Zap, text: 'أسرع بكثير' },
+            { icon: WifiOff, text: 'بلا إنترنت' },
+            { icon: Bell, text: 'إشعارات' },
+          ].map(({ icon: Icon, text }, i) => (
             <div key={i} className="flex-1 bg-rose-50 rounded-xl p-2 text-center">
-              <div style={{ fontSize: '16px' }}>{f.icon}</div>
-              <div className="text-xs text-rose-700 mt-1 font-medium">{f.text}</div>
+              <Icon className="mx-auto h-4 w-4 text-rose-500" />
+              <div className="text-xs text-rose-700 mt-1 font-medium">{text}</div>
             </div>
           ))}
         </div>
+
+        {showManualSteps && (
+          <div className="mb-3 space-y-2 rounded-2xl border border-rose-100 bg-rose-50/60 p-3 text-sm text-gray-700">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-rose-500">
+                <Share className="h-4 w-4" />
+              </span>
+              <span>افتحي قائمة المشاركة في المتصفح.</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-rose-500">
+                <PlusSquare className="h-4 w-4" />
+              </span>
+              <span>اختاري “إضافة إلى الشاشة الرئيسية”.</span>
+            </div>
+          </div>
+        )}
 
         <button
           onClick={handleInstall}
@@ -77,7 +101,7 @@ export const PWAInstallBanner = () => {
           className="w-full py-3 bg-rose-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
         >
           <Download className="w-4 h-4" style={{ width: '16px', height: '16px' }} />
-          {installing ? 'جارٍ التثبيت...' : 'تثبيت على الشاشة الرئيسية'}
+          {installing ? 'جارٍ التثبيت...' : platform.isIOS || platform.isSafari ? 'طريقة الإضافة للشاشة الرئيسية' : 'تثبيت على الشاشة الرئيسية'}
         </button>
 
         <p className="text-xs text-gray-400 text-center mt-2">مجاني — لا يتطلب App Store</p>

@@ -240,7 +240,6 @@ export async function ensurePregnancyRecord(currentWeek = 1): Promise<ApiRespons
     current_week: Math.min(40, Math.max(1, Math.round(currentWeek || 1))),
     lmp_date: toDateInputValue(lmpDate),
     due_date: toDateInputValue(dueDate),
-    weekly_notes: {},
   };
 
   const existing = await getActivePregnancyRecordForUser(authUser.id);
@@ -261,7 +260,38 @@ export async function ensurePregnancyRecord(currentWeek = 1): Promise<ApiRespons
     .insert({
       user_id: authUser.id,
       ...payload,
+      weekly_notes: {},
     })
+    .select('*')
+    .single();
+
+  return error ? { data: null, error: error.message } : { data: data as DBPregnancyRecord, error: null };
+}
+
+export async function getActivePregnancyRecord(): Promise<ApiResponse<DBPregnancyRecord>> {
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
+  return getActivePregnancyRecordForUser(authUser.id);
+}
+
+export async function updatePregnancyNotes(notes: Record<string, any>): Promise<ApiResponse<DBPregnancyRecord>> {
+  const authUser = await ensureUser();
+  if (!authUser) return { data: null, error: 'Not authenticated' };
+
+  const existing = await getActivePregnancyRecordForUser(authUser.id);
+  if (existing.error) return existing;
+  if (!existing.data) return { data: null, error: 'No active pregnancy record' };
+
+  const weeklyNotes = {
+    ...(existing.data.weekly_notes || {}),
+    ...notes,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from('pregnancy_records')
+    .update({ weekly_notes: weeklyNotes })
+    .eq('id', existing.data.id)
     .select('*')
     .single();
 

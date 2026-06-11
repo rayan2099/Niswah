@@ -1189,16 +1189,17 @@ const NiswahToggle = ({
     role="switch"
     aria-checked={value}
     disabled={disabled}
+    dir="ltr"
     onClick={() => {
       HapticService.medium();
       onChange(!value);
     }}
-    className={`relative inline-flex h-[31px] w-[51px] flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 ${
+    className={`relative h-8 w-[52px] flex-shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-100 disabled:opacity-40 ${
       value ? 'bg-[#34C759]' : 'bg-[#E5E5EA]'
     }`}
   >
     <span
-      className={`pointer-events-none inline-block h-[27px] w-[27px] transform rounded-full bg-white shadow-[0_2px_4px_rgba(0,0,0,0.3)] ring-0 transition-transform duration-200 ease-in-out ${
+      className={`pointer-events-none absolute left-[2px] top-[2px] h-[26px] w-[26px] rounded-full bg-white shadow-[0_2px_7px_rgba(15,23,42,0.28)] ring-1 ring-black/5 transition-transform duration-200 ease-out ${
         value ? 'translate-x-[20px]' : 'translate-x-0'
       }`}
     />

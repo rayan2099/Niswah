@@ -43,16 +43,31 @@ import { generateSmartAlerts } from '../logic/healthEngine.ts';
 
 export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void }) => {
   const { t, isRTL } = useTranslation();
-  const { user, ledger, cycleStats, entries, loading } = useCycleData();
+  const { user, ledger, cycleStats, entries, prediction, ovulation, loading } = useCycleData();
   const [selectedHistory, setSelectedHistory] = useState<any>(null);
+  const isPregnant = Boolean(user?.pregnant || user?.conditions?.includes('pregnant'));
+  const isPostpartum = Boolean(user?.conditions?.includes('postpartum'));
+  const isTtc = Boolean(user?.conditions?.includes('ttc'));
+  const actualEntries = useMemo(() => entries.filter(entry => !entry.is_predicted), [entries]);
+  const numberLocale = isRTL ? 'ar-SA-u-nu-latn' : 'en-US';
+  const formatNumber = (value: number) => value.toLocaleString(numberLocale);
+  const pregnancyWeek = Math.min(40, Math.max(1, Math.round(user?.pregnancy_week || 1)));
+  const pregnancyDaysRemaining = Math.max(0, (40 - pregnancyWeek) * 7);
+  const daysUntilNext = typeof cycleStats?.daysUntilNext === 'number' ? cycleStats.daysUntilNext : null;
+  const nextPeriodDate = prediction?.predictedStartDate ? new Date(prediction.predictedStartDate) : null;
+  const ovulationDate = ovulation?.predictedOvulationDate ? new Date(ovulation.predictedOvulationDate) : null;
 
   const symptomData = useMemo(() => {
-    if (!entries || entries.length === 0) return null;
+    if (!actualEntries || actualEntries.length === 0) return null;
     
     const symptomCounts: Record<string, number> = {};
     let totalSignificantEntries = 0;
+    const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
     
-    entries.forEach(entry => {
+    actualEntries.forEach(entry => {
+      const entryTime = new Date(entry.date || entry.time_logged).getTime();
+      if (!Number.isNaN(entryTime) && entryTime < ninetyDaysAgo) return;
+
       const hasSymptoms = entry.symptoms && Object.values(entry.symptoms).some(v => v > 0);
       const hasLowEnergy = entry.energy_level !== undefined && entry.energy_level <= 2;
       const hasPoorSleep = entry.sleep_quality !== undefined && entry.sleep_quality <= 2;
@@ -85,7 +100,7 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
       results[key] = (count / totalSignificantEntries) * 100;
     });
     return results;
-  }, [entries]);
+  }, [actualEntries]);
 
   const hasAnySymptomData = symptomData && Object.keys(symptomData).length > 0;
 
@@ -93,10 +108,29 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
     const list = [];
     
     // Only add if we have real ledger data
-    if (ledger.length >= 3) {
+    if (isPregnant) {
+      list.push({
+        title: isRTL ? `أنتِ في الأسبوع ${formatNumber(pregnancyWeek)}` : `Week ${pregnancyWeek}`,
+        subtitle: isRTL
+          ? `متبقّي تقريباً ${formatNumber(pregnancyDaysRemaining)} يوماً حتى موعد الولادة المتوقع. سجّلي أي أعراض غير معتادة.`
+          : `About ${pregnancyDaysRemaining} days remain until the estimated due window. Keep logging unusual symptoms.`,
+        icon: Heart,
+        color: 'bg-emerald-50 text-emerald-600'
+      });
+    } else if (isPostpartum) {
+      list.push({
+        title: isRTL ? 'توقعات الدورة متوقفة أثناء النفاس' : 'Cycle prediction is paused during nifas',
+        subtitle: isRTL
+          ? 'بعد انتهاء النفاس وعودة الحيض، ستتحسن التوقعات تدريجياً مع التسجيل.'
+          : 'After nifas ends and cycle logs return, predictions will improve gradually.',
+        icon: Heart,
+        color: 'bg-rose-50 text-rose-600'
+      });
+    } else if (ledger.length >= 3) {
       const cycleLengths = ledger.map(l => 
         (l.tuhr_duration_days || 0) + ((l.haid_duration_hours || 0) / 24)
-      );
+      ).filter(length => Number.isFinite(length) && length > 0);
+      if (cycleLengths.length < 3) return list;
       const avg = cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length;
       const variance = Math.max(...cycleLengths) - Math.min(...cycleLengths);
       
@@ -104,7 +138,7 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
         list.push({
           title: t('cycle_regularity_high'),
           subtitle: isRTL 
-            ? `كانت آخر ${ledger.length.toLocaleString('ar-SA-u-nu-latn')} دورات لك ${Math.round(avg).toLocaleString('ar-SA-u-nu-latn')} يوماً`
+            ? `كانت آخر ${formatNumber(cycleLengths.length)} دورات لك ${formatNumber(Math.round(avg))} يوماً`
             : `Your last ${ledger.length} cycles were ${Math.round(avg)} days`,
           icon: Heart,
           color: 'bg-rose-50 text-rose-600'
@@ -113,7 +147,7 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
         list.push({
           title: t('cycle_variance_detected' as any) || 'تفاوت في طول الدورة',
           subtitle: isRTL
-            ? `تراوحت دوراتك بين ${Math.min(...cycleLengths).toLocaleString('ar-SA-u-nu-latn')} و${Math.max(...cycleLengths).toLocaleString('ar-SA-u-nu-latn')} يوماً`
+            ? `تراوحت دوراتك بين ${formatNumber(Math.round(Math.min(...cycleLengths)))} و${formatNumber(Math.round(Math.max(...cycleLengths)))} يوماً`
             : `Your cycles ranged from ${Math.round(Math.min(...cycleLengths))} to ${Math.round(Math.max(...cycleLengths))} days`,
           icon: Activity,
           color: 'bg-amber-50 text-amber-600'
@@ -122,11 +156,11 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
     }
     
     // Only add if we have prediction data
-    if (cycleStats?.daysUntilNext !== undefined) {
+    if (!isPregnant && !isPostpartum && cycleStats?.daysUntilNext !== undefined) {
       const daysUntil = cycleStats.daysUntilNext;
       if (daysUntil <= 5 && daysUntil > 0) {
         list.push({
-          title: isRTL ? `الحيض المتوقع خلال ${daysUntil.toLocaleString('ar-SA-u-nu-latn')} أيام` : `Period expected in ${daysUntil} days`,
+          title: isRTL ? `الحيض المتوقع خلال ${formatNumber(daysUntil)} أيام` : `Period expected in ${daysUntil} days`,
           subtitle: t('prepare_and_rest' as any) || 'استعدي واحرصي على الراحة الكافية',
           icon: CalendarIcon,
           color: 'bg-rose-50 text-rose-600'
@@ -145,14 +179,14 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
     }
     
     return list;
-  }, [ledger, cycleStats, t, isRTL]);
+  }, [ledger, cycleStats, t, isRTL, isPregnant, isPostpartum, pregnancyWeek, pregnancyDaysRemaining]);
 
   const smartAlerts = useMemo(() => {
     const avgHaid = cycleStats?.avgPeriodLength || 5;
     const avgCycle = cycleStats?.avgCycleLength || 28;
     
     const symptomHistory: Record<string, number[]> = {};
-    entries.forEach(e => {
+    actualEntries.forEach(e => {
       if (e.symptoms) {
         Object.entries(e.symptoms).forEach(([s, v]) => {
           if (!symptomHistory[s]) symptomHistory[s] = [];
@@ -162,13 +196,17 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
     });
 
     return generateSmartAlerts(ledger, avgHaid, avgCycle, symptomHistory);
-  }, [ledger, cycleStats, entries]);
+  }, [ledger, cycleStats, actualEntries]);
 
-  const avgCycleLength = ledger.length >= 1
-    ? Math.round(ledger.reduce((a, c) => a + (c.tuhr_duration_days || 0) + ((c.haid_duration_hours || 0) / 24), 0) / ledger.length)
+  const validCycleLengths = ledger
+    .map(c => (c.tuhr_duration_days || 0) + ((c.haid_duration_hours || 0) / 24))
+    .filter(length => Number.isFinite(length) && length > 0);
+
+  const avgCycleLength = !isPregnant && !isPostpartum && validCycleLengths.length >= 1
+    ? Math.round(validCycleLengths.reduce((a, c) => a + c, 0) / validCycleLengths.length)
     : null;
 
-  const regularityScore = ledger.length >= 3 ? (cycleStats.regularity || 0) : null;
+  const regularityScore = !isPregnant && !isPostpartum && ledger.length >= 3 ? (cycleStats.regularity || 0) : null;
 
   if (loading) return (
     <div className="flex items-center justify-center p-12">
@@ -188,11 +226,18 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
         {/* Summary Stats */}
         <section className="grid grid-cols-2 gap-4">
           <div className="bg-white p-5 rounded-[32px] shadow-sm border border-black/5 space-y-1">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('avg_cycle_length')}</p>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              {isPregnant ? (isRTL ? 'أسبوع الحمل' : 'Pregnancy week') : t('avg_cycle_length')}
+            </p>
             <div className="flex items-baseline space-x-1 rtl:space-x-reverse">
-              {avgCycleLength !== null ? (
+              {isPregnant ? (
                 <>
-                  <span className="text-2xl font-serif font-bold text-rose-600">{avgCycleLength.toLocaleString(isRTL ? 'ar-SA-u-nu-latn' : 'en-US')}</span>
+                  <span className="text-2xl font-serif font-bold text-emerald-600">{formatNumber(pregnancyWeek)}</span>
+                  <span className="text-xs text-gray-400">{isRTL ? 'من 40' : 'of 40'}</span>
+                </>
+              ) : avgCycleLength !== null ? (
+                <>
+                  <span className="text-2xl font-serif font-bold text-rose-600">{formatNumber(avgCycleLength)}</span>
                   <span className="text-xs text-gray-400">{t('days')}</span>
                 </>
               ) : (
@@ -201,14 +246,23 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
             </div>
           </div>
           <div className="bg-white p-5 rounded-[32px] shadow-sm border border-black/5 space-y-1">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('regularity')}</p>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              {isPregnant ? (isRTL ? 'المتبقي تقريباً' : 'Approx. remaining') : t('regularity')}
+            </p>
             <div className="flex items-baseline space-x-1 rtl:space-x-reverse">
-              {regularityScore !== null ? (
+              {isPregnant ? (
+                <>
+                  <span className="text-2xl font-serif font-bold text-rose-600">{formatNumber(pregnancyDaysRemaining)}</span>
+                  <span className="text-xs text-gray-400">{t('days')}</span>
+                </>
+              ) : regularityScore !== null ? (
                 <>
                   <span className="text-2xl font-serif font-bold text-emerald-600">
-                    {regularityScore.toLocaleString(isRTL ? 'ar-SA-u-nu-latn' : 'en-US')}%
+                    {formatNumber(regularityScore)}%
                   </span>
-                  <span className="text-xs text-gray-400">{t('high' as any)}</span>
+                  <span className="text-xs text-gray-400">
+                    {regularityScore >= 80 ? t('high' as any) : regularityScore >= 55 ? (isRTL ? 'متوسط' : 'Medium') : (isRTL ? 'منخفض' : 'Low')}
+                  </span>
                 </>
               ) : (
                 <span className="text-sm font-medium text-gray-400">{t('insufficient_data' as any) || (isRTL ? 'بيانات غير كافية' : 'Insufficient data')}</span>
@@ -216,6 +270,51 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
             </div>
           </div>
         </section>
+
+        {!isPregnant && !isPostpartum && (nextPeriodDate || ovulationDate || isTtc) && (
+          <section className="bg-gradient-to-br from-rose-50 to-white rounded-[32px] p-5 shadow-sm border border-rose-100 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-right">
+                <h3 className="text-lg font-serif font-bold text-rose-900">
+                  {isTtc ? (isRTL ? 'توقعات الخصوبة' : 'Fertility outlook') : (isRTL ? 'التوقع القادم' : 'Next outlook')}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {isRTL ? 'تتحسن الدقة مع كل تسجيل حقيقي.' : 'Accuracy improves with each real log.'}
+                </p>
+              </div>
+              <CalendarIcon className="w-7 h-7 text-rose-500" />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {nextPeriodDate && (
+                <div className="rounded-3xl bg-white p-4 border border-rose-100 text-right">
+                  <p className="text-[10px] font-bold text-rose-400">{isRTL ? 'الحيض المتوقع' : 'Expected period'}</p>
+                  <p className="text-lg font-bold text-rose-900">
+                    {new Intl.DateTimeFormat(numberLocale, { day: 'numeric', month: 'long' }).format(nextPeriodDate)}
+                  </p>
+                  {daysUntilNext !== null && (
+                    <p className="text-xs text-gray-400">
+                      {daysUntilNext >= 0
+                        ? (isRTL ? `بعد ${formatNumber(daysUntilNext)} أيام تقريباً` : `In about ${daysUntilNext} days`)
+                        : (isRTL ? `متأخرة ${formatNumber(Math.abs(daysUntilNext))} أيام` : `${Math.abs(daysUntilNext)} days overdue`)}
+                    </p>
+                  )}
+                </div>
+              )}
+              {ovulationDate && (
+                <div className="rounded-3xl bg-white p-4 border border-emerald-100 text-right">
+                  <p className="text-[10px] font-bold text-emerald-500">{isRTL ? 'التبويض المتوقع' : 'Expected ovulation'}</p>
+                  <p className="text-lg font-bold text-emerald-900">
+                    {new Intl.DateTimeFormat(numberLocale, { day: 'numeric', month: 'long' }).format(ovulationDate)}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {isRTL ? 'للتخطيط فقط، وليس تأكيداً طبياً.' : 'For planning only, not medical confirmation.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Symptom Trends Enhanced */}
         <section className="bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 border border-black/5 space-y-8">
@@ -229,17 +328,17 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
 
           {(() => {
             const symptoms = [
-              { key: 'fatigue', labelAr: 'تعب', icon: '😫', color: '#1D9E75' },
-              { key: 'headache', labelAr: 'صداع', icon: '🧠', color: '#378ADD' },
-              { key: 'cramps', labelAr: 'تشنجات', icon: '⚡', color: '#b8325f' },
-              { key: 'mood', labelAr: 'المزاج', icon: '🫀', color: '#A09CF7' },
-              { key: 'bloating', labelAr: 'انتفاخ', icon: '💫', color: '#F0997B' },
-              { key: 'backache', labelAr: 'ألم الظهر', icon: '🔴', color: '#E24B4A' },
-              { key: 'energy', labelAr: 'طاقة منخفضة', icon: '🔋', color: '#F59E0B' },
-              { key: 'sleep', labelAr: 'نوم سيء', icon: '😴', color: '#6366F1' },
-              { key: 'nausea', labelAr: 'غثيان', icon: '🤢', color: '#FAC775' },
-              { key: 'acne', labelAr: 'حبوب', icon: '✨', color: '#B45309' },
-              { key: 'tender_breasts', labelAr: 'آلام الثدي', icon: '🎀', color: '#b8325f' },
+              { key: 'fatigue', labelAr: 'تعب', labelEn: 'Fatigue', color: '#1D9E75' },
+              { key: 'headache', labelAr: 'صداع', labelEn: 'Headache', color: '#378ADD' },
+              { key: 'cramps', labelAr: 'تشنجات', labelEn: 'Cramps', color: '#b8325f' },
+              { key: 'mood', labelAr: 'المزاج', labelEn: 'Mood', color: '#A09CF7' },
+              { key: 'bloating', labelAr: 'انتفاخ', labelEn: 'Bloating', color: '#F0997B' },
+              { key: 'backache', labelAr: 'ألم الظهر', labelEn: 'Backache', color: '#E24B4A' },
+              { key: 'energy', labelAr: 'طاقة منخفضة', labelEn: 'Low energy', color: '#F59E0B' },
+              { key: 'sleep', labelAr: 'نوم سيء', labelEn: 'Poor sleep', color: '#6366F1' },
+              { key: 'nausea', labelAr: 'غثيان', labelEn: 'Nausea', color: '#FAC775' },
+              { key: 'acne', labelAr: 'حبوب', labelEn: 'Acne', color: '#B45309' },
+              { key: 'tender_breasts', labelAr: 'آلام الثدي', labelEn: 'Breast tenderness', color: '#b8325f' },
             ];
 
             return (
@@ -249,28 +348,20 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
                     const hasData = symptomData?.[symptom.key];
                     const value = hasData ? symptomData[symptom.key] : 0;
                     const pct = hasData ? Math.round(value) : 0;
+                    const label = isRTL ? symptom.labelAr : symptom.labelEn;
                     
                     return (
-                      <div key={symptom.key} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        direction: 'rtl',
-                        marginBottom: '14px',
-                      }}>
-                        {/* Label */}
-                        <span style={{
-                          fontSize: '13px',
-                          fontWeight: 500,
-                          color: hasData ? '#374151' : '#9CA3AF',
-                          minWidth: '64px',
-                          textAlign: 'right',
-                          flexShrink: 0,
-                        }}>
-                          {symptom.labelAr}
+                      <div key={symptom.key} className={cn("flex items-center gap-3", isRTL ? "flex-row" : "flex-row-reverse")}>
+                        <span
+                          className={cn(
+                            "min-w-[76px] shrink-0 text-[13px] font-medium",
+                            hasData ? "text-gray-700" : "text-gray-400",
+                            isRTL ? "text-right" : "text-left"
+                          )}
+                        >
+                          {label}
                         </span>
                         
-                        {/* Bar track */}
                         <div style={{
                           flex: 1,
                           height: '8px',
@@ -299,16 +390,15 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
                           )}
                         </div>
                         
-                        {/* Percentage or "سجّلي" prompt */}
                         <span style={{
                           fontSize: '11px',
                           fontWeight: hasData ? 500 : 400,
                           color: hasData ? symptom.color : '#C4C4C4',
                           minWidth: '36px',
-                          textAlign: 'left',
+                          textAlign: isRTL ? 'left' : 'right',
                           flexShrink: 0,
                         }}>
-                          {hasData ? `${pct}%` : '—'}
+                          {hasData ? `${formatNumber(pct)}%` : '—'}
                         </span>
                       </div>
                     );
@@ -330,7 +420,7 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
                       color: '#9CA3AF',
                       margin: 0,
                     }}>
-                      سجّلي أعراضك يومياً لرؤية الاتجاهات هنا
+                      {isRTL ? 'سجّلي أعراضك يومياً لرؤية الاتجاهات هنا' : 'Log symptoms daily to see trends here'}
                     </p>
                   </div>
                 )}
@@ -350,7 +440,7 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
                     cursor: 'pointer',
                   }}
                 >
-                  سجّلي أعراض اليوم ←
+                  {isRTL ? 'سجّلي أعراض اليوم ←' : 'Log today’s symptoms →'}
                 </button>
               </>
             );
@@ -364,6 +454,7 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
         </section>
 
         {/* Cycle Regularity Dot Matrix */}
+        {!isPregnant && !isPostpartum && (
         <section className="bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 border border-black/5 space-y-6">
           <div className="flex items-center justify-between">
             <div className={cn("flex items-center", isRTL ? "space-x-reverse space-x-2" : "space-x-2")}>
@@ -376,7 +467,7 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
             </div>
           </div>
 
-          {entries && entries.length > 0 ? (
+          {actualEntries && actualEntries.length > 0 && regularityScore !== null ? (
             <div className="grid grid-cols-10 gap-2">
               {Array.from({ length: 30 }).map((_, i) => {
                 const isActive = regularityScore !== null && i < (regularityScore / 3.33);
@@ -411,6 +502,7 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
             {t('cycle_regularity_desc')}
           </p>
         </section>
+        )}
 
         {/* AI Insights Cards */}
         <section className="space-y-4">
@@ -466,7 +558,9 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
         <section className="space-y-4">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('cycle_history')}</h3>
-            <button className="text-[10px] font-bold text-[#FF5C8D] uppercase tracking-widest">{t('view_all')}</button>
+            <span className="text-[10px] font-bold text-[#FF5C8D] uppercase tracking-widest">
+              {ledger.length > 0 ? `${formatNumber(ledger.length)} ${isRTL ? 'سجل' : 'records'}` : t('view_all')}
+            </span>
           </div>
           
           <div className="bg-white rounded-[32px] overflow-hidden shadow-xl shadow-black/5 border border-black/5">
@@ -476,24 +570,27 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
                 <p className="text-sm text-gray-400 font-medium">{t('no_cycle_history_yet')}</p>
               </div>
             ) : (
-              ledger.slice(0, 5).map((record, i) => (
+              ledger.slice(0, 5).map((record, i) => {
+                const durationDays = record.haid_duration_hours ? Math.max(1, Math.round(record.haid_duration_hours / 24)) : null;
+                const cycleDays = durationDays !== null && record.tuhr_duration_days ? record.tuhr_duration_days + durationDays : null;
+                return (
                 <HistoryItem 
                   key={record.cycle_number}
                   startDate={new Date(record.haid_start)} 
                   endDate={record.haid_end ? new Date(record.haid_end) : null} 
-                  durationDays={Math.round(record.haid_duration_hours / 24)} 
-                  cycleDays={record.tuhr_duration_days + Math.round(record.haid_duration_hours / 24)} 
+                  durationDays={durationDays} 
+                  cycleDays={cycleDays} 
                   isRTL={isRTL}
                   t={t}
                   last={i === Math.min(ledger.length, 5) - 1}
                   onClick={() => setSelectedHistory({ 
                     startDate: new Date(record.haid_start),
                     endDate: record.haid_end ? new Date(record.haid_end) : null,
-                    durationDays: Math.round(record.haid_duration_hours / 24),
-                    cycleDays: record.tuhr_duration_days + Math.round(record.haid_duration_hours / 24)
+                    durationDays,
+                    cycleDays
                   })}
                 />
-              ))
+              )})
             )}
           </div>
         </section>
@@ -529,9 +626,11 @@ export const Insights = ({ onNavigateToToday }: { onNavigateToToday?: () => void
                     <div className="p-4 bg-emerald-50 rounded-2xl">
                       <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1">{t('duration' as any)}</p>
                       <p className="text-sm font-bold text-emerald-800">
-                        {isRTL 
-                          ? `${selectedHistory.durationDays.toLocaleString('en-US')} أيام` 
-                          : `${selectedHistory.durationDays} days`}
+                        {selectedHistory.durationDays
+                          ? (isRTL
+                            ? `${selectedHistory.durationDays.toLocaleString('en-US')} أيام`
+                            : `${selectedHistory.durationDays} days`)
+                          : (isRTL ? 'قيد التسجيل' : 'In progress')}
                       </p>
                     </div>
                   </div>
@@ -580,15 +679,17 @@ const InsightCard = ({ icon: Icon, title, desc, color, isRTL }: any) => (
 const HistoryItem = ({ startDate, endDate, durationDays, cycleDays, last, isRTL, t, onClick }: any) => {
   const locale = isRTL ? 'ar-SA-u-nu-latn' : 'en-US';
   const dateFormatter = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long' });
-  const dateRange = `${dateFormatter.format(startDate)} – ${dateFormatter.format(endDate)}`;
+  const dateRange = endDate
+    ? `${dateFormatter.format(startDate)} – ${dateFormatter.format(endDate)}`
+    : `${dateFormatter.format(startDate)} – ${isRTL ? 'مستمرة' : 'Ongoing'}`;
   
   const formattedDuration = isRTL 
-    ? `${durationDays.toLocaleString('en-US')} أيام` 
-    : `${durationDays} days`;
+    ? (durationDays ? `${durationDays.toLocaleString('en-US')} أيام` : 'قيد التسجيل')
+    : (durationDays ? `${durationDays} days` : 'In progress');
     
   const formattedCycle = isRTL
-    ? `${cycleDays.toLocaleString('en-US')} يوماً`
-    : `${cycleDays} days`;
+    ? (cycleDays ? `${cycleDays.toLocaleString('en-US')} يوماً` : '—')
+    : (cycleDays ? `${cycleDays} days` : '—');
 
   return (
     <div 

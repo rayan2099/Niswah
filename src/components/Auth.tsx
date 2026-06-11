@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Baby, CalendarDays, HeartHandshake } from 'lucide-react';
+import { Baby, Bot, CalendarDays, FileText, HeartHandshake, ShieldCheck, Sparkles, UsersRound } from 'lucide-react';
 import {
   sendPasswordReset,
   signInWithEmail,
@@ -29,18 +29,43 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
     {
       icon: CalendarDays,
       title: 'تتبع الدورة',
-      copy: 'حيض وطهارة وتنبيهات فقهية'
+      tint: 'rose'
     },
     {
       icon: HeartHandshake,
       title: 'تخطيط للحمل',
-      copy: 'نافذة الخصوبة والتبويض المتوقع'
+      tint: 'amber'
     },
     {
       icon: Baby,
       title: 'تتبع الحمل',
-      copy: 'أسابيع الحمل وطبيبة ذكية'
-    }
+      tint: 'emerald'
+    },
+    {
+      icon: Bot,
+      title: 'طبيبة ذكية',
+      tint: 'sky'
+    },
+    {
+      icon: UsersRound,
+      title: 'مجتمع نسائي',
+      tint: 'violet'
+    },
+    {
+      icon: FileText,
+      title: 'تقارير PDF',
+      tint: 'slate'
+    },
+    {
+      icon: ShieldCheck,
+      title: 'خصوصية عالية',
+      tint: 'teal'
+    },
+    {
+      icon: Sparkles,
+      title: 'رؤى يومية',
+      tint: 'pink'
+    },
   ];
 
   // Loading timeout to prevent getting stuck
@@ -191,15 +216,23 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               </p>
             </div>
 
-            <div className="w-full rounded-[28px] border border-rose-100 bg-white/80 p-3 shadow-sm shadow-rose-100/40">
-              <div className="grid grid-cols-3 gap-2">
-                {welcomeFeatures.map(({ icon: Icon, title, copy }) => (
-                  <div key={title} className="min-h-[116px] rounded-3xl bg-rose-50/70 px-2.5 py-3 text-center">
-                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-rose-500 shadow-sm">
-                      <Icon className="h-5 w-5" />
+            <div className="w-full rounded-[28px] border border-rose-100 bg-white/85 p-3 shadow-sm shadow-rose-100/40">
+              <div className="grid grid-cols-2 gap-2">
+                {welcomeFeatures.map(({ icon: Icon, title, tint }) => (
+                  <div key={title} className="flex min-h-[54px] items-center gap-2 rounded-2xl bg-white px-3 py-2 text-right shadow-sm ring-1 ring-black/[0.03]">
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${
+                      tint === 'amber' ? 'bg-amber-50 text-amber-600' :
+                      tint === 'emerald' ? 'bg-emerald-50 text-emerald-600' :
+                      tint === 'sky' ? 'bg-sky-50 text-sky-600' :
+                      tint === 'violet' ? 'bg-violet-50 text-violet-600' :
+                      tint === 'slate' ? 'bg-slate-50 text-slate-600' :
+                      tint === 'teal' ? 'bg-teal-50 text-teal-600' :
+                      tint === 'pink' ? 'bg-pink-50 text-pink-600' :
+                      'bg-rose-50 text-rose-600'
+                    }`}>
+                      <Icon className="h-4.5 w-4.5" />
                     </div>
-                    <div className="text-[12px] font-bold leading-5 text-rose-900">{title}</div>
-                    <div className="mt-1 text-[10px] leading-4 text-gray-500">{copy}</div>
+                    <div className="text-[12px] font-bold leading-5 text-slate-800">{title}</div>
                   </div>
                 ))}
               </div>

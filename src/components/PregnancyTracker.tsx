@@ -11,9 +11,6 @@ import {
   Heart,
   ShieldCheck,
   Sparkles,
-  Stethoscope,
-  Utensils,
-  Moon,
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -35,12 +32,6 @@ type WeekGuide = {
   stageEn: string;
   sizeAr: string;
   sizeEn: string;
-  medicalAr: string;
-  medicalEn: string;
-  nutritionAr: string;
-  nutritionEn: string;
-  prayerAr: string;
-  prayerEn: string;
 };
 
 const GUIDES: WeekGuide[] = [
@@ -50,12 +41,6 @@ const GUIDES: WeekGuide[] = [
     stageEn: 'Nutfah stage',
     sizeAr: 'بحجم بذرة صغيرة',
     sizeEn: 'Tiny seed size',
-    medicalAr: 'تثبيت الحمل يبدأ. راقبي النزيف أو الألم الشديد وراجعي الطبيبة عند القلق.',
-    medicalEn: 'Implantation begins. Watch for heavy bleeding or severe pain and seek care if worried.',
-    nutritionAr: 'ركزي على حمض الفوليك: السبانخ، العدس، الحمضيات، والحبوب المدعمة.',
-    nutritionEn: 'Prioritize folate: spinach, lentils, citrus, and fortified grains.',
-    prayerAr: 'الأصل الصلاة المعتادة، ومع الغثيان أو الدوخة خذي الهيئة الأيسر بحسب الاستطاعة.',
-    prayerEn: 'Standard prayer remains the default; with nausea or dizziness, use the easiest posture you can.',
   },
   {
     week: 12,
@@ -63,12 +48,6 @@ const GUIDES: WeekGuide[] = [
     stageEn: 'Alaqah stage',
     sizeAr: 'بحجم ليمونة',
     sizeEn: 'Lime size',
-    medicalAr: 'تتشكل الأعضاء الأساسية وغالباً تبدأ أعراض البداية بالاستقرار.',
-    medicalEn: 'Major organs are forming and early pregnancy symptoms often begin to settle.',
-    nutritionAr: 'ادعمي الكالسيوم والبروتين: الزبادي، البيض، البقول، والمكسرات.',
-    nutritionEn: 'Support calcium and protein: yogurt, eggs, legumes, and nuts.',
-    prayerAr: 'عند التعب الواضح، اختاري هيئة صلاة أرفق مع المحافظة على الطمأنينة قدر القدرة.',
-    prayerEn: 'When fatigue is strong, choose an easier prayer posture while keeping calmness as able.',
   },
   {
     week: 20,
@@ -76,12 +55,6 @@ const GUIDES: WeekGuide[] = [
     stageEn: 'Mid-pregnancy',
     sizeAr: 'بحجم موزة',
     sizeEn: 'Banana size',
-    medicalAr: 'قد تشعرين بالحركة بوضوح. هذا وقت مهم لمتابعة النمو والسونار.',
-    medicalEn: 'Movement may be clearer. This is an important growth and scan window.',
-    nutritionAr: 'الحديد مهم الآن: اللحوم الخفيفة، الفاصوليا، التمر، والمشمش المجفف.',
-    nutritionEn: 'Iron matters now: lean meats, beans, dates, and dried apricots.',
-    prayerAr: 'إذا تأثر التوازن أو الظهر، اختاري وضعية ثابتة ومريحة بحسب الاستطاعة.',
-    prayerEn: 'If balance or back pain is affected, choose a steady, comfortable posture as able.',
   },
   {
     week: 32,
@@ -89,12 +62,6 @@ const GUIDES: WeekGuide[] = [
     stageEn: 'Preparation stage',
     sizeAr: 'نمو سريع ووزن أكبر',
     sizeEn: 'Rapid growth',
-    medicalAr: 'يزداد الضغط على الظهر والتنفس. راقبي التورم المفاجئ أو الصداع الشديد.',
-    medicalEn: 'Back and breathing pressure can rise. Watch sudden swelling or severe headache.',
-    nutritionAr: 'وجبات أصغر ومتكررة قد تساعد مع الحموضة وثقل المعدة.',
-    nutritionEn: 'Smaller frequent meals may help with reflux and heaviness.',
-    prayerAr: 'عند المشقة، الصلاة جلوساً أو بالهيئة الأيسر تكون بحسب القدرة والحاجة.',
-    prayerEn: 'When hardship exists, sitting or easier prayer postures are based on ability and need.',
   },
   {
     week: 40,
@@ -102,12 +69,6 @@ const GUIDES: WeekGuide[] = [
     stageEn: 'Due window',
     sizeAr: 'اكتمل النمو غالباً',
     sizeEn: 'Likely full term',
-    medicalAr: 'تابعي علامات المخاض وحركة الجنين حسب إرشادات الطبيبة.',
-    medicalEn: 'Track labor signs and baby movement as advised by your clinician.',
-    nutritionAr: 'التمر والسوائل والوجبات الخفيفة تساعد على الطاقة إن كانت مناسبة لك.',
-    nutritionEn: 'Dates, fluids, and light meals can support energy if suitable for you.',
-    prayerAr: 'اختاري الوضعية الأيسر، ومع الولادة يبدأ النفاس بعد نزول الدم.',
-    prayerEn: 'Use the easiest posture; nifas begins after postpartum bleeding starts.',
   },
 ];
 
@@ -129,9 +90,6 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth }: PregnancyTrackerPr
   const copy = {
     stage: isRTL ? guide.stageAr : guide.stageEn,
     size: isRTL ? guide.sizeAr : guide.sizeEn,
-    medical: isRTL ? guide.medicalAr : guide.medicalEn,
-    nutrition: isRTL ? guide.nutritionAr : guide.nutritionEn,
-    prayer: isRTL ? guide.prayerAr : guide.prayerEn,
     daysRemaining: isRTL ? `${daysRemaining} يوم تقريباً` : `About ${daysRemaining} days`,
     weeksToBirth: isRTL ? `${weeksToBirth} أسبوع متبقٍ` : `${weeksToBirth} weeks left`,
     trimesterRange: isRTL ? `أسابيع ${trimesterRange}` : `Weeks ${trimesterRange}`,
@@ -140,27 +98,6 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth }: PregnancyTrackerPr
       : (isRTL ? 'أنتِ في نافذة الولادة' : 'You are in the due window'),
     prayerMetric: isRTL ? 'حسب الاستطاعة عند المشقة' : 'As able when hardship exists',
   };
-
-  const insights = [
-    {
-      icon: Stethoscope,
-      label: isRTL ? 'صحة' : 'Health',
-      text: copy.medical,
-      tone: 'emerald' as const,
-    },
-    {
-      icon: Utensils,
-      label: isRTL ? 'تغذية' : 'Nutrition',
-      text: copy.nutrition,
-      tone: 'amber' as const,
-    },
-    {
-      icon: Moon,
-      label: isRTL ? 'الصلاة' : 'Prayer',
-      text: copy.prayer,
-      tone: 'indigo' as const,
-    },
-  ];
 
   return (
     <div className="w-full max-w-5xl space-y-5" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -217,19 +154,6 @@ export const PregnancyTracker = ({ currentWeek, onLogBirth }: PregnancyTrackerPr
           </div>
         </div>
 
-        <div className="border-t border-emerald-50 bg-gradient-to-b from-emerald-50/40 to-white p-5 md:p-7">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-bold text-emerald-950">{isRTL ? 'مهم هذا الأسبوع' : 'This Week Matters'}</h3>
-            <span className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-emerald-700 shadow-sm">
-              {isRTL ? 'مختصر وعملي' : 'Short and practical'}
-            </span>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {insights.map((item) => (
-              <Insight key={item.label} {...item} />
-            ))}
-          </div>
-        </div>
       </section>
 
       <button
@@ -265,14 +189,4 @@ const StatusChip = ({ label, value }: { label: string; value: string }) => (
     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</p>
     <p className="mt-1 text-xs font-bold leading-5 text-gray-800">{value}</p>
   </div>
-);
-
-const Insight = ({ icon: Icon, label, text, tone }: { icon: any; label: string; text: string; tone: keyof typeof toneClasses }) => (
-  <article className={cn('rounded-2xl border p-4 shadow-sm', toneClasses[tone])}>
-    <div className="mb-2 flex items-center gap-2">
-      <Icon className="h-4 w-4" />
-      <h4 className="text-xs font-bold">{label}</h4>
-    </div>
-    <p className="text-xs leading-6">{text}</p>
-  </article>
 );

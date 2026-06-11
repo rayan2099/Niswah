@@ -3,17 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Activity,
   Baby,
   CalendarDays,
-  CheckCircle2,
+  MessageCircle,
   Heart,
   Moon,
-  ShieldAlert,
   ShieldCheck,
+  Send,
   Sparkles,
   Stethoscope,
   Utensils,
@@ -23,6 +23,7 @@ import { twMerge } from 'tailwind-merge';
 
 import * as api from '../api/index.ts';
 import { useTranslation } from '../i18n/LanguageContext.tsx';
+import { callGemini } from '../utils/aiClient.ts';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -52,20 +53,18 @@ type WeekGuide = {
 
 type PregnancyDashboardNotes = {
   movementLogs: { id: string; at: string }[];
-  symptoms: string[];
-  mood: 'calm' | 'tired' | 'anxious' | 'low' | null;
-  lastMoodAt: string | null;
-  prepDone: string[];
+  doctorMessages: PregnancyDoctorMessage[];
 };
 
-type SymptomLevel = 'green' | 'yellow' | 'red';
+type PregnancyDoctorMessage = {
+  role: 'ai' | 'user';
+  text: string;
+  timestamp: string;
+};
 
 const defaultNotes: PregnancyDashboardNotes = {
   movementLogs: [],
-  symptoms: [],
-  mood: null,
-  lastMoodAt: null,
-  prepDone: [],
+  doctorMessages: [],
 };
 
 const GUIDES: WeekGuide[] = [
@@ -161,21 +160,6 @@ const GUIDES: WeekGuide[] = [
   },
 ];
 
-const SYMPTOMS: { id: string; level: SymptomLevel; ar: string; en: string }[] = [
-  { id: 'nausea', level: 'green', ar: 'غثيان خفيف', en: 'Mild nausea' },
-  { id: 'heartburn', level: 'green', ar: 'حموضة', en: 'Heartburn' },
-  { id: 'backache', level: 'green', ar: 'ألم ظهر خفيف', en: 'Mild backache' },
-  { id: 'fatigue', level: 'green', ar: 'تعب', en: 'Fatigue' },
-  { id: 'swelling', level: 'yellow', ar: 'تورم واضح', en: 'Noticeable swelling' },
-  { id: 'vomiting', level: 'yellow', ar: 'قيء مستمر', en: 'Persistent vomiting' },
-  { id: 'contractions', level: 'yellow', ar: 'انقباضات متكررة', en: 'Repeated contractions' },
-  { id: 'reduced_movement', level: 'red', ar: 'نقص حركة الجنين', en: 'Reduced baby movement' },
-  { id: 'bleeding', level: 'red', ar: 'نزيف', en: 'Bleeding' },
-  { id: 'severe_headache', level: 'red', ar: 'صداع شديد أو زغللة', en: 'Severe headache or vision changes' },
-  { id: 'chest_pain', level: 'red', ar: 'ألم صدر أو ضيق نفس شديد', en: 'Chest pain or severe shortness of breath' },
-  { id: 'severe_pain', level: 'red', ar: 'ألم بطن شديد', en: 'Severe abdominal pain' },
-];
-
 const clampWeek = (week: number) => Math.min(40, Math.max(1, Math.round(week || 1)));
 const getGuide = (week: number) => [...GUIDES].reverse().find(item => week >= item.week) || GUIDES[0];
 const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
@@ -194,6 +178,10 @@ export const PregnancyTracker = ({ currentWeek, userId = 'local', onLogBirth }: 
   const nextMilestone = GUIDES.find(item => item.week > week);
   const [notes, setNotes] = useState<PregnancyDashboardNotes>(defaultNotes);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [doctorInput, setDoctorInput] = useState('');
+  const [isDoctorTyping, setIsDoctorTyping] = useState(false);
+  const [doctorError, setDoctorError] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -219,9 +207,9 @@ export const PregnancyTracker = ({ currentWeek, userId = 'local', onLogBirth }: 
   }, [storageKey]);
 
   const persistNotes = (nextNotes: PregnancyDashboardNotes) => {
-    setNotes(nextNotes);
-    localStorage.setItem(storageKey, JSON.stringify(nextNotes));
-    setIsSyncing(true);
+      setNotes(nextNotes);
+      localStorage.setItem(storageKey, JSON.stringify(nextNotes));
+      setIsSyncing(true);
     api.updatePregnancyNotes({ dashboard: nextNotes })
       .catch(() => undefined)
       .finally(() => setIsSyncing(false));
@@ -232,13 +220,6 @@ export const PregnancyTracker = ({ currentWeek, userId = 'local', onLogBirth }: 
   const movementLabel = lastMovementAt
     ? new Intl.DateTimeFormat(isRTL ? 'ar-SA' : 'en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date(lastMovementAt))
     : (isRTL ? 'لم تُسجل اليوم' : 'Not logged today');
-
-  const selectedSymptoms = SYMPTOMS.filter(symptom => notes.symptoms.includes(symptom.id));
-  const symptomLevel: SymptomLevel = selectedSymptoms.some(s => s.level === 'red')
-    ? 'red'
-    : selectedSymptoms.some(s => s.level === 'yellow')
-      ? 'yellow'
-      : 'green';
 
   const copy = {
     stage: isRTL ? guide.stageAr : guide.stageEn,
@@ -263,55 +244,88 @@ export const PregnancyTracker = ({ currentWeek, userId = 'local', onLogBirth }: 
     });
   };
 
-  const toggleSymptom = (id: string) => {
-    persistNotes({
-      ...notes,
-      symptoms: notes.symptoms.includes(id) ? notes.symptoms.filter(item => item !== id) : [...notes.symptoms, id],
-    });
-  };
-
-  const setMood = (mood: PregnancyDashboardNotes['mood']) => {
-    persistNotes({ ...notes, mood, lastMoodAt: new Date().toISOString() });
-  };
-
-  const togglePrep = (id: string) => {
-    persistNotes({
-      ...notes,
-      prepDone: notes.prepDone.includes(id) ? notes.prepDone.filter(item => item !== id) : [...notes.prepDone, id],
-    });
-  };
-
   const appointmentWindow = week < 28
     ? (isRTL ? 'زيارة كل 4 أسابيع تقريباً' : 'About every 4 weeks')
     : week < 36
       ? (isRTL ? 'زيارة كل أسبوعين تقريباً' : 'About every 2 weeks')
       : (isRTL ? 'متابعة أسبوعية غالباً' : 'Often weekly check-ins');
 
-  const prepItems = [
-    {
-      id: 'provider',
-      label: isRTL ? 'أسأل الطبيبة عن الحركة، النزيف، الألم، والأدوية' : 'Ask about movement, bleeding, pain, and medicine',
-    },
-    {
-      id: 'worship',
-      label: isRTL ? 'أجهز سؤال الصلاة والصيام عند المشقة' : 'Prepare prayer and fasting questions',
-    },
-    {
-      id: 'hospital',
-      label: week >= 32 ? (isRTL ? 'أراجع حقيبة الولادة وخطة المرافق' : 'Review hospital bag and support person') : (isRTL ? 'أحفظ قائمة تجهيزات الولادة لاحقاً' : 'Save the birth prep list for later'),
-    },
-    {
-      id: 'nifas',
-      label: isRTL ? 'أعرف متى أبدأ تسجيل النفاس بعد الولادة' : 'Know when to start nifas tracking after birth',
-    },
+  const doctorMessages = notes.doctorMessages.length > 0
+    ? notes.doctorMessages
+    : [{
+        role: 'ai' as const,
+        text: isRTL
+          ? 'السلام عليكِ، أنا طبيبة الحمل في نسوة. اسأليني عن الأعراض، الحركة، التغذية، القلق، الصلاة أو الصيام أثناء الحمل. إذا كان عندك نزيف، ألم شديد، صداع شديد مع زغللة، ألم صدر، أو نقص واضح في حركة الجنين فتواصلي مع الرعاية الطبية فوراً.'
+          : 'I am Niswah pregnancy doctor. Ask me about symptoms, baby movement, nutrition, anxiety, prayer, or fasting during pregnancy. If you have bleeding, severe pain, severe headache with vision changes, chest pain, or clearly reduced baby movement, contact medical care now.',
+        timestamp: new Date().toISOString(),
+      }];
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [doctorMessages.length, isDoctorTyping]);
+
+  const quickPrompts = [
+    isRTL ? 'هل هذه الأعراض طبيعية؟' : 'Are these symptoms normal?',
+    isRTL ? 'متى أقلق من حركة الجنين؟' : 'When should I worry about movement?',
+    isRTL ? 'هل أستطيع الصيام وأنا حامل؟' : 'Can I fast while pregnant?',
+    isRTL ? 'كيف أستعد لزيارة الطبيبة؟' : 'How do I prepare for my visit?',
+    isRTL ? 'أنا قلقة اليوم، ماذا أفعل؟' : 'I feel anxious today. What can I do?',
   ];
 
-  const moodOptions = [
-    { id: 'calm', ar: 'مطمئنة', en: 'Calm' },
-    { id: 'tired', ar: 'مرهقة', en: 'Tired' },
-    { id: 'anxious', ar: 'قلقة', en: 'Anxious' },
-    { id: 'low', ar: 'حزينة', en: 'Low' },
-  ] as const;
+  const askPregnancyDoctor = async (question: string) => {
+    const trimmed = question.trim();
+    if (!trimmed || isDoctorTyping) return;
+
+    setDoctorError('');
+    setDoctorInput('');
+    const userMessage: PregnancyDoctorMessage = {
+      role: 'user',
+      text: trimmed,
+      timestamp: new Date().toISOString(),
+    };
+    const history = [...doctorMessages, userMessage].slice(-10);
+    persistNotes({ ...notes, doctorMessages: history });
+    setIsDoctorTyping(true);
+
+    const systemInstruction = isRTL
+      ? `أنتِ "طبيبة الحمل في نسوة"، مساعدة حمل عربية مخصصة للنساء المسلمات.
+السياق: المستخدم حامل في الأسبوع ${week}. المرحلة: ${copy.stage}. المتابعة المتوقعة: ${appointmentWindow}.
+أجيبي بالعربية الفصحى اللطيفة، وبأسلوب مطمئن وعملي.
+أنتِ لا تقدمين تشخيصاً ولا تغنين عن الطبيبة. اذكري ذلك باختصار عند الأسئلة الطبية.
+عند أي علامة خطر مثل نزيف، ألم شديد، نقص واضح في حركة الجنين، صداع شديد أو زغللة، تورم مفاجئ، ألم صدر، ضيق نفس شديد، حرارة عالية، أو أفكار إيذاء النفس: وجهيها للتواصل الفوري مع الرعاية الطبية أو الطوارئ.
+إذا سألت عن الصلاة أو الصيام أو النفاس: قدمي إرشاداً عاماً يحترم اختلاف المذاهب، واذكري سؤال أهل العلم الموثوقين عند التفصيل.
+اجعلي الرد منظماً: 1) ماذا يعني غالباً 2) ماذا تفعل الآن 3) متى تراجع الطبيبة/الطوارئ. لا تتجاوزي 220 كلمة.`
+      : `You are "Niswah Pregnancy Doctor", a pregnancy assistant for Muslim women.
+Context: the user is pregnant at week ${week}. Stage: ${copy.stage}. Expected visit rhythm: ${appointmentWindow}.
+Answer warmly and practically.
+You do not diagnose and do not replace a clinician. Say this briefly for medical questions.
+For danger signs such as bleeding, severe pain, clearly reduced fetal movement, severe headache or vision changes, sudden swelling, chest pain, severe shortness of breath, high fever, or self-harm thoughts: advise immediate medical care/emergency care.
+For prayer, fasting, or nifas questions: provide general Muslim-sensitive guidance, respect scholarly differences, and encourage asking trusted scholars for detailed rulings.
+Structure answers: 1) what it may mean 2) what to do now 3) when to contact clinician/emergency care. Keep under 220 words.`;
+
+    try {
+      const response = await callGemini({
+        systemInstruction,
+        contents: history.map(message => ({
+          role: message.role === 'ai' ? 'model' as const : 'user' as const,
+          parts: [{ text: message.text }],
+        })),
+        temperature: 0.45,
+        maxOutputTokens: 1600,
+      });
+
+      const aiMessage: PregnancyDoctorMessage = {
+        role: 'ai',
+        text: response || (isRTL ? 'تعذر توليد رد واضح. أعيدي صياغة السؤال من فضلك.' : 'I could not generate a clear response. Please rephrase your question.'),
+        timestamp: new Date().toISOString(),
+      };
+      persistNotes({ ...notes, doctorMessages: [...history, aiMessage].slice(-12) });
+    } catch (error: any) {
+      setDoctorError(error?.message || (isRTL ? 'تعذر الاتصال بالطبيبة الآن.' : 'Could not reach the doctor right now.'));
+    } finally {
+      setIsDoctorTyping(false);
+    }
+  };
 
   return (
     <div className="w-full max-w-5xl space-y-5" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -376,7 +390,7 @@ export const PregnancyTracker = ({ currentWeek, userId = 'local', onLogBirth }: 
         </div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-[1fr_1fr]">
+      <section className="grid gap-3 md:grid-cols-[0.75fr_1.25fr]">
         <article className="rounded-[28px] border border-emerald-100 bg-white p-5 shadow-lg shadow-emerald-950/5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -402,99 +416,88 @@ export const PregnancyTracker = ({ currentWeek, userId = 'local', onLogBirth }: 
           </button>
         </article>
 
-        <article className="rounded-[28px] border border-rose-100 bg-white p-5 shadow-lg shadow-rose-950/5">
+        <article className="rounded-[28px] border border-rose-100 bg-white p-5 shadow-xl shadow-rose-950/5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-rose-500">{isRTL ? 'أمان الحمل' : 'Pregnancy safety'}</p>
-              <h3 className="mt-1 text-xl font-serif font-bold text-rose-950">{isRTL ? 'فحص الأعراض' : 'Symptom check'}</h3>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-rose-500">{isRTL ? 'طبيبة الحمل الذكية' : 'AI pregnancy doctor'}</p>
+              <h3 className="mt-1 text-xl font-serif font-bold text-rose-950">{isRTL ? 'اسألي عن أي شيء يخص حملك' : 'Ask anything about your pregnancy'}</h3>
+              <p className="mt-2 text-xs leading-6 text-gray-500">
+                {isRTL
+                  ? 'تجيب عن الأعراض، الحركة، التغذية، القلق، الصلاة، الصيام، والاستعداد للولادة. ليست بديلاً عن الطبيبة.'
+                  : 'Answers symptoms, movement, nutrition, anxiety, prayer, fasting, and birth prep. Not a replacement for your clinician.'}
+              </p>
             </div>
-            <ShieldAlert className="h-6 w-6 text-rose-600" />
+            <MessageCircle className="h-7 w-7 text-rose-600" />
           </div>
-          <div className="flex flex-wrap gap-2">
-            {SYMPTOMS.map((symptom) => {
-              const selected = notes.symptoms.includes(symptom.id);
-              return (
-                <button
-                  key={symptom.id}
-                  onClick={() => toggleSymptom(symptom.id)}
-                  className={cn(
-                    'rounded-full border px-3 py-2 text-xs font-bold transition',
-                    selected ? symptomTone[symptom.level].selected : 'border-gray-100 bg-gray-50 text-gray-500'
-                  )}
-                >
-                  {isRTL ? symptom.ar : symptom.en}
-                </button>
-              );
-            })}
-          </div>
-          <div className={cn('mt-4 rounded-3xl border p-4', symptomTone[symptomLevel].panel)}>
-            <p className="text-sm font-bold">{triageCopy[symptomLevel][isRTL ? 'arTitle' : 'enTitle']}</p>
-            <p className="mt-2 text-xs leading-6">{triageCopy[symptomLevel][isRTL ? 'arText' : 'enText']}</p>
-            <p className="mt-3 text-[11px] leading-5 opacity-70">
-              {isRTL ? 'هذا الفحص لا يغني عن التقييم الطبي.' : 'This check does not replace medical evaluation.'}
-            </p>
-          </div>
-        </article>
-      </section>
 
-      <section className="grid gap-3 md:grid-cols-[0.9fr_1.1fr]">
-        <article className="rounded-[28px] border border-indigo-100 bg-white p-5 shadow-lg shadow-indigo-950/5">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-indigo-500">{isRTL ? 'الدعم النفسي' : 'Emotional support'}</p>
-              <h3 className="mt-1 text-xl font-serif font-bold text-indigo-950">{isRTL ? 'كيف حالك اليوم؟' : 'How are you today?'}</h3>
-            </div>
-            <Heart className="h-6 w-6 text-indigo-600" />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {moodOptions.map((option) => (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {quickPrompts.map((prompt) => (
               <button
-                key={option.id}
-                onClick={() => setMood(option.id)}
-                className={cn(
-                  'rounded-2xl border px-3 py-4 text-sm font-bold transition',
-                  notes.mood === option.id ? 'border-indigo-200 bg-indigo-50 text-indigo-800' : 'border-gray-100 bg-gray-50 text-gray-500'
-                )}
+                key={prompt}
+                onClick={() => askPregnancyDoctor(prompt)}
+                className="rounded-full border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-800 transition active:scale-[0.98]"
               >
-                {isRTL ? option.ar : option.en}
+                {prompt}
               </button>
             ))}
           </div>
-          <div className="mt-4 rounded-3xl bg-indigo-50 p-4 text-xs leading-6 text-indigo-900/80">
-            {notes.mood === 'anxious' || notes.mood === 'low'
-              ? (isRTL ? 'خذي نفساً هادئاً، أخبري شخصاً تثقين به، واطلبي دعماً طبياً إذا استمر الضيق أو زاد.' : 'Take a slow breath, tell someone you trust, and seek medical support if distress persists or increases.')
-              : (isRTL ? 'المشاعر تتغير في الحمل. تسجيلها يساعدك تلاحظين النمط وتطلبين الدعم مبكراً.' : 'Feelings shift in pregnancy. Logging them helps you notice patterns and ask for support early.')}
-          </div>
-        </article>
 
-        <article className="rounded-[28px] border border-amber-100 bg-white p-5 shadow-lg shadow-amber-950/5">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-amber-600">{isRTL ? 'الزيارة والاستعداد' : 'Visit and preparation'}</p>
-              <h3 className="mt-1 text-xl font-serif font-bold text-amber-950">{appointmentWindow}</h3>
-            </div>
-            <Stethoscope className="h-6 w-6 text-amber-700" />
-          </div>
-          <div className="grid gap-2">
-            {prepItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => togglePrep(item.id)}
+          <div className="max-h-[360px] space-y-3 overflow-y-auto rounded-3xl bg-gray-50 p-3">
+            {doctorMessages.map((message, index) => (
+              <div
+                key={`${message.timestamp}-${index}`}
                 className={cn(
-                  'flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-start text-sm font-bold leading-6 transition',
-                  notes.prepDone.includes(item.id) ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-gray-100 bg-gray-50 text-gray-600'
+                  'max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 shadow-sm',
+                  message.role === 'user'
+                    ? 'ms-auto bg-rose-600 text-white'
+                    : 'me-auto bg-white text-gray-700'
                 )}
               >
-                <span>{item.label}</span>
-                <span className={cn(
-                  'grid h-6 w-6 flex-none place-items-center rounded-full border text-[11px]',
-                  notes.prepDone.includes(item.id) ? 'border-amber-500 bg-amber-500 text-white' : 'border-gray-200 text-transparent'
-                )}>
-                  ✓
-                </span>
-              </button>
+                {message.text}
+              </div>
             ))}
+            {isDoctorTyping && (
+              <div className="me-auto rounded-2xl bg-white px-4 py-3 text-sm font-bold text-gray-500 shadow-sm">
+                {isRTL ? 'تكتب الرد...' : 'Writing...'}
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
+
+          {doctorError && (
+            <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800">
+              {doctorError}
+            </div>
+          )}
+
+          <form
+            className="mt-4 flex items-center gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm"
+            onSubmit={(event) => {
+              event.preventDefault();
+              askPregnancyDoctor(doctorInput);
+            }}
+          >
+            <input
+              value={doctorInput}
+              onChange={(event) => setDoctorInput(event.target.value)}
+              placeholder={isRTL ? 'اكتبي سؤالك هنا...' : 'Write your question...'}
+              className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none"
+            />
+            <button
+              type="submit"
+              disabled={!doctorInput.trim() || isDoctorTyping}
+              className="grid h-10 w-10 place-items-center rounded-xl bg-rose-600 text-white transition active:scale-95 disabled:bg-gray-200 disabled:text-gray-400"
+              aria-label={isRTL ? 'إرسال' : 'Send'}
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </form>
+
+          <p className="mt-3 text-[11px] leading-5 text-gray-400">
+            {isRTL
+              ? 'للنزيف، الألم الشديد، نقص حركة الجنين، صداع شديد مع زغللة، ألم صدر أو ضيق نفس شديد: تواصلي مع الرعاية الطبية فوراً.'
+              : 'For bleeding, severe pain, reduced baby movement, severe headache with vision changes, chest pain, or severe shortness of breath: contact medical care now.'}
+          </p>
         </article>
       </section>
 
@@ -514,42 +517,6 @@ const toneClasses = {
   amber: 'bg-amber-50 text-amber-900 border-amber-100',
   indigo: 'bg-indigo-50 text-indigo-800 border-indigo-100',
   rose: 'bg-rose-50 text-rose-800 border-rose-100',
-};
-
-const symptomTone = {
-  green: {
-    selected: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-    panel: 'border-emerald-100 bg-emerald-50 text-emerald-900',
-  },
-  yellow: {
-    selected: 'border-amber-200 bg-amber-50 text-amber-900',
-    panel: 'border-amber-100 bg-amber-50 text-amber-950',
-  },
-  red: {
-    selected: 'border-rose-200 bg-rose-50 text-rose-900',
-    panel: 'border-rose-100 bg-rose-50 text-rose-950',
-  },
-};
-
-const triageCopy = {
-  green: {
-    arTitle: 'أعراض شائعة غالباً',
-    enTitle: 'Often common symptoms',
-    arText: 'راقبيها وسجلي نمطها. إذا أصبحت شديدة أو مختلفة عن المعتاد، تواصلي مع الطبيبة.',
-    enText: 'Watch and log the pattern. If they become severe or unusual for you, contact your clinician.',
-  },
-  yellow: {
-    arTitle: 'يحتاج متابعة قريبة',
-    enTitle: 'Needs closer watching',
-    arText: 'خففي النشاط، اشربي ماء، واطلبي نصيحة طبية إذا استمر العرض أو تكرر.',
-    enText: 'Ease activity, hydrate, and seek medical advice if the symptom persists or repeats.',
-  },
-  red: {
-    arTitle: 'تواصلي مع الرعاية الطبية الآن',
-    enTitle: 'Contact medical care now',
-    arText: 'هذه علامات لا تنتظر. اتصلي بالطبيبة أو الطوارئ حسب شدة العرض وتوجيهات بلدك.',
-    enText: 'These signs should not wait. Contact your clinician or emergency care depending on severity and local guidance.',
-  },
 };
 
 const Metric = ({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone: keyof typeof toneClasses }) => (

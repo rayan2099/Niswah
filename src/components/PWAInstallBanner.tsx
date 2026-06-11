@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { X, Download, CheckCircle2, Share, PlusSquare, WifiOff, Bell, Zap, ArrowDown } from 'lucide-react';
 import { useTranslation } from '../i18n/LanguageContext.tsx';
+import { useCycleData } from '../contexts/CycleContext.tsx';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -12,13 +13,29 @@ function cn(...inputs: ClassValue[]) {
 
 export const PWAInstallBanner = () => {
   const { isInstalled, triggerInstall, shouldShowBanner, platform } = usePWAInstall();
-  const [dismissed, setDismissed] = useState(() => {
-    const t = localStorage.getItem('niswah_install_dismissed_v2');
+  const { user } = useCycleData();
+  const dismissalKey = useMemo(
+    () => `niswah_install_dismissed_v3_${user?.id || 'guest'}`,
+    [user?.id]
+  );
+  const isRecentlyDismissed = (key: string) => {
+    const t = localStorage.getItem(key);
     if (!t) return false;
     return Date.now() - parseInt(t) < 7 * 24 * 60 * 60 * 1000;
-  });
+  };
+  const [dismissed, setDismissed] = useState(() => isRecentlyDismissed(dismissalKey));
   const [installing, setInstalling] = useState(false);
   const [showManualSteps, setShowManualSteps] = useState(false);
+
+  useEffect(() => {
+    setDismissed(isRecentlyDismissed(dismissalKey));
+    setShowManualSteps(false);
+  }, [dismissalKey]);
+
+  const dismissPrompt = () => {
+    setDismissed(true);
+    localStorage.setItem(dismissalKey, Date.now().toString());
+  };
 
   if (isInstalled || dismissed || !shouldShowBanner) return null;
 
@@ -31,7 +48,7 @@ export const PWAInstallBanner = () => {
     setInstalling(true);
     const outcome = await triggerInstall();
     setInstalling(false);
-    if (outcome === 'accepted') setDismissed(true);
+    if (outcome === 'accepted') dismissPrompt();
     if (outcome === 'unavailable') setShowManualSteps(true);
   };
 
@@ -46,10 +63,7 @@ export const PWAInstallBanner = () => {
         dir="rtl"
       >
         <button
-          onClick={() => {
-            setDismissed(true);
-            localStorage.setItem('niswah_install_dismissed_v2', Date.now().toString());
-          }}
+          onClick={dismissPrompt}
           className="absolute top-3 left-3 w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center"
         >
           <X className="w-4 h-4 text-gray-400" />

@@ -177,7 +177,6 @@ export const PregnancyTracker = ({ currentWeek, userId = 'local', onLogBirth }: 
   const weeksToBirth = Math.max(0, 40 - week);
   const nextMilestone = GUIDES.find(item => item.week > week);
   const [notes, setNotes] = useState<PregnancyDashboardNotes>(defaultNotes);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [doctorInput, setDoctorInput] = useState('');
   const [isDoctorTyping, setIsDoctorTyping] = useState(false);
   const [doctorError, setDoctorError] = useState('');
@@ -210,10 +209,8 @@ export const PregnancyTracker = ({ currentWeek, userId = 'local', onLogBirth }: 
   const persistNotes = (nextNotes: PregnancyDashboardNotes) => {
       setNotes(nextNotes);
       localStorage.setItem(storageKey, JSON.stringify(nextNotes));
-      setIsSyncing(true);
     api.updatePregnancyNotes({ dashboard: nextNotes })
-      .catch(() => undefined)
-      .finally(() => setIsSyncing(false));
+      .catch(() => undefined);
   };
 
   const todayMovementCount = notes.movementLogs.filter(log => isToday(log.at)).length;
@@ -370,7 +367,6 @@ Structure answers: 1) what it may mean 2) what to do now 3) when to contact clin
               <div className="grid gap-2 pt-1 sm:grid-cols-3">
                 <StatusChip label={isRTL ? 'نطاق الثلث' : 'Trimester range'} value={copy.trimesterRange} />
                 <StatusChip label={isRTL ? 'المحطة' : 'Milestone'} value={copy.nextMilestone} />
-                <StatusChip label={isRTL ? 'الحفظ' : 'Saved'} value={isSyncing ? (isRTL ? 'جارٍ الحفظ' : 'Syncing') : (isRTL ? 'محفوظ' : 'Saved')} />
               </div>
             </div>
 

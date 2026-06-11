@@ -521,6 +521,136 @@ export const generateDoctorPDF = async (user: any, ledger: any[], stats: any): P
   return doc.output('blob');
 };
 
+export const generatePregnancyPDF = async (user: any, pregnancyRecord: any): Promise<Blob> => {
+  const currentWeek = Math.min(40, Math.max(1, Math.round(pregnancyRecord?.current_week || user?.pregnancy_week || 1)));
+  const trimester = Math.min(3, Math.max(1, Math.ceil(currentWeek / 13)));
+  const dueDate = pregnancyRecord?.due_date ? new Date(pregnancyRecord.due_date) : null;
+  const lmpDate = pregnancyRecord?.lmp_date ? new Date(pregnancyRecord.lmp_date) : null;
+  const today = new Date();
+  const daysRemaining = dueDate ? Math.max(0, differenceInCalendarDays(dueDate, today)) : Math.max(0, (40 - currentWeek) * 7);
+  const weeksRemaining = Math.max(0, 40 - currentWeek);
+  const dashboardNotes = pregnancyRecord?.weekly_notes?.dashboard || {};
+  const movementLogs = Array.isArray(dashboardNotes?.movementLogs) ? dashboardNotes.movementLogs : [];
+  const todayMovements = movementLogs.filter((log: any) => {
+    if (!log?.at) return false;
+    return new Date(log.at).toDateString() === today.toDateString();
+  }).length;
+  const lastMovement = movementLogs[movementLogs.length - 1]?.at
+    ? format(new Date(movementLogs[movementLogs.length - 1].at), 'yyyy-MM-dd HH:mm')
+    : 'لا يوجد تسجيل بعد';
+  const visitRhythm = currentWeek < 28
+    ? 'زيارة متابعة كل 4 أسابيع تقريباً، أو حسب توجيه الطبيبة.'
+    : currentWeek < 36
+      ? 'زيارة متابعة كل أسبوعين تقريباً، أو حسب توجيه الطبيبة.'
+      : 'متابعة أسبوعية غالباً حتى الولادة، أو حسب توجيه الطبيبة.';
+  const stage = currentWeek <= 13
+    ? 'الثلث الأول: تثبيت الحمل وبداية تكوّن الأعضاء.'
+    : currentWeek <= 27
+      ? 'الثلث الثاني: نمو أوضح وحركة قد تصبح ملحوظة.'
+      : 'الثلث الثالث: استعداد للولادة ومتابعة الحركة والنمو.';
+
+  const visualPdf = await renderVisualPdf(
+    'تقرير الحمل',
+    'ملخص صحي وتنظيمي للحمل من نسوة، لا يغني عن متابعة الطبيبة أو القابلة.',
+    [
+      `تاريخ التقرير: ${format(today, 'yyyy-MM-dd')}`,
+      `المستخدمة: ${user?.anonymous_mode ? 'أخت' : (user?.display_name || 'أخت')}`,
+      `الأسبوع الحالي: ${currentWeek}`,
+      `الثلث: ${trimester}`,
+    ],
+    [
+      {
+        title: 'ملخص الحمل',
+        rows: [
+          ['تاريخ آخر دورة مقدر', lmpDate ? format(lmpDate, 'yyyy-MM-dd') : 'غير محدد'],
+          ['موعد الولادة المتوقع', dueDate ? format(dueDate, 'yyyy-MM-dd') : 'غير محدد'],
+          ['المتبقي حتى الموعد', `${daysPhrase(daysRemaining)} تقريباً`],
+          ['الأسابيع المتبقية', `${weeksRemaining} أسبوع تقريباً`],
+          ['مرحلة الحمل', stage],
+        ],
+      },
+      {
+        title: 'حركة الجنين والمتابعة',
+        rows: [
+          ['حركات مسجلة اليوم', currentWeek < 20 ? 'قد لا تكون الحركة واضحة قبل الأسبوع 20' : `${todayMovements}`],
+          ['آخر تسجيل حركة', currentWeek < 20 ? 'غير مطلوب حالياً' : lastMovement],
+          ['إيقاع الزيارات المتوقع', visitRhythm],
+        ],
+        paragraphs: [
+          'راقبي النمط المعتاد لحركة الجنين عندما تصبح الحركة واضحة، وراجعي الطبيبة عند نقص واضح أو مفاجئ.',
+          'اكتبي أسئلتك قبل الزيارة: النزيف، الألم، الحركة، الأدوية، الصيام، الصلاة، والولادة.',
+        ],
+      },
+      {
+        title: 'ملاحظات مهمة للمسلمة',
+        paragraphs: [
+          'الأصل أداء الصلاة حسب القدرة، ومع المشقة تأخذ المرأة بالهيئة الأيسر لها بحسب الاستطاعة وتسأل أهل العلم الموثوقين في التفاصيل.',
+          'الصيام أثناء الحمل يحتاج تقدير القدرة والمشقة ورأي الطبيبة، خصوصاً مع الجفاف، القيء، الدوخة، أو وجود خطورة طبية.',
+          'بعد الولادة يبدأ تتبع النفاس في نسوة لتسهيل معرفة المدة والتنبيهات المتعلقة بالطهارة.',
+        ],
+      },
+      {
+        title: 'متى تطلبين رعاية عاجلة؟',
+        paragraphs: [
+          'نزيف، ألم شديد، نقص واضح في حركة الجنين، صداع شديد مع زغللة، تورم مفاجئ، ألم صدر، ضيق نفس شديد، حرارة عالية، أو أفكار إيذاء النفس.',
+          'هذا التقرير للتنظيم والمشاركة ولا يقدم تشخيصاً طبياً.',
+        ],
+      },
+    ],
+  );
+  if (visualPdf) return visualPdf;
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const fontLoaded = await loadArabicFont(doc);
+
+  if (!fontLoaded) {
+    doc.setFont('helvetica');
+    doc.setFontSize(14);
+    doc.text('Niswah | Pregnancy Report', 105, 20, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(`Week: ${currentWeek}`, 105, 40, { align: 'center' });
+    doc.text(`Due date: ${dueDate ? format(dueDate, 'yyyy-MM-dd') : 'Unknown'}`, 105, 50, { align: 'center' });
+    doc.text('This report does not replace medical care.', 105, 65, { align: 'center' });
+    return doc.output('blob');
+  }
+
+  const W = doc.internal.pageSize.getWidth();
+  const right = W - 15;
+  let y = 20;
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'Niswah | نسوة', right, y, 20); y += 9;
+  R(doc, 'تقرير الحمل', right, y, 14); y += 7;
+  doc.setTextColor(100, 100, 100);
+  R(doc, `تاريخ التقرير: ${format(today, 'yyyy-MM-dd')}`, right, y, 9); y += 5;
+  R(doc, `الأسبوع الحالي: ${currentWeek} | الثلث: ${trimester}`, right, y, 9); y += 8;
+  doc.line(15, y, right, y); y += 8;
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'ملخص الحمل', right, y, 13); y += 7;
+  doc.setTextColor(55, 65, 81);
+  R(doc, `موعد الولادة المتوقع: ${dueDate ? format(dueDate, 'yyyy-MM-dd') : 'غير محدد'}`, right, y, 10); y += 6;
+  R(doc, `المتبقي حتى الموعد: ${daysPhrase(daysRemaining)} تقريباً`, right, y, 10); y += 6;
+  R(doc, stage, right, y, 10); y += 10;
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'المتابعة والتنبيهات', right, y, 13); y += 7;
+  doc.setTextColor(55, 65, 81);
+  R(doc, visitRhythm, right, y, 10); y += 6;
+  R(doc, currentWeek < 20 ? 'حركة الجنين قد لا تكون واضحة قبل الأسبوع 20.' : `حركات اليوم: ${todayMovements} | آخر تسجيل: ${lastMovement}`, right, y, 10); y += 10;
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'ملاحظات مهمة', right, y, 13); y += 7;
+  doc.setTextColor(55, 65, 81);
+  R(doc, 'الصلاة حسب القدرة، والصيام بحسب القدرة والمشقة ورأي الطبيبة عند الحاجة.', right, y, 10); y += 6;
+  R(doc, 'راجعي الرعاية الطبية فوراً عند النزيف أو الألم الشديد أو نقص حركة الجنين.', right, y, 10);
+
+  doc.setTextColor(150, 150, 150);
+  R(doc, 'تم إنشاء هذا التقرير بواسطة تطبيق نسوة. لا يغني عن المتابعة الطبية.', W / 2, 285, 8, 'center');
+
+  return doc.output('blob');
+};
+
 export const generateHusbandPDF = async (
   user: any,
   currentDay: number,

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { X, Download, CheckCircle2, Share, PlusSquare, WifiOff, Bell, Zap, ArrowDown } from 'lucide-react';
+import { X, Download, CheckCircle2, Share, PlusSquare, ArrowDown } from 'lucide-react';
 import { useTranslation } from '../i18n/LanguageContext.tsx';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -80,19 +80,6 @@ export const PWAInstallBanner = ({ placement = 'app', userId }: { placement?: 'a
             <p className="font-bold text-gray-800 text-sm">أضيفي نسوة لشاشتك الرئيسية</p>
             <p className="text-xs text-gray-500 mt-0.5">وصول سريع — تعمل بلا إنترنت — إشعارات فورية</p>
           </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          {[
-            { icon: Zap, text: 'أسرع بكثير' },
-            { icon: WifiOff, text: 'بلا إنترنت' },
-            { icon: Bell, text: 'إشعارات' },
-          ].map(({ icon: Icon, text }, i) => (
-            <div key={i} className="flex-1 bg-rose-50 rounded-xl p-2 text-center">
-              <Icon className="mx-auto h-4 w-4 text-rose-500" />
-              <div className="text-xs text-rose-700 mt-1 font-medium">{text}</div>
-            </div>
-          ))}
         </div>
 
         {showManualSteps && (

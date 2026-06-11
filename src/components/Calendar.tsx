@@ -5,24 +5,24 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  ChevronLeft,
+  ChevronRight,
   Droplets,
   Sparkles,
   Heart,
   Info
 } from 'lucide-react';
-import { 
-  format, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfWeek, 
-  endOfWeek, 
-  eachDayOfInterval, 
-  isSameMonth, 
-  isSameDay, 
-  addMonths, 
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  isSameMonth,
+  isSameDay,
+  addMonths,
   subMonths,
   isToday,
   parseISO,
@@ -60,6 +60,7 @@ export const Calendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarType, setCalendarType] = useState<'gregorian' | 'hijri'>('gregorian');
   const isPregnant = Boolean(user?.pregnant);
+  const isTryingToConceive = Boolean(user?.conditions?.includes('ttc'));
 
   const cycleLength = cycleStats.avgCycleLength;
 
@@ -85,7 +86,7 @@ export const Calendar = () => {
 
   const cycleDates = useMemo(() => {
     if (!user || !prediction || !ovulation || !cycleStats.lastPeriodDate) return null;
-    
+
     const start = parseISO(cycleStats.lastPeriodDate);
     const ovu = new Date(ovulation.predictedOvulationDate);
     const next = new Date(prediction.predictedStartDate);
@@ -96,9 +97,9 @@ export const Calendar = () => {
       return null;
     }
 
-    return { 
-      start, 
-      ovulation: ovu, 
+    return {
+      start,
+      ovulation: ovu,
       next,
       fertileStart: fStart,
       fertileEnd: fEnd
@@ -119,13 +120,13 @@ export const Calendar = () => {
 
   const { calendarDays, displayTitle, monthStart } = useMemo(() => {
     const safeDate = (currentDate instanceof Date && !isNaN(currentDate.getTime())) ? currentDate : new Date();
-    
+
     if (calendarType === 'gregorian') {
       const mStart = startOfMonth(safeDate);
       const mEnd = endOfMonth(mStart);
       const sDate = startOfWeek(mStart);
       const eDate = endOfWeek(mEnd);
-      
+
       try {
         return {
           calendarDays: eachDayOfInterval({ start: sDate, end: eDate }),
@@ -147,7 +148,7 @@ export const Calendar = () => {
         const h = toHijri(safeDate.getFullYear(), safeDate.getMonth() + 1, safeDate.getDate());
         const mStart = new Date(safeDate);
         mStart.setDate(safeDate.getDate() - (h.hd - 1));
-        
+
         const mEnd = new Date(mStart);
         mEnd.setDate(mEnd.getDate() + 28);
         let hEnd = toHijri(mEnd.getFullYear(), mEnd.getMonth() + 1, mEnd.getDate());
@@ -158,12 +159,12 @@ export const Calendar = () => {
           safetyCounter++;
         }
         mEnd.setDate(mEnd.getDate() - 1);
-        
+
         const sDate = startOfWeek(mStart);
         const eDate = endOfWeek(mEnd);
-        
+
         const hijriMonthName = isRTL ? hijriMonthNamesAr[h.hm - 1] : hijriMonthNames[h.hm - 1];
-        
+
         return {
           calendarDays: eachDayOfInterval({ start: sDate, end: eDate }),
           displayTitle: `${hijriMonthName} ${h.hy}`,
@@ -221,30 +222,30 @@ export const Calendar = () => {
     const dayString = format(day, 'yyyy-MM-dd');
     const entry = entries.find(e => e.date === dayString);
     if (entry) return { state: entry.fiqh_state as State };
-    
+
     // Prediction logic using shared segments
     if (user && cycleStats.lastPeriodDate) {
       const lastPeriod = startOfDay(parseISO(cycleStats.lastPeriodDate));
       const targetDay = startOfDay(day);
       const diff = differenceInDays(targetDay, lastPeriod);
-      
+
       const isTodayDay = isToday(day);
-      
+
       // If it is today, use the official fiqhState from context
       if (isTodayDay) {
         let predictedFertile = false;
         let predictedOvulation = false;
-        if (!isPregnant && ovulation) {
+        if (!isPregnant && isTryingToConceive && ovulation) {
           const fertileStart = new Date(ovulation.fertileWindowStart);
           const fertileEnd = new Date(ovulation.fertileWindowEnd);
           const ovulationDay = new Date(ovulation.predictedOvulationDate);
           if (isSameDay(day, ovulationDay)) predictedOvulation = true;
           if (day >= fertileStart && day <= fertileEnd) predictedFertile = true;
         }
-        return { 
-          state: fiqhState, 
-          isFertile: predictedFertile, 
-          isOvulation: predictedOvulation 
+        return {
+          state: fiqhState,
+          isFertile: predictedFertile,
+          isOvulation: predictedOvulation
         };
       }
 
@@ -252,15 +253,15 @@ export const Calendar = () => {
       const cycleLength = Math.round(cycleStats.avgCycleLength || 28);
       // Normalized dayInCycle (1-indexed)
       const dayInCycle = ((diff % cycleLength) + cycleLength) % cycleLength + 1;
-      
-      const segments = logic.getCycleSegments(cycleStats, isPregnant ? null : ovulation);
+
+      const segments = logic.getCycleSegments(cycleStats, isPregnant || !isTryingToConceive ? null : ovulation);
       const phaseId = logic.getPhaseForDayInCycle(dayInCycle, segments);
 
       if (phaseId === 'haid' || phaseId === 'expected') {
         return { state: 'HAID', isExpected: true };
       }
-      
-      if (!isPregnant && phaseId === 'fertile') {
+
+      if (!isPregnant && isTryingToConceive && phaseId === 'fertile') {
         let isOvu = false;
         if (ovulation) {
           const ovulationDay = new Date(ovulation.predictedOvulationDate);
@@ -277,7 +278,7 @@ export const Calendar = () => {
 
       return { state: 'TAHARA' };
     }
-    
+
     return { state: null };
   };
 
@@ -296,7 +297,7 @@ export const Calendar = () => {
       if (day > today && isSameMonth(currentDate, today)) return;
 
       const { state } = getDayState(day);
-      
+
       // If state is HAID (logged or predicted), count as haid
       if (state === 'HAID') {
         haidDays++;
@@ -321,7 +322,7 @@ export const Calendar = () => {
     : regularity > 50 ? (isRTL ? 'متوسطة' : 'Moderate')
     : (isRTL ? 'غير منتظمة' : 'Irregular');
 
-  const weekDays = isRTL 
+  const weekDays = isRTL
     ? [t('sat'), t('fri'), t('thu'), t('wed'), t('tue'), t('mon'), t('sun')]
     : [t('sun'), t('mon'), t('tue'), t('wed'), t('thu'), t('fri'), t('sat')];
 
@@ -331,7 +332,7 @@ export const Calendar = () => {
       <header className="p-6 flex items-center justify-between sticky top-0 bg-[#FDFCFB]/80 backdrop-blur-md z-50">
         <h1 className="text-xl font-serif font-bold text-emerald-900">{t('calendar')}</h1>
         <div className="flex items-center space-x-1 bg-white rounded-2xl p-1 shadow-sm border border-black/5">
-          <button 
+          <button
             onClick={prevMonth}
             className="p-2 hover:bg-gray-50 rounded-xl transition-colors"
           >
@@ -340,7 +341,7 @@ export const Calendar = () => {
           <span className="px-2 text-sm font-bold text-emerald-900 min-w-[100px] text-center">
             {displayTitle}
           </span>
-          <button 
+          <button
             onClick={nextMonth}
             className="p-2 hover:bg-gray-50 rounded-xl transition-colors"
           >
@@ -355,7 +356,7 @@ export const Calendar = () => {
           {/* Calendar Type Toggle - Now inside the white frame */}
           <div className="flex justify-center mb-6">
             <div className="flex bg-emerald-50 p-1 rounded-xl border border-emerald-100">
-              <button 
+              <button
                 onClick={() => setCalendarType('gregorian')}
                 className={cn(
                   "px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all",
@@ -364,7 +365,7 @@ export const Calendar = () => {
               >
                 {isRTL ? 'ميلادي' : 'Gregorian'}
               </button>
-              <button 
+              <button
                 onClick={() => setCalendarType('hijri')}
                 className={cn(
                   "px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all",
@@ -387,7 +388,7 @@ export const Calendar = () => {
           <div className="grid grid-cols-7 gap-y-4">
             {calendarDays.map((day, i) => {
               const { state, isExpected, isFertile, isOvulation } = getDayState(day);
-              
+
               const isValidDay = day instanceof Date && !isNaN(day.getTime());
               if (!isValidDay) return null;
 
@@ -399,13 +400,13 @@ export const Calendar = () => {
               const currentHijri = toHijri(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate());
               const cur_hm = currentHijri?.hm || 1;
               const cur_hy = currentHijri?.hy || 1445;
-              
-              const isCurrentMonth = calendarType === 'gregorian' 
+
+              const isCurrentMonth = calendarType === 'gregorian'
                 ? (isSameMonth(day, monthStart) && !isNaN(monthStart.getTime()))
                 : (h_hm === cur_hm && h_hy === cur_hy);
-              
+
               const isTodayDay = isToday(day);
-              
+
               const hijriMonthName = isRTL ? hijriMonthNamesAr[h_hm - 1] : hijriMonthNames[h_hm - 1];
 
               return (
@@ -470,7 +471,7 @@ export const Calendar = () => {
               { label: isRTL ? 'حيض' : t('haid'), bg: '#b8325f', text: 'white' },
               { label: isRTL ? 'حيض متوقع' : t('expected_period'), bg: '#FBEAF0', text: '#b8325f', dashed: true },
               { label: isRTL ? 'طهارة' : t('tahara'), bg: '#E1F5EE', text: '#0F6E56' },
-              ...(!isPregnant ? [{ label: isRTL ? 'خصوبة' : t('fertile_window'), bg: '#FAEEDA', text: '#633806' }] : []),
+              ...(!isPregnant && isTryingToConceive ? [{ label: isRTL ? 'خصوبة' : t('fertile_window'), bg: '#FAEEDA', text: '#633806' }] : []),
             ].map(item => (
               <div
                 key={item.label}
@@ -488,13 +489,13 @@ export const Calendar = () => {
         </div>
 
         {/* Pregnancy Chance Chart */}
-        {!isPregnant && (
+        {!isPregnant && isTryingToConceive && (
         <section className="bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 border border-black/5 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-gray-800">{t('chance_of_getting_pregnant')}</h3>
             <span className="text-xs font-bold text-blue-500 uppercase tracking-widest">{t('high')}</span>
           </div>
-          
+
           <div className="h-40 w-full relative">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={pregnancyData} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
@@ -505,31 +506,31 @@ export const Calendar = () => {
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="day" hide />
-                <Area 
-                  type="monotone" 
-                  dataKey="chance" 
-                  stroke="#4FC3F7" 
+                <Area
+                  type="monotone"
+                  dataKey="chance"
+                  stroke="#4FC3F7"
                   strokeWidth={3}
                   strokeDasharray={(user?.adahConfidence || 0) < 50 ? "5 5" : "0"}
-                  fillOpacity={1} 
-                  fill="url(#colorChance)" 
+                  fillOpacity={1}
+                  fill="url(#colorChance)"
                   animationDuration={1000}
                 />
                 {/* Fertile Window Shading */}
                 {cycleDates && (
-                  <ReferenceArea 
-                    x1={differenceInDays(cycleDates.fertileStart, cycleDates.start) + 1} 
-                    x2={differenceInDays(cycleDates.fertileEnd, cycleDates.start) + 1} 
-                    fill="#4FC3F7" 
+                  <ReferenceArea
+                    x1={differenceInDays(cycleDates.fertileStart, cycleDates.start) + 1}
+                    x2={differenceInDays(cycleDates.fertileEnd, cycleDates.start) + 1}
+                    fill="#4FC3F7"
                     fillOpacity={0.1}
                     label={{ position: 'top', value: t('fertile_window'), fontSize: 8, fill: '#4FC3F7', fontWeight: 'bold' }}
                   />
                 )}
                 {/* Current Day Marker */}
                 {cycleStats.currentDay > 0 && !isNaN(cycleStats.currentDay) && (
-                  <ReferenceLine 
-                    x={cycleStats.currentDay} 
-                    stroke="#10B981" 
+                  <ReferenceLine
+                    x={cycleStats.currentDay}
+                    stroke="#10B981"
                     strokeWidth={2}
                     label={{ position: 'top', value: t('you_are_here'), fontSize: 8, fill: '#10B981', fontWeight: 'bold' }}
                   />
@@ -586,7 +587,7 @@ export const Calendar = () => {
               </span>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-6">
             <div className="bg-white/50 p-4 rounded-3xl space-y-1">
               <span className="text-[9px] font-bold text-emerald-700/40 uppercase tracking-widest">{t('total_haid_days')}</span>
@@ -596,7 +597,7 @@ export const Calendar = () => {
                     "text-2xl font-serif font-bold text-emerald-900"
                   )}>
                     {monthlyStats.haidDays > 0 ? (
-                      isRTL 
+                      isRTL
                         ? `${monthlyStats.haidDays.toLocaleString('ar-SA-u-nu-latn')} ${t('days')}`
                         : `${monthlyStats.haidDays} ${t('days')}`
                     ) : (isRTL ? 'لم يُسجَّل حيض هذا الشهر' : 'No haid logged')}
@@ -639,7 +640,7 @@ export const Calendar = () => {
                   "text-2xl font-serif font-bold text-emerald-900"
                 )}>
                   {monthlyStats.daysUntilNext !== null ? (
-                    isRTL 
+                    isRTL
                       ? `${monthlyStats.daysUntilNext.toLocaleString('ar-SA-u-nu-latn')} ${t('days_left')}`
                       : `${monthlyStats.daysUntilNext} ${t('days_left')}`
                   ) : '—'}
@@ -655,7 +656,7 @@ export const Calendar = () => {
               <span>{Math.round(cycleStats.progress).toLocaleString('en-US')}%</span>
             </div>
             <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
-              <motion.div 
+              <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${cycleStats.progress}%` }}
                 className="h-full bg-emerald-500"

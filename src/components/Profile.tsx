@@ -5,18 +5,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  User, 
-  Shield, 
-  Bell, 
-  Globe, 
-  CreditCard, 
-  ChevronRight, 
-  LogOut, 
-  Trash2, 
-  Download, 
-  Lock, 
-  EyeOff, 
+import {
+  User,
+  Shield,
+  Bell,
+  Globe,
+  CreditCard,
+  ChevronRight,
+  LogOut,
+  Trash2,
+  Download,
+  Lock,
+  EyeOff,
   Fingerprint,
   Check,
   AlertCircle,
@@ -32,7 +32,9 @@ import {
   Search,
   MapPin,
   CheckCircle2,
-  ShieldCheck
+  ShieldCheck,
+  Baby,
+  Droplets
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -55,16 +57,16 @@ interface ProfileProps {
 
 // --- CITY SEARCH COMPONENT ---
 
-const CitySearch = ({ 
-  currentCity, 
-  currentCountry, 
+const CitySearch = ({
+  currentCity,
+  currentCountry,
   currentCityAr,
-  onSelect 
-}: { 
-  currentCity: string; 
-  currentCountry: string; 
+  onSelect
+}: {
+  currentCity: string;
+  currentCountry: string;
   currentCityAr: string;
-  onSelect: (city: any) => void 
+  onSelect: (city: any) => void
 }) => {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -87,11 +89,11 @@ const CitySearch = ({
         const { latitude, longitude } = position.coords;
         const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&accept-language=${isRTL ? 'ar' : 'en'}`);
         const data = await response.json();
-        
+
         if (data.address) {
           const city = data.address.city || data.address.town || data.address.village || data.address.state;
           const country = data.address.country;
-          
+
           onSelect({
             name: city,
             nameEn: city, // Fallback
@@ -119,8 +121,8 @@ const CitySearch = ({
       const trimmedQuery = query.trim().replace(/[،,.;]$/, '');
       if (trimmedQuery.length >= 2) {
         // First check local popular cities
-        const localFiltered = popularCities.filter(c => 
-          c.name.includes(trimmedQuery) || 
+        const localFiltered = popularCities.filter(c =>
+          c.name.includes(trimmedQuery) ||
           c.nameEn.toLowerCase().includes(trimmedQuery.toLowerCase()) ||
           c.country.includes(trimmedQuery) ||
           c.countryEn.toLowerCase().includes(trimmedQuery.toLowerCase())
@@ -140,7 +142,7 @@ const CitySearch = ({
         try {
           const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trimmedQuery)}&addressdetails=1&limit=5&accept-language=${isRTL ? 'ar' : 'en'}`);
           const results = await response.json();
-          
+
           const apiSuggestions = results.map((item: any) => ({
             name: item.address.city || item.address.town || item.address.village || item.display_name.split(',')[0],
             nameEn: item.display_name.split(',')[0], // Fallback
@@ -149,7 +151,7 @@ const CitySearch = ({
             lat: item.lat,
             lon: item.lon
           }));
-          
+
           // Combine local and API suggestions, avoiding duplicates if possible
           setSuggestions(prev => {
             const combined = [...localFiltered];
@@ -187,7 +189,7 @@ const CitySearch = ({
               <p className="text-[10px] text-gray-400">{isRTL ? 'تم تحديد المدينة' : 'City selected'}</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => setIsEditing(true)}
             className="text-xs font-bold text-rose-400 hover:underline"
           >
@@ -203,7 +205,7 @@ const CitySearch = ({
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className={cn("absolute top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300", isRTL ? "right-4" : "left-4")} />
-          <input 
+          <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -221,7 +223,7 @@ const CitySearch = ({
             </div>
           )}
           {query && (
-            <button 
+            <button
               onClick={() => setQuery('')}
               className={cn("absolute top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full", isRTL ? "left-4" : "right-4")}
             >
@@ -229,7 +231,7 @@ const CitySearch = ({
             </button>
           )}
         </div>
-        
+
         <button
           onClick={detectLocation}
           disabled={isDetecting}
@@ -246,7 +248,7 @@ const CitySearch = ({
 
       <AnimatePresence>
         {isFocused && query.trim().length >= 2 && !isLoading && suggestions.length === 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -257,7 +259,7 @@ const CitySearch = ({
         )}
 
         {isFocused && suggestions.length > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -290,13 +292,13 @@ const CitySearch = ({
 };
 
 export const Profile = ({ }: ProfileProps) => {
-  const { 
-    user: contextUser, 
-    refresh, 
-    fiqhState, 
-    currentDay, 
-    prediction, 
-    ovulation 
+  const {
+    user: contextUser,
+    refresh,
+    fiqhState,
+    currentDay,
+    prediction,
+    ovulation
   } = useCycleData();
   const [user, setUser] = useState<any>(null);
   const [isPremium, setIsPremium] = useState(true); // Freemium
@@ -317,6 +319,7 @@ export const Profile = ({ }: ProfileProps) => {
   const [showPregnancySetup, setShowPregnancySetup] = useState(false);
   const [pregnancySetupWeek, setPregnancySetupWeek] = useState(1);
   const [isSavingPregnancySetup, setIsSavingPregnancySetup] = useState(false);
+  const [savingHealthMode, setSavingHealthMode] = useState<'pregnancy' | 'postpartum' | 'ttc' | null>(null);
   const { t, language, setLanguage, isRTL } = useTranslation();
 
   useEffect(() => {
@@ -330,10 +333,10 @@ export const Profile = ({ }: ProfileProps) => {
           setUser(userData);
           setIsPremium(true); // Freemium
         }
-        
+
         const { data: ledgerData } = await api.getAdahLedger();
         if (ledgerData) setLedger(ledgerData);
-        
+
         const { data: entriesData } = await api.getCycleEntries();
         if (entriesData) setEntries(entriesData);
 
@@ -367,15 +370,81 @@ export const Profile = ({ }: ProfileProps) => {
         return;
       }
 
-      const updated = await api.updateUser({ pregnant: true, pregnancy_week: week });
+      const nextConditions = (user?.conditions || []).filter((c: string) => c !== 'ttc' && c !== 'postpartum');
+      const updated = await api.updateUser({ pregnant: true, pregnancy_week: week, conditions: nextConditions });
       if (updated.error) {
         console.warn('Pregnancy profile mirror update failed:', updated.error);
       }
-      setUser(prev => prev ? { ...prev, ...(updated.data || {}), pregnant: true, pregnancy_week: week } : updated.data);
+      setUser(prev => prev ? { ...prev, ...(updated.data || {}), pregnant: true, pregnancy_week: week, conditions: nextConditions } : updated.data);
       setShowPregnancySetup(false);
       await refresh();
     } finally {
       setIsSavingPregnancySetup(false);
+    }
+  };
+
+  const saveHealthMode = async (mode: 'postpartum' | 'ttc', enabled: boolean) => {
+    if (savingHealthMode) return;
+    setSavingHealthMode(mode);
+
+    const existingConditions = user?.conditions || [];
+    const withoutModes = existingConditions.filter((c: string) => c !== 'postpartum' && c !== 'ttc');
+    const nextConditions = enabled ? [...withoutModes, mode] : withoutModes;
+    const optimisticUser = {
+      ...user,
+      pregnant: false,
+      pregnancy_week: 0,
+      conditions: nextConditions,
+    };
+
+    setUser(optimisticUser);
+
+    try {
+      await api.clearActivePregnancyRecords();
+
+      if (mode === 'postpartum' && enabled) {
+        await api.logBirthEvent(Date.now());
+        await api.logCycleEntry({
+          date: new Date().toISOString().split('T')[0],
+          time_logged: new Date().toISOString(),
+          fiqh_state: 'NIFAS',
+          flow_intensity: 'medium',
+          blood_color: 'red',
+          blood_thickness: 'normal',
+          notes: isRTL ? 'تم بدء وضع النفاس من الملف الشخصي' : 'Postpartum mode started from Profile',
+        });
+      }
+
+      if (mode === 'postpartum' && !enabled) {
+        await api.logCycleEntry({
+          date: new Date().toISOString().split('T')[0],
+          time_logged: new Date().toISOString(),
+          fiqh_state: 'TAHARA',
+          flow_intensity: 'none',
+          blood_color: 'red',
+          blood_thickness: 'normal',
+          notes: isRTL ? 'تم إيقاف وضع النفاس من الملف الشخصي' : 'Postpartum mode ended from Profile',
+        });
+      }
+
+      const updated = await api.updateUser({
+        pregnant: false,
+        pregnancy_week: 0,
+        conditions: nextConditions,
+      });
+
+      if (updated.error) {
+        throw new Error(updated.error);
+      }
+
+      setUser(prev => ({ ...prev, ...(updated.data || {}), conditions: nextConditions, pregnant: false, pregnancy_week: 0 }));
+      await refresh();
+    } catch (error) {
+      console.error('Failed to save health mode', error);
+      alert(isRTL ? 'تعذر حفظ الوضع الصحي. حاولي مرة أخرى.' : 'Could not save this health mode. Please try again.');
+      await refresh();
+    } finally {
+      setSavingHealthMode(null);
     }
   };
 
@@ -436,12 +505,12 @@ export const Profile = ({ }: ProfileProps) => {
 
   const handleInviteFriend = async () => {
     if (isSharing) return;
-    
+
     const text = t('share_message');
     const url = window.location.origin;
-    
+
     setIsSharing(true);
-    
+
     if (navigator.share) {
       try {
         await navigator.share({
@@ -556,7 +625,7 @@ export const Profile = ({ }: ProfileProps) => {
         madhhab: user?.madhhab ?? 'HANBALI',
         anonymous_mode: user?.anonymous_mode ?? false,
         language: user?.language ?? 'ar',
-        trying_to_conceive: user?.trying_to_conceive ?? false,
+        trying_to_conceive: Boolean(user?.conditions?.includes('ttc')),
       };
       const blob = await generateHusbandPDF(
         safeUser,
@@ -622,6 +691,8 @@ export const Profile = ({ }: ProfileProps) => {
   if (loading) return null;
 
   const isPregnant = Boolean(user?.pregnant);
+  const isPostpartum = Boolean(user?.conditions?.includes('postpartum'));
+  const isTryingToConceive = Boolean(user?.conditions?.includes('ttc'));
 
   return (
     <div className="min-h-screen bg-[#FDFCFB] pb-32">
@@ -633,7 +704,7 @@ export const Profile = ({ }: ProfileProps) => {
       <div className="px-6 space-y-8">
         {/* User Card */}
         <section className="p-6 bg-white rounded-[40px] shadow-xl shadow-black/5 border border-black/5 flex items-center space-x-6">
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             className="w-20 h-20 rounded-full bg-rose-50 flex items-center justify-center text-2xl font-serif font-bold text-rose-400 border-4 border-rose-50"
@@ -643,7 +714,7 @@ export const Profile = ({ }: ProfileProps) => {
           <div className="flex-1 space-y-1">
             <div className="flex items-center space-x-2">
               <h2 className="text-xl font-bold text-rose-800">{user?.display_name}</h2>
-              <motion.div 
+              <motion.div
                 animate={{ opacity: [0.5, 1, 0.5] }}
                 transition={{ repeat: Infinity, duration: 2 }}
                 className="px-2 py-0.5 bg-amber-50 rounded-full text-[8px] font-bold text-amber-500 uppercase tracking-widest border border-amber-100"
@@ -658,14 +729,14 @@ export const Profile = ({ }: ProfileProps) => {
         {/* Location & Prayer Times */}
         <section className="space-y-4">
           <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('prayer_times_settings')}</h3>
-          <CitySearch 
+          <CitySearch
             currentCity={user?.prayerCity}
             currentCountry={user?.prayerCountry}
             currentCityAr={user?.prayerCityAr}
             onSelect={async (city) => {
               const lat = typeof city.lat === 'string' ? parseFloat(city.lat) : city.lat;
               const lon = typeof city.lon === 'string' ? parseFloat(city.lon) : (typeof city.lng === 'string' ? parseFloat(city.lng) : city.lng);
-              
+
               await handleUpdateUser({
                 prayerCity: city.nameEn || city.name,
                 prayerCountry: city.countryEn || city.country,
@@ -685,18 +756,23 @@ export const Profile = ({ }: ProfileProps) => {
         <section className="space-y-4">
           <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('health_profile')}</h3>
           <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
-            <ToggleRow 
-              label={t('currently_pregnant')} 
-              active={isPregnant} 
+            <ToggleRow
+              icon={Baby}
+              label={t('currently_pregnant')}
+              active={isPregnant}
+              disabled={savingHealthMode !== null}
+              sublabel={isRTL ? 'يفتح إعداد أسبوع الحمل ثم يعرض لوحة الحمل والتقرير' : 'Opens pregnancy setup, dashboard, and report'}
               onChange={async (val) => {
                 if (val) {
                   openPregnancySetup();
                   return;
                 }
 
+                setSavingHealthMode('pregnancy');
                 const pregnancy = await api.clearActivePregnancyRecords();
                 if (pregnancy.error) {
                   alert(isRTL ? 'تعذر إيقاف وضع الحمل. حاولي مرة أخرى.' : 'Could not turn off pregnancy mode. Please try again.');
+                  setSavingHealthMode(null);
                   await refresh();
                   return;
                 }
@@ -707,7 +783,8 @@ export const Profile = ({ }: ProfileProps) => {
                 }
                 setUser(prev => prev ? { ...prev, ...(updated.data || {}), pregnant: false, pregnancy_week: 0 } : updated.data);
                 await refresh();
-              }} 
+                setSavingHealthMode(null);
+              }}
             />
             {isPregnant ? (
               <div className="px-5 py-4 bg-emerald-50 border-t border-emerald-100 text-xs leading-6 text-emerald-800">
@@ -717,28 +794,41 @@ export const Profile = ({ }: ProfileProps) => {
               </div>
             ) : (
               <>
-                <ToggleRow 
-                  label={t('postpartum_mode')} 
-                  active={user?.conditions?.includes('postpartum')} 
-                  onChange={async (val) => {
-                    const conditions = user?.conditions || [];
-                    await api.updateUser({ 
-                      conditions: val ? [...conditions, 'postpartum'] : conditions.filter((c: string) => c !== 'postpartum')
-                    });
-                    await refresh();
-                  }} 
+                <ToggleRow
+                  icon={Droplets}
+                  label={t('postpartum_mode')}
+                  active={isPostpartum}
+                  disabled={savingHealthMode !== null}
+                  sublabel={
+                    isRTL
+                      ? 'عند تفعيله يبدأ النفاس من اليوم، وتُعلّق الصلاة والصوم حسب الحالة'
+                      : 'Starts nifas from today and adjusts prayer/fasting status'
+                  }
+                  onChange={(val) => saveHealthMode('postpartum', val)}
                 />
-                <ToggleRow 
-                  label={t('ttc_mode')} 
-                  active={user?.conditions?.includes('ttc')} 
-                  onChange={async (val) => {
-                    const conditions = user?.conditions || [];
-                    await api.updateUser({ 
-                      conditions: val ? [...conditions, 'ttc'] : conditions.filter((c: string) => c !== 'ttc')
-                    });
-                    await refresh();
-                  }} 
+                <ToggleRow
+                  icon={Heart}
+                  label={t('ttc_mode')}
+                  active={isTryingToConceive}
+                  disabled={savingHealthMode !== null}
+                  sublabel={
+                    isRTL
+                      ? 'يُظهر نافذة الخصوبة وفرصة الحمل في التقويم ويُحسّن تقرير الزوج'
+                      : 'Shows fertile-window tools in Calendar and improves the husband report'
+                  }
+                  onChange={(val) => saveHealthMode('ttc', val)}
                 />
+                {(isPostpartum || isTryingToConceive) && (
+                  <div className="px-5 py-4 bg-rose-50 border-t border-rose-100 text-xs leading-6 text-rose-800">
+                    {isPostpartum
+                      ? (isRTL
+                        ? 'وضع النفاس نشط: تم تسجيل بداية النفاس من اليوم، ويمكنك إيقافه عند الطهارة.'
+                        : 'Postpartum mode is active: nifas started today and can be turned off when tahara returns.')
+                      : (isRTL
+                        ? 'وضع التخطيط نشط: افتحي التقويم لرؤية نافذة الخصوبة وفرصة الحمل.'
+                        : 'TTC mode is active: open Calendar to see fertile-window and pregnancy-chance tools.')}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -755,8 +845,8 @@ export const Profile = ({ }: ProfileProps) => {
                 onClick={() => setShowMadhhabConfirm(m)}
                 className={cn(
                   "p-4 rounded-3xl border transition-all text-left space-y-1",
-                  user?.madhhab === m 
-                    ? "bg-rose-50 border-rose-200 shadow-sm" 
+                  user?.madhhab === m
+                    ? "bg-rose-50 border-rose-200 shadow-sm"
                     : "bg-white border-black/5"
                 )}
               >
@@ -778,14 +868,14 @@ export const Profile = ({ }: ProfileProps) => {
         <section className="space-y-4">
           <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('privacy_settings')}</h3>
           <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
-            <ToggleRow 
+            <ToggleRow
               icon={EyeOff}
-              label={t('anonymous_mode')} 
-              active={user?.anonymous_mode} 
+              label={t('anonymous_mode')}
+              active={user?.anonymous_mode}
               onChange={async (val) => {
                 await api.updateUser({ anonymous_mode: val });
                 await refresh();
-              }} 
+              }}
             />
             <LinkRow icon={Trash2} label={t('delete_account')} color="text-rose-500" onClick={() => setShowDeleteConfirm(true)} />
           </div>
@@ -795,29 +885,29 @@ export const Profile = ({ }: ProfileProps) => {
         <section className="space-y-4">
           <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('notifications')}</h3>
           <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
-            <ToggleRow 
-              label={t('prayer_alerts')} 
-              active={Boolean(user?.notification_prefs?.prayer_alerts)} 
-              onChange={(val) => handleTogglePreference('prayer_alerts', val)} 
+            <ToggleRow
+              label={t('prayer_alerts')}
+              active={Boolean(user?.notification_prefs?.prayer_alerts)}
+              onChange={(val) => handleTogglePreference('prayer_alerts', val)}
             />
             {!isPregnant && (
               <>
-                <ToggleRow 
-                  label={t('haid_prediction_alerts')} 
-                  active={Boolean(user?.notification_prefs?.haid_prediction_alerts)} 
-                  onChange={(val) => handleTogglePreference('haid_prediction_alerts', val)} 
+                <ToggleRow
+                  label={t('haid_prediction_alerts')}
+                  active={Boolean(user?.notification_prefs?.haid_prediction_alerts)}
+                  onChange={(val) => handleTogglePreference('haid_prediction_alerts', val)}
                 />
-                <ToggleRow 
-                  label={t('ghusl_reminders')} 
-                  active={Boolean(user?.notification_prefs?.ghusl_reminders)} 
-                  onChange={(val) => handleTogglePreference('ghusl_reminders', val)} 
+                <ToggleRow
+                  label={t('ghusl_reminders')}
+                  active={Boolean(user?.notification_prefs?.ghusl_reminders)}
+                  onChange={(val) => handleTogglePreference('ghusl_reminders', val)}
                 />
               </>
             )}
-            <ToggleRow 
-              label={t('daily_insight_alerts')} 
-              active={Boolean(user?.notification_prefs?.daily_insight_alerts)} 
-              onChange={(val) => handleTogglePreference('daily_insight_alerts', val)} 
+            <ToggleRow
+              label={t('daily_insight_alerts')}
+              active={Boolean(user?.notification_prefs?.daily_insight_alerts)}
+              onChange={(val) => handleTogglePreference('daily_insight_alerts', val)}
             />
             {isPregnant && (
               <div className="px-5 py-4 bg-rose-50 border-t border-rose-100 text-xs leading-6 text-rose-800">
@@ -838,7 +928,7 @@ export const Profile = ({ }: ProfileProps) => {
                 <Download className="w-5 h-5 text-rose-400" />
                 <span className="text-sm font-bold text-rose-800">{t('export_fiqh')}</span>
               </div>
-              <button 
+              <button
                 onClick={handleDownloadFiqhReport}
                 disabled={isGeneratingFiqhPDF}
                 className="text-[10px] font-bold text-rose-400 uppercase tracking-widest disabled:opacity-50"
@@ -852,7 +942,7 @@ export const Profile = ({ }: ProfileProps) => {
                 <Download className="w-5 h-5 text-rose-400" />
                 <span className="text-sm font-bold text-rose-800">{t('export_doctor')}</span>
               </div>
-              <button 
+              <button
                 onClick={handleDownloadDoctorReport}
                 disabled={isGeneratingDoctorPDF}
                 className="text-[10px] font-bold text-rose-400 uppercase tracking-widest disabled:opacity-50"
@@ -867,7 +957,7 @@ export const Profile = ({ }: ProfileProps) => {
                   <Download className="w-5 h-5 text-rose-400" />
                   <span className="text-sm font-bold text-rose-800">{t('export_pregnancy')}</span>
                 </div>
-                <button 
+                <button
                   onClick={handleDownloadPregnancyReport}
                   disabled={isGeneratingPregnancyPDF}
                   className="text-[10px] font-bold text-rose-400 uppercase tracking-widest disabled:opacity-50"
@@ -882,7 +972,7 @@ export const Profile = ({ }: ProfileProps) => {
                 <Download className="w-5 h-5 text-rose-400" />
                 <span className="text-sm font-bold text-rose-800">{t('husband_report_title')}</span>
               </div>
-              <button 
+              <button
                 onClick={handleDownloadHusbandReport}
                 disabled={isGeneratingHusbandPDF}
                 className="text-[10px] font-bold text-rose-400 uppercase tracking-widest disabled:opacity-50"
@@ -903,13 +993,13 @@ export const Profile = ({ }: ProfileProps) => {
                 <span className="text-sm font-bold text-rose-800">{t('language')}</span>
               </div>
               <div className="flex items-center space-x-2">
-                <button 
+                <button
                   onClick={() => setLanguage('en')}
                   className={cn("text-xs font-bold uppercase tracking-widest px-2 py-1 rounded-lg", language === 'en' ? "bg-rose-50 text-rose-400" : "text-gray-400")}
                 >
                   EN
                 </button>
-                <button 
+                <button
                   onClick={() => setLanguage('ar')}
                   className={cn("text-xs font-bold uppercase tracking-widest px-2 py-1 rounded-lg", language === 'ar' ? "bg-rose-50 text-rose-400" : "text-gray-400")}
                 >
@@ -924,7 +1014,7 @@ export const Profile = ({ }: ProfileProps) => {
         <section className="space-y-4">
           <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">{t('community')}</h3>
           <div className="bg-white rounded-[32px] border border-black/5 overflow-hidden">
-            <button 
+            <button
               onClick={handleInviteFriend}
               disabled={isSharing}
               className="w-full p-5 flex items-center justify-between hover:bg-gray-50 transition-colors disabled:opacity-50"
@@ -939,7 +1029,7 @@ export const Profile = ({ }: ProfileProps) => {
         </section>
 
         <div className="pt-8 pb-4 text-center">
-          <button 
+          <button
             onClick={() => signOut()}
             className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-sm active:scale-95 transition-transform"
           >
@@ -956,14 +1046,14 @@ export const Profile = ({ }: ProfileProps) => {
       <AnimatePresence>
         {showMadhhabConfirm && (
           <>
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowMadhhabConfirm(null)}
               className="fixed inset-0 bg-black/40 z-[200] backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
@@ -980,7 +1070,7 @@ export const Profile = ({ }: ProfileProps) => {
                 </p>
               </div>
               <div className="space-y-3">
-                <button 
+                <button
                   onClick={async () => {
                     await handleUpdateUser({ madhhab: showMadhhabConfirm });
                     setShowMadhhabConfirm(null);
@@ -989,7 +1079,7 @@ export const Profile = ({ }: ProfileProps) => {
                 >
                   {t('confirm')}
                 </button>
-                <button 
+                <button
                   onClick={() => setShowMadhhabConfirm(null)}
                   className="w-full py-4 bg-gray-50 text-rose-800 rounded-2xl font-bold"
                 >
@@ -1137,14 +1227,14 @@ export const Profile = ({ }: ProfileProps) => {
       <AnimatePresence>
         {showClinicShare && (
           <>
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowClinicShare(false)}
               className="fixed inset-0 bg-black/40 z-[200] backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
@@ -1156,12 +1246,12 @@ export const Profile = ({ }: ProfileProps) => {
                   <X className="w-5 h-5 text-gray-400" />
                 </button>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('clinic_code')}</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={clinicCode}
                     onChange={(e) => setClinicCode(e.target.value)}
                     placeholder={t('enter_6_digit')}
@@ -1172,7 +1262,7 @@ export const Profile = ({ }: ProfileProps) => {
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('share_type')}</label>
                   <div className="grid grid-cols-2 gap-3">
-                    <button 
+                    <button
                       onClick={() => setShareType('health')}
                       className={cn(
                         "p-4 rounded-2xl border-2 text-[10px] font-bold transition-all",
@@ -1181,7 +1271,7 @@ export const Profile = ({ }: ProfileProps) => {
                     >
                       {t('health_data_only')}
                     </button>
-                    <button 
+                    <button
                       onClick={() => setShareType('full')}
                       className={cn(
                         "p-4 rounded-2xl border-2 text-[10px] font-bold transition-all",
@@ -1193,7 +1283,7 @@ export const Profile = ({ }: ProfileProps) => {
                   </div>
                 </div>
 
-                <button 
+                <button
                   onClick={() => {
                     setShowClinicShare(false);
                   }}
@@ -1214,7 +1304,7 @@ export const Profile = ({ }: ProfileProps) => {
 import { HapticService } from '../services/HapticService.ts';
 
 const LinkRow = ({ icon: Icon, label, onClick, color = "text-rose-800" }: { icon: any, label: string, onClick: () => void, color?: string }) => (
-  <button 
+  <button
     onClick={() => {
       HapticService.light();
       onClick();
@@ -1229,13 +1319,13 @@ const LinkRow = ({ icon: Icon, label, onClick, color = "text-rose-800" }: { icon
   </button>
 );
 
-const NiswahToggle = ({ 
-  value, 
-  onChange, 
-  disabled = false 
-}: { 
-  value: boolean; 
-  onChange: (v: boolean) => void; 
+const NiswahToggle = ({
+  value,
+  onChange,
+  disabled = false
+}: {
+  value: boolean;
+  onChange: (v: boolean) => void;
   disabled?: boolean;
 }) => (
   <button
@@ -1259,12 +1349,29 @@ const NiswahToggle = ({
   </button>
 );
 
-const ToggleRow = ({ icon: Icon, label, active, onChange }: { icon?: any, label: string, active: boolean, onChange: (val: boolean) => void }) => (
-  <div className="p-5 flex items-center justify-between border-b border-black/5 last:border-0">
-    <div className="flex items-center space-x-3">
+const ToggleRow = ({
+  icon: Icon,
+  label,
+  sublabel,
+  active,
+  disabled = false,
+  onChange
+}: {
+  icon?: any;
+  label: string;
+  sublabel?: string;
+  active: boolean;
+  disabled?: boolean;
+  onChange: (val: boolean) => void;
+}) => (
+  <div className="p-5 flex items-center justify-between gap-4 border-b border-black/5 last:border-0">
+    <div className="flex min-w-0 items-center space-x-3">
       {Icon && <Icon className="w-5 h-5 text-rose-400" />}
-      <span className="text-sm font-bold text-rose-800">{label}</span>
+      <div className="min-w-0">
+        <span className="block text-sm font-bold text-rose-800">{label}</span>
+        {sublabel && <span className="mt-1 block text-[11px] leading-5 text-gray-400">{sublabel}</span>}
+      </div>
     </div>
-    <NiswahToggle value={active} onChange={onChange} />
+    <NiswahToggle value={active} onChange={onChange} disabled={disabled} />
   </div>
 );

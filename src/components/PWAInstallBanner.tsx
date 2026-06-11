@@ -21,18 +21,20 @@ export const PWAInstallBanner = ({ placement = 'app', userId }: { placement?: 'a
     if (!t) return false;
     return Date.now() - parseInt(t) < 7 * 24 * 60 * 60 * 1000;
   };
-  const [dismissed, setDismissed] = useState(() => isRecentlyDismissed(dismissalKey));
+  const [dismissed, setDismissed] = useState(() => placement === 'app' && isRecentlyDismissed(dismissalKey));
   const [installing, setInstalling] = useState(false);
   const [showManualSteps, setShowManualSteps] = useState(false);
 
   useEffect(() => {
-    setDismissed(isRecentlyDismissed(dismissalKey));
+    setDismissed(placement === 'app' && isRecentlyDismissed(dismissalKey));
     setShowManualSteps(false);
-  }, [dismissalKey]);
+  }, [dismissalKey, placement]);
 
   const dismissPrompt = () => {
     setDismissed(true);
-    localStorage.setItem(dismissalKey, Date.now().toString());
+    if (placement === 'app') {
+      localStorage.setItem(dismissalKey, Date.now().toString());
+    }
   };
 
   const isManualInstallPlatform = platform.isIOS || platform.isSafari;

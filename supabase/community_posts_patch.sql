@@ -10,6 +10,21 @@ alter table public.community_posts add column if not exists comments jsonb not n
 alter table public.community_posts add column if not exists created_at timestamptz not null default now();
 alter table public.community_posts add column if not exists updated_at timestamptz not null default now();
 
+comment on table public.community_posts is
+  'Women community feed posts. Each row is one user-created post shown in the Niswah community tab.';
+comment on column public.community_posts.content is
+  'The visible text/body of the community post written by the user.';
+comment on column public.community_posts.category is
+  'Post topic category: general, health, fiqh, or mental.';
+comment on column public.community_posts.author_name is
+  'Display name shown on the post when the post is not anonymous.';
+comment on column public.community_posts.is_anonymous is
+  'When true, the UI hides the author display name and shows guest/sister wording.';
+comment on column public.community_posts.comments is
+  'JSON array of lightweight comments attached to this post.';
+comment on column public.community_posts.like_user_ids is
+  'JSON array of auth user ids that liked this post.';
+
 update public.community_posts
 set content = 'مشاركة قديمة'
 where content is null or length(trim(content)) = 0;
@@ -70,3 +85,5 @@ create policy "community_posts_delete_own"
 on public.community_posts
 for delete
 using (auth.uid() = author_id or public.is_admin());
+
+notify pgrst, 'reload schema';

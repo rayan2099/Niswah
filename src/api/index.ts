@@ -715,13 +715,25 @@ export async function createCommunityPost(input: {
 
   const buildPayload = () => ({
     author_id: authUser.id,
-    author_name: input.is_anonymous ? null : (profile?.display_name || authUser.user_metadata?.display_name || 'Sister'),
     content: input.content.trim(),
-    category: input.category,
-    is_anonymous: input.is_anonymous,
-    like_user_ids: [],
-    comments: [],
   });
+
+  const enrichPost = async (post: DBCommunityPost) => {
+    const updates = {
+      author_name: input.is_anonymous ? null : (profile?.display_name || authUser.user_metadata?.display_name || 'Sister'),
+      category: input.category,
+      is_anonymous: input.is_anonymous,
+    };
+
+    const { data: updated } = await supabase
+      .from('community_posts')
+      .update(updates)
+      .eq('id', post.id)
+      .select('*')
+      .maybeSingle();
+
+    return updated ? mapCommunityPost(updated) : post;
+  };
 
   const insertPost = (payload: Record<string, any>) => supabase
     .from('community_posts')
@@ -753,7 +765,10 @@ export async function createCommunityPost(input: {
     error = retry.error;
   }
 
-  return error ? { data: null, error: error.message } : { data: mapCommunityPost(data), error: null };
+  if (error) return { data: null, error: error.message };
+
+  const post = mapCommunityPost(data);
+  return { data: await enrichPost(post), error: null };
 }
 
 export async function toggleCommunityPostLike(post: DBCommunityPost): Promise<ApiResponse<DBCommunityPost>> {

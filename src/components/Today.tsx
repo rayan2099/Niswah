@@ -1442,52 +1442,56 @@ export const Today = ({
   const activeSymptomEntries = Object.entries(todayEntry?.symptoms || {}).filter(([, value]) => Number(value) > 0);
 
   const renderDailyWellnessCard = () => {
+    if (!isInTahara || isPregnant) return null;
+
     const openMentalLog = () => {
       setDefaultIntensity('none');
       setLogMode('mental');
       setIsLogOpen(true);
     };
-    const contextLabel = isPregnant
-      ? (isRTL ? 'متابعة نفسية أثناء الحمل' : 'Pregnancy mental check-in')
-      : isInTahara
-        ? (isRTL ? 'متابعة الحالة النفسية في الطهر' : 'Mental check-in during purity')
-        : (isRTL ? 'متابعة الحالة النفسية' : 'Mental state check-in');
-    const helperText = isPregnant
-      ? (isRTL ? 'سجلي قلقك، طاقتك، نومك وأي أعراض حمل لتظهر للطبيبة نسوة بصورة أوضح.' : 'Log anxiety, energy, sleep, and pregnancy symptoms for better AI doctor context.')
-      : isInTahara
-        ? (isRTL ? 'هذا التسجيل لا يبدّل حالة الطهر. يساعدك على ملاحظة المزاج والطاقة بين الدورات.' : 'This does not change purity state. It helps you notice mood and energy between cycles.')
-        : (isRTL ? 'منفصل عن بدء الحيض: فقط مشاعر، أعراض، نوم وطاقة لهذا اليوم.' : 'Separate from period start: only feelings, symptoms, sleep, and energy for today.');
+    const contextLabel = isRTL ? 'متابعة الحالة النفسية' : 'Mental state check-in';
+    const helperText = isRTL
+      ? 'دوّني مزاجك، طاقتك، نومك وأي أعراض خفيفة لتفهمي نمطك بهدوء.'
+      : 'Log mood, energy, sleep, and light symptoms to understand your pattern.';
     const moodLabel = t(MOODS_DATA[todayEntry?.mood ?? 2]?.key as any);
 
     return (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-sm overflow-hidden rounded-[34px] border border-emerald-100 bg-white shadow-xl shadow-emerald-950/5"
+        className="w-full max-w-sm overflow-hidden rounded-[34px] border border-emerald-100/80 bg-white shadow-2xl shadow-emerald-950/5"
         dir={isRTL ? 'rtl' : 'ltr'}
       >
-        <div className="bg-gradient-to-br from-emerald-50 via-white to-rose-50 p-5 space-y-5">
-          <div className="flex items-start justify-between gap-4">
+        <div className="relative bg-gradient-to-br from-emerald-50 via-white to-rose-50 p-5 space-y-5">
+          <div className="absolute -left-10 -top-10 h-28 w-28 rounded-full bg-emerald-100/45 blur-2xl" />
+          <div className="absolute -bottom-12 right-8 h-24 w-24 rounded-full bg-rose-100/50 blur-2xl" />
+
+          <div className="relative flex items-start justify-between gap-4">
             <button
               onClick={openMentalLog}
-              className="shrink-0 rounded-2xl bg-emerald-700 px-4 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-200 active:scale-95 transition-transform"
+              className="shrink-0 rounded-2xl bg-emerald-800 px-4 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-200 active:scale-95 transition-transform"
             >
               {todayEntry ? (isRTL ? 'تحديث' : 'Update') : (isRTL ? 'تسجيل' : 'Log')}
             </button>
-            <div className={cn("space-y-1", isRTL ? "text-right" : "text-left")}>
-              <p className="text-[11px] font-bold text-emerald-700">{contextLabel}</p>
-              <h3 className="text-xl font-serif font-bold text-gray-950">
-                {todayEntry ? (isRTL ? 'كيف تشعرين الآن؟' : 'How are you feeling now?') : (isRTL ? 'اطمئني على حالتك اليوم' : 'Check in with yourself today')}
+            <div className={cn("flex-1 space-y-2", isRTL ? "text-right" : "text-left")}>
+              <div className="flex items-center justify-end gap-2">
+                <p className="text-[11px] font-bold text-emerald-700">{contextLabel}</p>
+                <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm">
+                  <Heart className="h-4 w-4" />
+                </div>
+              </div>
+              <h3 className="text-2xl font-serif font-bold text-gray-950">
+                {todayEntry ? (isRTL ? 'كيف قلبك اليوم؟' : 'How is your heart today?') : (isRTL ? 'اطمئني على نفسك' : 'Check in with yourself')}
               </h3>
-              <p className="text-xs leading-relaxed text-gray-500">{helperText}</p>
+              <p className="text-xs leading-relaxed text-gray-500 max-w-[17rem]">{helperText}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="relative grid grid-cols-3 gap-2">
             {[
-              { label: t('mood'), value: todayEntry ? moodLabel : (isRTL ? 'غير مسجل' : 'Not logged'), className: 'bg-white/90 text-emerald-800 border-emerald-100' },
-              { label: t('energy'), value: todayEntry?.energy_level ? `${todayEntry.energy_level}/5` : '-', className: 'bg-white/90 text-rose-700 border-rose-100' },
-              { label: t('sleep'), value: todayEntry?.sleep_quality ? `${todayEntry.sleep_quality}/5` : '-', className: 'bg-white/90 text-indigo-700 border-indigo-100' },
+              { label: t('mood'), value: todayEntry ? moodLabel : '—', className: 'bg-white/90 text-emerald-800 border-emerald-100' },
+              { label: t('energy'), value: todayEntry?.energy_level ? `${todayEntry.energy_level}/5` : '—', className: 'bg-white/90 text-rose-700 border-rose-100' },
+              { label: t('sleep'), value: todayEntry?.sleep_quality ? `${todayEntry.sleep_quality}/5` : '—', className: 'bg-white/90 text-indigo-700 border-indigo-100' },
             ].map(item => (
               <div key={item.label} className={cn("rounded-2xl border p-3 text-center shadow-sm shadow-black/[0.02]", item.className)}>
                 <p className="text-[10px] font-bold text-current/55">{item.label}</p>
@@ -1526,18 +1530,18 @@ export const Today = ({
 
             <button
               onClick={openMentalLog}
-              className="w-full rounded-2xl bg-gray-950 px-4 py-4 text-sm font-bold text-white active:scale-[0.99] transition-transform"
+              className="w-full rounded-2xl bg-emerald-800 px-4 py-4 text-sm font-bold text-white shadow-lg shadow-emerald-100 active:scale-[0.99] transition-transform"
             >
-              {isRTL ? 'تعديل متابعة الحالة النفسية' : 'Edit mental check-in'}
+              {isRTL ? 'تحديث حالتي النفسية' : 'Update mental state'}
             </button>
           </div>
         ) : (
           <div className="p-5">
             <button
               onClick={openMentalLog}
-              className="w-full rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-5 text-sm font-bold text-emerald-800 active:scale-[0.99] transition-transform"
+              className="w-full rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-5 text-sm font-bold text-emerald-800 shadow-inner shadow-white active:scale-[0.99] transition-transform"
             >
-              {isRTL ? 'ابدئي متابعة نفسية منفصلة عن تسجيل الحيض' : 'Start a mental check-in separate from period logging'}
+              {isRTL ? 'سجلي حالتك النفسية الآن' : 'Log your mental state now'}
             </button>
             <div className="mt-3 flex flex-wrap justify-center gap-2">
               {[
@@ -1621,7 +1625,6 @@ export const Today = ({
                     setTimeout(() => setShowBloom(false), 2500);
                   }} 
                 />
-                {renderDailyWellnessCard()}
               </>
             ) : isFirstTime ? (
               <FirstTimeWelcome onStart={() => {
@@ -1695,7 +1698,7 @@ export const Today = ({
                   </motion.button>
                 </div>
 
-                {renderDailyWellnessCard()}
+                {isInTahara && renderDailyWellnessCard()}
 
                 {/* Health Doctor Card */}
                 <div

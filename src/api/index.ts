@@ -713,7 +713,7 @@ export async function createCommunityPost(input: {
     profile = repaired.data;
   }
 
-  const payload = {
+  const buildPayload = () => ({
     author_id: authUser.id,
     author_name: input.is_anonymous ? null : (profile?.display_name || authUser.user_metadata?.display_name || 'Sister'),
     content: input.content.trim(),
@@ -721,21 +721,34 @@ export async function createCommunityPost(input: {
     is_anonymous: input.is_anonymous,
     like_user_ids: [],
     comments: [],
-  };
+  });
 
-  const insertPost = () => supabase
+  const insertPost = (payload: Record<string, any>) => supabase
     .from('community_posts')
     .insert(payload)
     .select('*')
     .single();
 
-  let { data, error } = await insertPost();
+  let payload = buildPayload();
+  let { data, error } = await insertPost(payload);
+  for (let attempt = 0; error && attempt < 4; attempt += 1) {
+    const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
+    if (!missingColumn || !Object.prototype.hasOwnProperty.call(payload, missingColumn)) break;
+    if (missingColumn === 'author_id' || missingColumn === 'content') break;
+    payload = { ...payload };
+    delete payload[missingColumn];
+    const retry = await insertPost(payload);
+    data = retry.data;
+    error = retry.error;
+    if (!error) break;
+  }
+
   if (error && /foreign key|community_posts_author_id_fkey|violates/i.test(error.message)) {
     await upsertUser({
       display_name: profile?.display_name || authUser.user_metadata?.display_name || authUser.user_metadata?.full_name || 'Sister',
       premium_status: true,
     });
-    const retry = await insertPost();
+    const retry = await insertPost(payload);
     data = retry.data;
     error = retry.error;
   }

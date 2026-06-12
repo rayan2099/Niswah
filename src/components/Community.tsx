@@ -366,7 +366,7 @@ const PostCard = ({
     setError('');
     const { data, error: apiError } = await toggleCommunityPostLike(post);
     if (apiError || !data) {
-      setError(isRTL ? 'تعذر حفظ الإعجاب.' : 'Could not save like.');
+      setError(isRTL ? `تعذر حفظ الإعجاب. (${apiError})` : `Could not save like. (${apiError})`);
     } else {
       onPostUpdated(data);
     }
@@ -380,7 +380,7 @@ const PostCard = ({
     setError('');
     const { data, error: apiError } = await addCommunityComment(post, content);
     if (apiError || !data) {
-      setError(isRTL ? 'تعذر إضافة التعليق.' : 'Could not add comment.');
+      setError(isRTL ? `تعذر إضافة التعليق. (${apiError})` : `Could not add comment. (${apiError})`);
     } else {
       onPostUpdated(data);
       setCommentText('');

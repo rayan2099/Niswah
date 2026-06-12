@@ -683,6 +683,62 @@ function mapCommunityPost(row: any): DBCommunityPost {
   };
 }
 
+async function hydrateCommunityPosts(posts: DBCommunityPost[]): Promise<DBCommunityPost[]> {
+  const postIds = posts.map(post => post.id).filter(Boolean);
+  if (!postIds.length) return posts;
+
+  const [{ data: likes }, { data: comments }] = await Promise.all([
+    supabase
+      .from('community_post_likes')
+      .select('post_id,user_id')
+      .in('post_id', postIds),
+    supabase
+      .from('community_post_comments')
+      .select('id,post_id,author_id,author_name,is_anonymous,content,created_at')
+      .in('post_id', postIds)
+      .order('created_at', { ascending: true }),
+  ]);
+
+  const likesByPost = new Map<string, string[]>();
+  (likes || []).forEach((like: any) => {
+    const current = likesByPost.get(like.post_id) || [];
+    current.push(like.user_id);
+    likesByPost.set(like.post_id, current);
+  });
+
+  const commentsByPost = new Map<string, DBCommunityComment[]>();
+  (comments || []).forEach((comment: any) => {
+    const current = commentsByPost.get(comment.post_id) || [];
+    current.push({
+      id: comment.id,
+      author_id: comment.author_id,
+      author_name: comment.author_name || 'Sister',
+      is_anonymous: Boolean(comment.is_anonymous),
+      content: comment.content || '',
+      created_at: comment.created_at,
+    });
+    commentsByPost.set(comment.post_id, current);
+  });
+
+  return posts.map(post => ({
+    ...post,
+    like_user_ids: likesByPost.get(post.id) || post.like_user_ids || [],
+    comments: commentsByPost.get(post.id) || post.comments || [],
+  }));
+}
+
+async function getCommunityPostById(postId: string): Promise<ApiResponse<DBCommunityPost>> {
+  const { data, error } = await supabase
+    .from('community_posts')
+    .select('*')
+    .eq('id', postId)
+    .single();
+
+  if (error) return { data: null, error: error.message };
+  const [post] = await hydrateCommunityPosts([mapCommunityPost(data)]);
+  return { data: post, error: null };
+}
+
 export async function getCommunityPosts(): Promise<ApiResponse<DBCommunityPost[]>> {
   const authUser = await ensureUser();
   if (!authUser) return { data: [], error: null };
@@ -693,7 +749,8 @@ export async function getCommunityPosts(): Promise<ApiResponse<DBCommunityPost[]
     .order('created_at', { ascending: false })
     .limit(50);
 
-  return error ? { data: null, error: error.message } : { data: (data || []).map(mapCommunityPost), error: null };
+  if (error) return { data: null, error: error.message };
+  return { data: await hydrateCommunityPosts((data || []).map(mapCommunityPost)), error: null };
 }
 
 export async function createCommunityPost(input: {
@@ -775,10 +832,23 @@ export async function toggleCommunityPostLike(post: DBCommunityPost): Promise<Ap
   const authUser = await ensureUser();
   if (!authUser) return { data: null, error: 'Not authenticated' };
 
+  const liked = Array.isArray(post.like_user_ids) && post.like_user_ids.includes(authUser.id);
+  const reactionResult = liked
+    ? await supabase
+      .from('community_post_likes')
+      .delete()
+      .eq('post_id', post.id)
+      .eq('user_id', authUser.id)
+    : await supabase
+      .from('community_post_likes')
+      .insert({ post_id: post.id, user_id: authUser.id });
+
+  if (!reactionResult.error) {
+    return getCommunityPostById(post.id);
+  }
+
   const existingLikes = Array.isArray(post.like_user_ids) ? post.like_user_ids : [];
-  const nextLikes = existingLikes.includes(authUser.id)
-    ? existingLikes.filter(id => id !== authUser.id)
-    : [...existingLikes, authUser.id];
+  const nextLikes = liked ? existingLikes.filter(id => id !== authUser.id) : [...existingLikes, authUser.id];
 
   const { data, error } = await supabase
     .from('community_posts')
@@ -787,7 +857,16 @@ export async function toggleCommunityPostLike(post: DBCommunityPost): Promise<Ap
     .select('*')
     .single();
 
-  return error ? { data: null, error: error.message } : { data: mapCommunityPost(data), error: null };
+  if (error) {
+    return {
+      data: null,
+      error: /community_post_likes|like_user_ids|schema cache/i.test(`${reactionResult.error.message} ${error.message}`)
+        ? 'Community reactions schema is missing. Run supabase/community_reactions_patch.sql in Supabase.'
+        : error.message,
+    };
+  }
+
+  return { data: mapCommunityPost(data), error: null };
 }
 
 export async function addCommunityComment(post: DBCommunityPost, content: string, isAnonymous = false): Promise<ApiResponse<DBCommunityPost>> {
@@ -803,8 +882,21 @@ export async function addCommunityComment(post: DBCommunityPost, content: string
     content: content.trim(),
     created_at: new Date().toISOString(),
   };
-  const nextComments = [...(post.comments || []), nextComment];
+  const commentResult = await supabase
+    .from('community_post_comments')
+    .insert({
+      post_id: post.id,
+      author_id: nextComment.author_id,
+      author_name: nextComment.author_name,
+      is_anonymous: nextComment.is_anonymous,
+      content: nextComment.content,
+    });
 
+  if (!commentResult.error) {
+    return getCommunityPostById(post.id);
+  }
+
+  const nextComments = [...(post.comments || []), nextComment];
   const { data, error } = await supabase
     .from('community_posts')
     .update({ comments: nextComments, updated_at: new Date().toISOString() })
@@ -812,7 +904,16 @@ export async function addCommunityComment(post: DBCommunityPost, content: string
     .select('*')
     .single();
 
-  return error ? { data: null, error: error.message } : { data: mapCommunityPost(data), error: null };
+  if (error) {
+    return {
+      data: null,
+      error: /community_post_comments|comments|schema cache/i.test(`${commentResult.error.message} ${error.message}`)
+        ? 'Community comments schema is missing. Run supabase/community_reactions_patch.sql in Supabase.'
+        : error.message,
+    };
+  }
+
+  return { data: mapCommunityPost(data), error: null };
 }
 
 export async function saveChatMessage(message: Omit<DBChatMessage, 'id' | 'user_id'>): Promise<ApiResponse<DBChatMessage>> {

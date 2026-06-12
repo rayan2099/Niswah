@@ -704,7 +704,15 @@ export async function createCommunityPost(input: {
   const authUser = await ensureUser();
   if (!authUser) return { data: null, error: 'Not authenticated' };
 
-  const { data: profile } = await getUser();
+  let { data: profile } = await getUser();
+  if (!profile) {
+    const repaired = await upsertUser({
+      display_name: authUser.user_metadata?.display_name || authUser.user_metadata?.full_name || 'Sister',
+      premium_status: true,
+    });
+    profile = repaired.data;
+  }
+
   const payload = {
     author_id: authUser.id,
     author_name: input.is_anonymous ? null : (profile?.display_name || authUser.user_metadata?.display_name || 'Sister'),
@@ -715,11 +723,22 @@ export async function createCommunityPost(input: {
     comments: [],
   };
 
-  const { data, error } = await supabase
+  const insertPost = () => supabase
     .from('community_posts')
     .insert(payload)
     .select('*')
     .single();
+
+  let { data, error } = await insertPost();
+  if (error && /foreign key|community_posts_author_id_fkey|violates/i.test(error.message)) {
+    await upsertUser({
+      display_name: profile?.display_name || authUser.user_metadata?.display_name || authUser.user_metadata?.full_name || 'Sister',
+      premium_status: true,
+    });
+    const retry = await insertPost();
+    data = retry.data;
+    error = retry.error;
+  }
 
   return error ? { data: null, error: error.message } : { data: mapCommunityPost(data), error: null };
 }

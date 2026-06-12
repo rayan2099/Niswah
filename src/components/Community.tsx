@@ -149,7 +149,12 @@ export const Community = () => {
     });
 
     if (error || !data) {
-      setSaveError(isRTL ? 'تعذر نشر المشاركة. تحققي من اتصالك وحاولي مرة أخرى.' : 'Could not publish the post. Please check your connection and try again.');
+      const details = error ? ` (${error})` : '';
+      setSaveError(
+        isRTL
+          ? `تعذر نشر المشاركة. تحققي من اتصالك وحاولي مرة أخرى.${details}`
+          : `Could not publish the post. Please check your connection and try again.${details}`
+      );
     } else {
       setPosts(current => [data, ...current]);
       setNewPostContent('');

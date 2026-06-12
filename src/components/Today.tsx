@@ -666,13 +666,27 @@ const FiqhStateBanner = ({ fiqhState, madhhab, currentDay, cycleLength, haidDura
 
 // --- LOG BOTTOM SHEET ---
 
-const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaultIntensity = 'none' }: { isOpen: boolean; onClose: () => void; madhhab: Madhhab; onSave: (data: any) => void; currentState: State; defaultIntensity?: string }) => {
+const LogBottomSheet = ({
+  isOpen,
+  onClose,
+  madhhab,
+  onSave,
+  currentState,
+  defaultIntensity = 'none',
+  initialEntry = null,
+  isPregnant = false,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  madhhab: Madhhab;
+  onSave: (data: any) => void;
+  currentState: State;
+  defaultIntensity?: string;
+  initialEntry?: Partial<DBCycleEntry> | null;
+  isPregnant?: boolean;
+}) => {
   const { t, isRTL } = useTranslation();
   const [intensity, setIntensity] = useState(defaultIntensity);
-
-  useEffect(() => {
-    setIntensity(defaultIntensity);
-  }, [defaultIntensity, isOpen]);
   const [color, setColor] = useState('red');
   const [thickness, setThickness] = useState('normal');
   const [kursuf, setKursuf] = useState(false);
@@ -683,6 +697,25 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
   const [mood, setMood] = useState(2);
   const [feeling, setFeeling] = useState('');
   const [notes, setNotes] = useState('');
+  const showCycleFields = !isPregnant && (defaultIntensity !== 'none' || currentState === 'HAID' || currentState === 'NIFAS');
+
+  useEffect(() => {
+    const nextIntensity = showCycleFields
+      ? (defaultIntensity !== 'none' ? defaultIntensity : initialEntry?.flow_intensity || 'medium')
+      : 'none';
+
+    setIntensity(nextIntensity);
+    setColor(initialEntry?.blood_color || 'red');
+    setThickness(initialEntry?.blood_thickness || 'normal');
+    setKursuf(Boolean(initialEntry?.kursuf_used));
+    setInternal(Boolean(initialEntry?.discharge_internal));
+    setSymptoms((initialEntry?.symptoms as Record<string, number>) || {});
+    setSleepQuality(initialEntry?.sleep_quality ?? 3);
+    setEnergyLevel(initialEntry?.energy_level ?? 3);
+    setMood(initialEntry?.mood ?? 2);
+    setFeeling(initialEntry?.feeling || '');
+    setNotes(initialEntry?.notes || '');
+  }, [defaultIntensity, initialEntry, isOpen, showCycleFields]);
 
   const symptomList = [
     { key: 'cramps' },
@@ -720,6 +753,7 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
 
   const handleSave = () => {
     onSave({
+      mode: showCycleFields ? 'cycle' : 'wellness',
       intensity,
       color,
       thickness,
@@ -756,12 +790,24 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
             className="fixed bottom-0 left-0 right-0 bg-[#FDFCFB] rounded-t-[40px] z-[101] max-h-[92vh] overflow-y-auto p-8 space-y-8 shadow-2xl"
           >
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-2" />
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-serif font-bold text-rose-800">{t('log_today')}</h3>
+            <div className="flex items-start justify-between gap-4">
+              <div className={cn("space-y-1", isRTL ? "text-right" : "text-left")}>
+                <h3 className="text-xl font-serif font-bold text-rose-800">
+                  {showCycleFields ? t('log_today') : (isRTL ? 'تسجيل العافية اليومي' : 'Daily wellness log')}
+                </h3>
+                <p className="text-xs leading-relaxed text-gray-400">
+                  {showCycleFields
+                    ? (isRTL ? 'سجلي تفاصيل الدم والأعراض لهذا اليوم.' : 'Track flow details and symptoms for today.')
+                    : (isPregnant
+                      ? (isRTL ? 'سجلي أعراض الحمل، طاقتك، نومك ومشاعرك في أي وقت.' : 'Track pregnancy symptoms, energy, sleep, and emotions anytime.')
+                      : (isRTL ? 'سجلي المزاج، النوم، الطاقة والأعراض أثناء الطهر بدون تغيير حالة الطهر.' : 'Track mood, sleep, energy, and symptoms during purity without changing your state.'))}
+                </p>
+              </div>
               <button onClick={onClose} className="p-2 bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             
             {/* Intensity */}
+            {showCycleFields && (
             <section className="space-y-4">
               <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('flow_intensity')}</h4>
               <div className="flex justify-between">
@@ -786,8 +832,10 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
                 ))}
               </div>
             </section>
+            )}
 
             {/* Color */}
+            {showCycleFields && (
             <section className="space-y-4">
               <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('blood_color')}</h4>
               <div className="flex space-x-4">
@@ -813,9 +861,10 @@ const LogBottomSheet = ({ isOpen, onClose, madhhab, onSave, currentState, defaul
                 ))}
               </div>
             </section>
+            )}
 
             {/* Kursuf (Hanafi) */}
-            {madhhab === 'HANAFI' && (
+            {showCycleFields && madhhab === 'HANAFI' && (
               <section className="space-y-4 p-6 bg-rose-50 rounded-3xl border border-rose-100">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1337,18 +1386,22 @@ export const Today = ({
 
   const handleSaveLog = async (logData: any) => {
     try {
-      const newState = (logData.intensity === 'none' ? 'TAHARA' : 'HAID') as State;
+      const isCycleLog = logData.mode === 'cycle';
+      const newState = (isCycleLog
+        ? (logData.intensity === 'none' ? 'TAHARA' : 'HAID')
+        : (todayEntry?.fiqh_state || (isPostpartum ? 'NIFAS' : 'TAHARA'))) as State;
+      const flowIntensity = isCycleLog ? logData.intensity : (todayEntry?.flow_intensity || 'none');
       
       const entry: Partial<api.DBCycleEntry> = {
         id: todayEntry?.id,
         date: format(new Date(), 'yyyy-MM-dd'),
         time_logged: logData.timestamp || new Date().toISOString(),
         fiqh_state: newState,
-        flow_intensity: logData.intensity as any,
-        blood_color: (logData.intensity === 'none' ? 'other' : (logData.color || 'red')) as any,
-        blood_thickness: (logData.thickness || 'normal') as any,
-        kursuf_used: Boolean(logData.kursuf),
-        discharge_internal: Boolean(logData.internal),
+        flow_intensity: flowIntensity as any,
+        blood_color: (isCycleLog && logData.intensity !== 'none' ? (logData.color || 'red') : (todayEntry?.blood_color || 'other')) as any,
+        blood_thickness: (isCycleLog ? logData.thickness : todayEntry?.blood_thickness || 'normal') as any,
+        kursuf_used: isCycleLog ? Boolean(logData.kursuf) : Boolean(todayEntry?.kursuf_used),
+        discharge_internal: isCycleLog ? Boolean(logData.internal) : Boolean(todayEntry?.discharge_internal),
         symptoms: logData.symptoms || {},
         sleep_quality: logData.sleep_quality ?? todayEntry?.sleep_quality ?? 3,
         energy_level: logData.energy_level ?? todayEntry?.energy_level ?? 3,
@@ -1383,6 +1436,90 @@ export const Today = ({
 
   const hasPCOS = user?.conditions?.includes('PCOS');
   const hasEndo = user?.conditions?.includes('Endometriosis');
+  const activeSymptomEntries = Object.entries(todayEntry?.symptoms || {}).filter(([, value]) => Number(value) > 0);
+
+  const renderDailyWellnessCard = () => {
+    const contextLabel = isPregnant
+      ? (isRTL ? 'متابعة الحمل اليومية' : 'Pregnancy daily check-in')
+      : isInTahara
+        ? (isRTL ? 'متابعة الطهر اليومية' : 'Purity daily check-in')
+        : (isRTL ? 'متابعة اليوم' : 'Daily check-in');
+    const helperText = isPregnant
+      ? (isRTL ? 'سجلي أعراض الحمل، المزاج، النوم والطاقة في أي وقت.' : 'Log pregnancy symptoms, mood, sleep, and energy anytime.')
+      : isInTahara
+        ? (isRTL ? 'حتى في الطهر، يمكنك تسجيل المشاعر والأعراض بدون تغيير حالة الطهر.' : 'Even during purity, you can log emotions and symptoms without changing your state.')
+        : (isRTL ? 'تتبعي شدة الأعراض والطاقة والمزاج لهذا اليوم.' : 'Track symptoms, energy, and mood for today.');
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-sm bg-white rounded-[32px] p-5 shadow-xl shadow-rose-950/5 border border-rose-100/80 space-y-5"
+        dir={isRTL ? 'rtl' : 'ltr'}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className={cn("space-y-1", isRTL ? "text-right" : "text-left")}>
+            <p className="text-[11px] font-bold text-rose-400">{contextLabel}</p>
+            <h3 className="text-lg font-serif font-bold text-gray-900">
+              {todayEntry ? (isRTL ? 'كيف حالك الآن؟' : 'How are you now?') : (isRTL ? 'سجلي شعورك اليوم' : 'Log how you feel today')}
+            </h3>
+            <p className="text-xs leading-relaxed text-gray-400">{helperText}</p>
+          </div>
+          <button
+            onClick={() => setIsLogOpen(true)}
+            className="shrink-0 rounded-2xl bg-rose-500 px-4 py-3 text-xs font-bold text-white shadow-lg shadow-rose-200 active:scale-95 transition-transform"
+          >
+            {todayEntry ? (isRTL ? 'تحديث' : 'Update') : (isRTL ? 'تسجيل' : 'Log')}
+          </button>
+        </div>
+
+        {todayEntry ? (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: t('energy'), value: todayEntry.energy_level ?? 3, className: 'bg-rose-50 text-rose-700 border-rose-100' },
+                { label: t('sleep'), value: todayEntry.sleep_quality ?? 3, className: 'bg-indigo-50 text-indigo-700 border-indigo-100' },
+                { label: t('mood'), value: t(MOODS_DATA[todayEntry.mood ?? 2]?.key as any), className: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+              ].map(item => (
+                <div key={item.label} className={cn("rounded-2xl border p-3 text-center", item.className)}>
+                  <p className="text-[10px] font-bold text-current/60">{item.label}</p>
+                  <p className="mt-1 text-sm font-bold">{item.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-3xl bg-gray-50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-700">{t('symptoms')}</span>
+                <span className="text-[10px] font-bold text-gray-400">{activeSymptomEntries.length}</span>
+              </div>
+              {activeSymptomEntries.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {activeSymptomEntries.map(([key, level]) => (
+                    <span key={key} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-bold text-gray-600 border border-gray-100">
+                      {t(key as any)} · {level}/3
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400">{isRTL ? 'لا توجد أعراض مسجلة اليوم.' : 'No symptoms logged today.'}</p>
+              )}
+              {todayEntry.feeling && (
+                <p className="border-t border-white pt-3 text-sm text-gray-700 leading-relaxed">“{todayEntry.feeling}”</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <button
+            onClick={() => setIsLogOpen(true)}
+            className="w-full rounded-3xl border border-dashed border-rose-200 bg-rose-50/60 px-4 py-5 text-sm font-bold text-rose-600 active:scale-[0.99] transition-transform"
+          >
+            {isRTL ? 'إضافة مزاج، أعراض، نوم وطاقة لهذا اليوم' : 'Add mood, symptoms, sleep, and energy for today'}
+          </button>
+        )}
+      </motion.div>
+    );
+  };
 
   if (dataLoading) return <CycleSkeleton />;
 
@@ -1430,23 +1567,26 @@ export const Today = ({
           {/* Main Cycle Ring or Pregnancy Tracker */}
           <section className="flex flex-col items-center py-6 space-y-6">
             {isPregnant ? (
-              <PregnancyTracker 
-                currentWeek={user?.pregnancy_week || 1} 
-                userId={user?.id}
-                onLogBirth={async () => {
-                  await api.logBirthEvent(Date.now());
-                  await api.clearActivePregnancyRecords();
-                  await api.updateUser({
-                    pregnant: false,
-                    pregnancy_week: 0,
-                    conditions: Array.from(new Set([...(user?.conditions || []), 'postpartum'])),
-                  });
-                  await refresh();
-                  setBloomMessage(t('nifas'));
-                  setShowBloom(true);
-                  setTimeout(() => setShowBloom(false), 2500);
-                }} 
-              />
+              <>
+                <PregnancyTracker 
+                  currentWeek={user?.pregnancy_week || 1} 
+                  userId={user?.id}
+                  onLogBirth={async () => {
+                    await api.logBirthEvent(Date.now());
+                    await api.clearActivePregnancyRecords();
+                    await api.updateUser({
+                      pregnant: false,
+                      pregnancy_week: 0,
+                      conditions: Array.from(new Set([...(user?.conditions || []), 'postpartum'])),
+                    });
+                    await refresh();
+                    setBloomMessage(t('nifas'));
+                    setShowBloom(true);
+                    setTimeout(() => setShowBloom(false), 2500);
+                  }} 
+                />
+                {renderDailyWellnessCard()}
+              </>
             ) : isFirstTime ? (
               <FirstTimeWelcome onStart={() => setIsLogOpen(true)} />
             ) : (
@@ -1499,7 +1639,7 @@ export const Today = ({
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={() => {
-                      handleSaveLog({ intensity: 'none', timestamp: new Date().toISOString() });
+                      handleSaveLog({ mode: 'cycle', intensity: 'none', timestamp: new Date().toISOString() });
                       if (user) notificationService.scheduleGhuslReminder(user, t);
                     }}
                     disabled={isInTahara}
@@ -1513,109 +1653,7 @@ export const Today = ({
                   </motion.button>
                 </div>
 
-                {/* Daily Log Summary */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="w-full max-w-sm bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 border border-black/5 space-y-6"
-                >
-                  {todayEntry ? (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-gray-800">{t('logged_today')}</h3>
-                        <div className="flex items-center gap-2">
-                          {todayEntry.flow_intensity && todayEntry.flow_intensity !== 'none' && (
-                            <div className="px-3 py-1 bg-rose-50 text-rose-600 rounded-full text-[10px] font-bold uppercase tracking-wider border border-rose-100">
-                              {t(todayEntry.flow_intensity as any)}
-                            </div>
-                          )}
-                          <button 
-                            onClick={() => setIsLogOpen(true)}
-                            className="text-xs font-bold text-rose-400 uppercase tracking-widest hover:text-rose-500 transition-colors"
-                          >
-                            {t('edit')}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        {todayEntry.energy_level !== undefined && (
-                          <div className="space-y-2">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">{t('energy')}</span>
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 font-bold text-xs border border-rose-100">
-                                {todayEntry.energy_level}
-                              </div>
-                              <span className="text-[10px] text-gray-500 font-medium uppercase">
-                                {todayEntry.energy_level <= 2 ? t('energy_low') : todayEntry.energy_level >= 4 ? t('energy_high') : t('medium')}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                        {todayEntry.sleep_quality !== undefined && (
-                          <div className="space-y-2">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">{t('sleep')}</span>
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs border border-indigo-100">
-                                {todayEntry.sleep_quality}
-                              </div>
-                              <span className="text-[10px] text-gray-500 font-medium uppercase">
-                                {todayEntry.sleep_quality <= 2 ? t('sleep_poor') : todayEntry.sleep_quality >= 4 ? t('sleep_excellent') : t('medium')}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {todayEntry.symptoms && Object.entries(todayEntry.symptoms).filter(([_, v]) => (v as number) > 0).length > 0 && (
-                        <div className="space-y-3">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">{t('symptoms')}</span>
-                          <div className="flex flex-wrap justify-center gap-2">
-                            {Object.entries(todayEntry.symptoms)
-                              .filter(([_, v]) => (v as number) > 0)
-                              .map(([key, level]) => (
-                              <div key={key} className="px-3 py-1.5 bg-gray-50 rounded-full text-xs font-medium text-gray-700 flex items-center gap-2 border border-gray-100 shadow-sm">
-                                {t(key as any)}
-                                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" style={{ opacity: (level as number) / 3 }} />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {(todayEntry.mood !== undefined || todayEntry.feeling) && (
-                        <div className="space-y-3 pt-2 border-t border-gray-50 flex flex-col items-center">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-center">
-                            {t('mood')} ({t(MOODS_DATA[todayEntry.mood || 0]?.key as any)})
-                          </span>
-                          <div className="flex flex-col items-center">
-                            {todayEntry.feeling && (
-                              <p className="text-sm font-medium text-gray-800 text-center italic">"{todayEntry.feeling}"</p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center space-y-4 py-2">
-                      <div className="flex items-center justify-between w-full">
-                        <h3 className="text-sm font-bold text-gray-800">{t('log_today_symptoms')}</h3>
-                        <button 
-                          onClick={() => setIsLogOpen(true)}
-                          className="text-xs font-bold text-rose-400 uppercase tracking-widest hover:text-rose-500 transition-colors"
-                        >
-                          {t('add')}
-                        </button>
-                      </div>
-                      <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center">
-                        <Plus className="w-6 h-6 text-rose-400" />
-                      </div>
-                      <p className="text-xs text-gray-400 text-center leading-relaxed">
-                        {t('tell_us_how_you_feel')}
-                      </p>
-                    </div>
-                  )}
-                </motion.div>
+                {renderDailyWellnessCard()}
 
                 {/* Health Doctor Card */}
                 <div
@@ -1779,6 +1817,8 @@ export const Today = ({
         onSave={handleSaveLog}
         currentState={fiqhState}
         defaultIntensity={defaultIntensity}
+        initialEntry={todayEntry}
+        isPregnant={isPregnant}
       />
 
       {/* Health Doctor Modal */}

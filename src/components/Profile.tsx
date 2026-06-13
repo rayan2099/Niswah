@@ -300,6 +300,7 @@ export const Profile = ({ }: ProfileProps) => {
   const [isGeneratingDoctorPDF, setIsGeneratingDoctorPDF] = useState(false);
   const [isGeneratingHusbandPDF, setIsGeneratingHusbandPDF] = useState(false);
   const [isGeneratingPregnancyPDF, setIsGeneratingPregnancyPDF] = useState(false);
+  const [isGeneratingMentalPDF, setIsGeneratingMentalPDF] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [showPregnancySetup, setShowPregnancySetup] = useState(false);
   const [pregnancySetupWeek, setPregnancySetupWeek] = useState(1);
@@ -709,6 +710,35 @@ export const Profile = ({ }: ProfileProps) => {
     }
   };
 
+  const handleDownloadMentalReport = async () => {
+    if (!user) return;
+    setIsGeneratingMentalPDF(true);
+    try {
+      const { generateMentalStatePDF } = await import('./Reports');
+      const safeUser = {
+        id: user?.id ?? 'anonymous',
+        display_name: user?.display_name ?? 'أخت',
+        anonymous_mode: user?.anonymous_mode ?? false,
+        language: user?.language ?? 'ar',
+      };
+      const blob = await generateMentalStatePDF(safeUser, entries ?? []);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `niswah-mental-state-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err: any) {
+      console.error('Mental state PDF error:', err?.message);
+      alert(`خطأ: ${err?.message}`);
+    } finally {
+      setIsGeneratingMentalPDF(false);
+    }
+  };
+
   if (loading) return null;
 
   const isPregnant = Boolean(user?.pregnant);
@@ -983,6 +1013,20 @@ export const Profile = ({ }: ProfileProps) => {
                 </button>
               </div>
             )}
+
+            <div className="w-full p-5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-black/5">
+              <div className="flex items-center space-x-3">
+                <Heart className="w-5 h-5 text-rose-400" />
+                <span className="text-sm font-bold text-rose-800">{isRTL ? 'تقرير الحالة النفسية' : 'Mental state report'}</span>
+              </div>
+              <button
+                onClick={handleDownloadMentalReport}
+                disabled={isGeneratingMentalPDF}
+                className="text-[10px] font-bold text-rose-400 uppercase tracking-widest disabled:opacity-50"
+              >
+                {isGeneratingMentalPDF ? t('preparing') : t('download')}
+              </button>
+            </div>
 
             <div className="w-full p-5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-black/5">
               <div className="flex items-center space-x-3">

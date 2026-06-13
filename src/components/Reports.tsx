@@ -623,6 +623,90 @@ export const generateDoctorPDF = async (user: any, ledger: any[], stats: any, en
   return doc.output('blob');
 };
 
+export const generateMentalStatePDF = async (user: any, entries: any[] = []): Promise<Blob> => {
+  const mentalEntries = [...entries]
+    .filter(hasMentalEntryData)
+    .sort((a, b) => new Date(b?.time_logged || b?.date || 0).getTime() - new Date(a?.time_logged || a?.date || 0).getTime());
+  const mentalSections = buildMentalStateSections(mentalEntries);
+  const visualPdf = await renderVisualPdf(
+    'تقرير الحالة النفسية',
+    'ملخص خاص لمتابعة المزاج والطاقة والنوم والأعراض اليومية المسجلة.',
+    [
+      `تاريخ الإصدار: ${format(new Date(), 'yyyy-MM-dd')}`,
+      `المستخدمة: ${user?.anonymous_mode ? 'أخت' : (user?.display_name || 'أخت')}`,
+      `عدد المتابعات: ${mentalEntries.length}`,
+    ],
+    mentalSections.length > 0
+      ? mentalSections
+      : [{
+        title: 'لا توجد متابعات نفسية بعد',
+        paragraphs: [
+          'ابدئي من صفحة اليوم أثناء حالة الطهارة عبر بطاقة “كيف نفسيتك اليوم؟”.',
+          'بعد التسجيل سيظهر هنا ملخص المزاج والطاقة والنوم والأعراض.',
+        ],
+      }],
+  );
+  if (visualPdf) return visualPdf;
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const fontLoaded = await loadArabicFont(doc);
+
+  if (!fontLoaded) {
+    doc.setFont('helvetica');
+    doc.setFontSize(14);
+    doc.text('Niswah | Mental State Report', 105, 20, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text('Report font unavailable. Please try again.', 105, 35, { align: 'center' });
+    return doc.output('blob');
+  }
+
+  const W = doc.internal.pageSize.getWidth();
+  const right = W - 15;
+  let y = 20;
+
+  doc.setTextColor(6, 95, 70);
+  R(doc, 'Niswah | نسوة', right, y, 20); y += 9;
+  R(doc, 'تقرير الحالة النفسية', right, y, 14); y += 7;
+
+  doc.setTextColor(100, 100, 100);
+  R(doc, `تاريخ الإصدار: ${format(new Date(), 'yyyy-MM-dd')}`, right, y, 9); y += 5;
+  R(doc, `المستخدمة: ${user?.anonymous_mode ? 'أخت' : (user?.display_name || 'أخت')}`, right, y, 9); y += 8;
+
+  doc.setDrawColor(200, 200, 200);
+  doc.line(15, y, right, y); y += 8;
+
+  if (mentalEntries.length === 0) {
+    doc.setTextColor(55, 65, 81);
+    R(doc, 'لا توجد متابعات نفسية مسجلة بعد.', right, y, 10); y += 6;
+    R(doc, 'ابدئي من صفحة اليوم أثناء حالة الطهارة عبر بطاقة كيف نفسيتك اليوم؟', right, y, 9);
+  } else {
+    mentalEntries.slice(0, 8).forEach((entry: any) => {
+      const activeSymptoms = entry?.symptoms
+        ? Object.entries(entry.symptoms)
+          .filter(([, value]) => Number(value) > 0)
+          .map(([key, value]) => `${symptomLabel(key)} ${value}/3`)
+        : [];
+      doc.setTextColor(6, 95, 70);
+      R(doc, safe(entry?.date), right, y, 11); y += 6;
+      doc.setTextColor(55, 65, 81);
+      R(doc, `المزاج ${moodLabel(entry?.mood)} | الطاقة ${entry?.energy_level || '—'}/5 | النوم ${entry?.sleep_quality || '—'}/5`, right, y, 9); y += 5;
+      if (entry?.feeling && y < 270) {
+        R(doc, `ملاحظة: ${entry.feeling}`, right, y, 8); y += 5;
+      }
+      if (activeSymptoms.length > 0 && y < 270) {
+        R(doc, `الأعراض: ${activeSymptoms.join('، ')}`, right, y, 8); y += 5;
+      }
+      y += 3;
+      if (y > 260) return;
+    });
+  }
+
+  doc.setTextColor(150, 150, 150);
+  R(doc, 'تم إنشاء هذا التقرير بواسطة تطبيق نسوة.', W / 2, 285, 8, 'center');
+
+  return doc.output('blob');
+};
+
 export const generatePregnancyPDF = async (user: any, pregnancyRecord: any): Promise<Blob> => {
   const currentWeek = Math.min(40, Math.max(1, Math.round(pregnancyRecord?.current_week || user?.pregnancy_week || 1)));
   const trimester = Math.min(3, Math.max(1, Math.ceil(currentWeek / 13)));

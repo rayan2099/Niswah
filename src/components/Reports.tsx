@@ -272,15 +272,15 @@ const buildMentalStateSections = (entries: any[] = [], user: any = null): Report
       ],
     },
     {
-      title: 'آخر متابعات مختصرة',
+      title: 'تفاصيل المتابعة اليومية',
       paragraphs: mentalEntries.slice(0, 8).map(entry => {
         const date = safe(entry?.date);
         const mood = moodLabel(entry?.mood);
         const energy = entry?.energy_level ? `${entry.energy_level}/5` : '—';
         const sleep = entry?.sleep_quality ? `${entry.sleep_quality}/5` : '—';
         const state = stateLabel(entry?.fiqh_state);
-        const note = entry?.feeling || entry?.notes ? ` | ملاحظة: ${safe(entry?.feeling || entry?.notes)}` : '';
-        return `${date}: ${state} | المزاج ${mood} | الطاقة ${energy} | النوم ${sleep}${note}`;
+        const note = entry?.feeling || entry?.notes ? `\nملاحظة: ${safe(entry?.feeling || entry?.notes)}` : '';
+        return `${date}\n${state} · المزاج: ${mood}\nالطاقة: ${energy} · النوم: ${sleep}${note}`;
       }),
     },
   ];
@@ -379,11 +379,11 @@ const buildReportPage = (
     h2 { color:#065f46; font-size:22px; margin:24px 0 12px; font-weight:800; }
     p { margin:0; font-size:16px; color:#6b7280; }
     .meta { display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; margin:0 0 18px; }
-    .meta div, .row { background:#ffffff; border:1px solid #f1dbe3; border-radius:14px; padding:10px 14px; font-size:15px; }
-    .row { display:grid; grid-template-columns:180px 1fr; gap:16px; margin-bottom:9px; }
+    .meta div, .row { background:#ffffff; border:1px solid #f1dbe3; border-radius:14px; padding:12px 16px; font-size:15px; }
+    .row { display:grid; grid-template-columns:minmax(150px, 190px) minmax(0, 1fr); gap:18px; margin-bottom:10px; direction:rtl; text-align:right; align-items:start; }
     .label { color:#8f1d42; font-weight:800; }
-    .value { color:#374151; overflow-wrap:anywhere; }
-    .note { background:#f8fafc; border:1px solid #e5e7eb; border-radius:14px; padding:12px 14px; margin-bottom:10px; font-size:15px; color:#374151; }
+    .value { color:#374151; overflow-wrap:anywhere; word-break:normal; line-height:1.9; }
+    .note { background:#f8fafc; border:1px solid #e5e7eb; border-radius:16px; padding:14px 16px; margin-bottom:11px; font-size:15px; color:#374151; direction:rtl; text-align:right; line-height:1.95; overflow-wrap:anywhere; white-space:pre-line; }
     .footer { position:absolute; bottom:36px; left:56px; right:56px; text-align:center; color:#9ca3af; font-size:13px; border-top:1px solid #f3f4f6; padding-top:14px; }
   `;
   page.appendChild(style);

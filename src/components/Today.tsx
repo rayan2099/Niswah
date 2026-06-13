@@ -753,6 +753,17 @@ const LogBottomSheet = ({
     label: t(key as any)
   }));
 
+  const selectedSymptomsCount = Object.values(symptoms).filter(level => level > 0).length;
+  const isMentalMode = !showCycleFields;
+  const modalTitle = showCycleFields
+    ? t('log_today')
+    : (isRTL ? 'كيف نفسيتك اليوم؟' : 'How is your mood today?');
+  const modalSubtitle = showCycleFields
+    ? (isRTL ? 'سجلي تفاصيل الدم والأعراض لهذا اليوم.' : 'Track flow details and symptoms for today.')
+    : (isPregnant
+      ? (isRTL ? 'سجلي مزاجك وطاقتك ونومك وأعراض الحمل في لحظة هادئة.' : 'Log mood, energy, sleep, and pregnancy symptoms in a calm moment.')
+      : (isRTL ? 'متابعة يومية لطيفة للمزاج والطاقة والنوم والأعراض أثناء الطهارة.' : 'A gentle daily check-in for mood, energy, sleep, and symptoms during tahara.'));
+
   const handleSave = () => {
     onSave({
       mode: showCycleFields ? 'cycle' : 'wellness',
@@ -789,269 +800,287 @@ const LogBottomSheet = ({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 18, stiffness: 200 }}
-            className="fixed bottom-0 left-0 right-0 bg-[#FDFCFB] rounded-t-[40px] z-[101] max-h-[92vh] overflow-y-auto p-8 space-y-8 shadow-2xl"
+            className="fixed inset-x-0 bottom-0 z-[101] mx-auto flex max-h-[94vh] w-full max-w-[560px] flex-col overflow-hidden rounded-t-[32px] bg-[#FDFCFB] shadow-2xl sm:bottom-5 sm:rounded-[36px]"
+            dir={isRTL ? 'rtl' : 'ltr'}
           >
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-2" />
-            <div className="flex items-start justify-between gap-4">
-              <div className={cn("space-y-1", isRTL ? "text-right" : "text-left")}>
-                <h3 className="text-xl font-serif font-bold text-rose-800">
-                  {showCycleFields ? t('log_today') : (isRTL ? 'متابعة الحالة النفسية' : 'Mental state check-in')}
-                </h3>
-                <p className="text-xs leading-relaxed text-gray-400">
-                  {showCycleFields
-                    ? (isRTL ? 'سجلي تفاصيل الدم والأعراض لهذا اليوم.' : 'Track flow details and symptoms for today.')
-                    : (isPregnant
-                      ? (isRTL ? 'مساحة هادئة لتسجيل مشاعرك وأعراض الحمل بدون تغيير حالة الحمل.' : 'A calm space to log feelings and pregnancy symptoms without changing pregnancy state.')
-                      : (isRTL ? 'تسجيل منفصل للمزاج والطاقة والنوم والأعراض، ولا يغيّر حالة الطهر أو الحيض.' : 'A separate mood, energy, sleep, and symptoms check-in that does not change cycle state.'))}
-                </p>
-              </div>
-              <button onClick={onClose} className="p-2 bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-400" /></button>
-            </div>
-            
-            {/* Intensity */}
-            {showCycleFields && (
-            <section className="space-y-4">
-              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('flow_intensity')}</h4>
-              <div className="flex justify-between">
-                {['none', 'spotting', 'light', 'medium', 'heavy'].map(lvl => (
-                  <motion.button
-                    key={lvl}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => setIntensity(lvl)}
-                    className={cn(
-                      "flex flex-col items-center space-y-1",
-                      intensity === lvl ? "text-rose-400" : "text-gray-300"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-12 h-12 rounded-2xl border-2 flex items-center justify-center transition-all",
-                      intensity === lvl ? "border-rose-300 bg-rose-50" : "border-black/5"
-                    )}>
-                      <div className={cn("w-6 h-6 rounded-full", lvl === 'none' ? 'border-2 border-dashed border-gray-200' : 'bg-current')} style={{ opacity: intensity === lvl ? 1 : 0.2 }} />
-                    </div>
-                    <span className="text-[8px] font-bold uppercase">{lvl === 'none' && currentState === 'HAID' ? t('period_end') : t(lvl as TranslationKey)}</span>
-                  </motion.button>
-                ))}
-              </div>
-            </section>
-            )}
+            <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-gray-200" />
 
-            {/* Color */}
-            {showCycleFields && (
-            <section className="space-y-4">
-              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('blood_color')}</h4>
-              <div className="flex space-x-4">
-                {[
-                  { id: 'red', hex: '#F43F5E' },
-                  { id: 'dark', hex: '#9F1239' },
-                  { id: 'brown', hex: '#78350F' },
-                  { id: 'pink', hex: '#FB7185' },
-                  { id: 'other', hex: '#D1D5DB' }
-                ].map((c) => (
-                  <div key={c.id} className="flex flex-col items-center space-y-1">
-                    <motion.button
-                      animate={{ scale: color === c.id ? 1.25 : 1 }}
-                      onClick={() => setColor(c.id)}
-                      className={cn(
-                        "w-8 h-8 rounded-full border-2 shadow-sm transition-all",
-                        color === c.id ? "border-rose-300" : "border-white"
-                      )}
-                      style={{ backgroundColor: c.hex }}
-                    />
-                    <span className="text-[8px] font-bold text-gray-400 uppercase">{t(c.id as TranslationKey)}</span>
+            <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4 sm:px-6">
+              <div className="mb-6 flex items-start justify-between gap-4">
+                <div className="min-w-0 space-y-2 text-right">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-500 ring-1 ring-rose-100">
+                    {isMentalMode ? <Heart className="h-3.5 w-3.5" /> : <Droplets className="h-3.5 w-3.5" />}
+                    <span>{isMentalMode ? (isRTL ? 'متابعة نفسية' : 'Mental check-in') : t('log_today')}</span>
                   </div>
-                ))}
-              </div>
-            </section>
-            )}
-
-            {/* Kursuf (Hanafi) */}
-            {showCycleFields && madhhab === 'HANAFI' && (
-              <section className="space-y-4 p-6 bg-rose-50 rounded-3xl border border-rose-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm font-bold text-rose-800">{t('internal_tracking')}</h4>
-                    <p className="text-[10px] text-rose-400/60">{t('internal_barrier_q')}</p>
-                  </div>
-                  <button 
-                    onClick={() => setKursuf(!kursuf)}
-                    className={cn("w-12 h-6 rounded-full relative transition-all shrink-0", kursuf ? "bg-rose-400" : "bg-rose-100")}
-                  >
-                    <motion.div 
-                      animate={{ x: isRTL ? (kursuf ? -24 : -4) : (kursuf ? 24 : 4) }} 
-                      className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm" 
-                    />
-                  </button>
+                  <h3 className="font-serif text-[28px] font-bold leading-tight text-slate-900">
+                    {modalTitle}
+                  </h3>
+                  <p className="max-w-md text-sm leading-7 text-gray-500">
+                    {modalSubtitle}
+                  </p>
                 </div>
-                <AnimatePresence>
-                  {kursuf && (
-                    <motion.div 
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="space-y-3 overflow-hidden pt-2"
-                    >
-                      <p className="text-[10px] font-bold text-rose-800 uppercase">{t('discharge_location')}</p>
-                      <div className="flex space-x-2">
-                        {[t('internal'), t('external_only')].map(opt => (
+                <button
+                  onClick={onClose}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-gray-400 shadow-sm ring-1 ring-black/5 active:scale-95"
+                  aria-label={isRTL ? 'إغلاق' : 'Close'}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                {showCycleFields && (
+                  <section className="rounded-[28px] border border-rose-100 bg-white p-4 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div className="text-right">
+                        <h4 className="text-sm font-bold text-slate-800">{t('flow_intensity')}</h4>
+                        <p className="mt-1 text-[11px] text-gray-400">{isRTL ? 'اختاري أقرب وصف لهذا اليوم.' : 'Choose the closest description for today.'}</p>
+                      </div>
+                      <Droplets className="h-5 w-5 text-rose-400" />
+                    </div>
+                    <div className="grid grid-cols-5 gap-2">
+                      {['none', 'spotting', 'light', 'medium', 'heavy'].map(lvl => (
+                        <motion.button
+                          key={lvl}
+                          whileTap={{ scale: 0.94 }}
+                          onClick={() => setIntensity(lvl)}
+                          className={cn(
+                            "flex min-h-[74px] flex-col items-center justify-center rounded-2xl border text-center transition-all",
+                            intensity === lvl ? "border-rose-300 bg-rose-50 text-rose-700 shadow-sm" : "border-gray-100 bg-gray-50 text-gray-400"
+                          )}
+                        >
+                          <div className={cn("mb-2 h-7 w-7 rounded-full", lvl === 'none' ? 'border-2 border-dashed border-current bg-transparent' : 'bg-current')} style={{ opacity: intensity === lvl ? 1 : 0.25 }} />
+                          <span className="text-[9px] font-bold leading-4">{lvl === 'none' && currentState === 'HAID' ? t('period_end') : t(lvl as TranslationKey)}</span>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {showCycleFields && (
+                  <section className="rounded-[28px] border border-rose-100 bg-white p-4 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-slate-800">{t('blood_color')}</h4>
+                      <span className="rounded-full bg-gray-50 px-3 py-1 text-[11px] font-bold text-gray-400">{t(color as TranslationKey)}</span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-2">
+                      {[
+                        { id: 'red', hex: '#F43F5E' },
+                        { id: 'dark', hex: '#9F1239' },
+                        { id: 'brown', hex: '#78350F' },
+                        { id: 'pink', hex: '#FB7185' },
+                        { id: 'other', hex: '#D1D5DB' }
+                      ].map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => setColor(c.id)}
+                          className={cn(
+                            "flex h-16 flex-col items-center justify-center rounded-2xl border bg-gray-50 transition-all",
+                            color === c.id ? "border-rose-300 ring-4 ring-rose-50" : "border-gray-100"
+                          )}
+                        >
+                          <span className="h-7 w-7 rounded-full shadow-sm ring-2 ring-white" style={{ backgroundColor: c.hex }} />
+                          <span className="mt-1 text-[9px] font-bold text-gray-400">{t(c.id as TranslationKey)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {showCycleFields && madhhab === 'HANAFI' && (
+                  <section className="rounded-[28px] border border-rose-100 bg-rose-50/70 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="text-right">
+                        <h4 className="text-sm font-bold text-rose-900">{t('internal_tracking')}</h4>
+                        <p className="mt-1 text-[11px] leading-5 text-rose-400">{t('internal_barrier_q')}</p>
+                      </div>
+                      <button
+                        onClick={() => setKursuf(!kursuf)}
+                        className={cn("relative h-8 w-14 shrink-0 rounded-full transition-all", kursuf ? "bg-rose-500" : "bg-rose-100")}
+                      >
+                        <motion.div
+                          animate={{ x: isRTL ? (kursuf ? -24 : -4) : (kursuf ? 24 : 4) }}
+                          className="absolute top-1 h-6 w-6 rounded-full bg-white shadow-sm"
+                        />
+                      </button>
+                    </div>
+                    <AnimatePresence>
+                      {kursuf && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden pt-4"
+                        >
+                          <div className="grid grid-cols-2 gap-2">
+                            {[t('internal'), t('external_only')].map(opt => (
+                              <button
+                                key={opt}
+                                onClick={() => setInternal(opt === t('internal'))}
+                                className={cn(
+                                  "rounded-2xl border py-3 text-xs font-bold transition-all",
+                                  (opt === t('internal') ? internal : !internal) ? "border-rose-300 bg-white text-rose-800" : "border-rose-100 bg-rose-50 text-rose-300"
+                                )}
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </section>
+                )}
+
+                <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {[
+                    { title: t('energy'), value: energyLevel, setValue: setEnergyLevel, Icon: Zap, active: 'bg-rose-500 text-white shadow-rose-100', quiet: 'text-rose-600', low: t('energy_low'), high: t('energy_high') },
+                    { title: t('sleep'), value: sleepQuality, setValue: setSleepQuality, Icon: Moon, active: 'bg-indigo-500 text-white shadow-indigo-100', quiet: 'text-indigo-600', low: t('sleep_poor'), high: t('sleep_excellent') },
+                  ].map(item => (
+                    <div key={item.title} className="rounded-[28px] border border-gray-100 bg-white p-4 shadow-sm">
+                      <div className="mb-4 flex items-center justify-between">
+                        <div className="text-right">
+                          <h4 className="text-sm font-bold text-slate-800">{item.title}</h4>
+                          <p className="mt-1 text-[11px] text-gray-400">{item.low} - {item.high}</p>
+                        </div>
+                        <div className={cn("flex h-10 w-10 items-center justify-center rounded-2xl bg-gray-50", item.quiet)}>
+                          <item.Icon className="h-5 w-5" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-5 gap-1.5 rounded-2xl bg-gray-50 p-1.5">
+                        {[1, 2, 3, 4, 5].map((lvl) => (
                           <button
-                            key={opt}
-                            onClick={() => setInternal(opt === t('internal'))}
+                            key={lvl}
+                            onClick={() => item.setValue(lvl)}
                             className={cn(
-                              "flex-1 py-3 rounded-xl border-2 text-[10px] font-bold transition-all",
-                              (opt === t('internal') ? internal : !internal) ? "border-rose-300 bg-white text-rose-800" : "border-rose-100 bg-rose-50/50 text-rose-200"
+                              "h-10 rounded-xl text-xs font-bold transition-all",
+                              item.value === lvl ? item.active : "text-gray-400"
                             )}
                           >
-                            {opt}
+                            {lvl}
                           </button>
                         ))}
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </section>
-            )}
-
-            {/* Energy & Sleep Scales */}
-            <section className="grid grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('energy')}</h4>
-                <div className="flex items-center justify-between bg-gray-50 p-2 rounded-2xl border border-gray-100">
-                  {[1, 2, 3, 4, 5].map((lvl) => (
-                    <button
-                      key={lvl}
-                      onClick={() => setEnergyLevel(lvl)}
-                      className={cn(
-                        "w-8 h-8 rounded-full text-[10px] font-bold transition-all",
-                        energyLevel === lvl 
-                          ? "bg-rose-400 text-white shadow-md scale-110" 
-                          : "text-gray-400 hover:bg-gray-100"
-                      )}
-                    >
-                      {lvl}
-                    </button>
+                    </div>
                   ))}
-                </div>
-                <div className="flex justify-between px-1">
-                  <span className="text-[8px] text-gray-400 uppercase">{t('energy_low')}</span>
-                  <span className="text-[8px] text-gray-400 uppercase">{t('energy_high')}</span>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('sleep')}</h4>
-                <div className="flex items-center justify-between bg-gray-50 p-2 rounded-2xl border border-gray-100">
-                  {[1, 2, 3, 4, 5].map((lvl) => (
-                    <button
-                      key={lvl}
-                      onClick={() => setSleepQuality(lvl)}
-                      className={cn(
-                        "w-8 h-8 rounded-full text-[10px] font-bold transition-all",
-                        sleepQuality === lvl 
-                          ? "bg-indigo-400 text-white shadow-md scale-110" 
-                          : "text-gray-400 hover:bg-gray-100"
-                      )}
-                    >
-                      {lvl}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex justify-between px-1">
-                  <span className="text-[8px] text-gray-400 uppercase">{t('sleep_poor')}</span>
-                  <span className="text-[8px] text-gray-400 uppercase">{t('sleep_excellent')}</span>
-                </div>
-              </div>
-            </section>
+                </section>
 
-            {/* Symptoms */}
-            <section className="space-y-4">
-              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('symptoms')}</h4>
-              <div className="flex flex-wrap gap-2">
-                {symptomList.map(symptom => (
-                  <motion.button
-                    key={symptom.key}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => cycleSymptom(symptom.key)}
-                    style={{
-                      padding: '8px 14px',
-                      borderRadius: '20px',
-                      border: `1px solid ${symptoms[symptom.key] ? '#b8325f' : '#E5E7EB'}`,
-                      background: levelColors[symptoms[symptom.key] || 0],
-                      color: levelTextColors[symptoms[symptom.key] || 0],
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    {t(symptom.key as any)}
-                    {symptoms[symptom.key] > 0 && (
-                      <span className="ml-1 rtl:mr-1 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">
-                        {symptoms[symptom.key]}
-                      </span>
-                    )}
-                  </motion.button>
-                ))}
-              </div>
-            </section>
+                <section className="rounded-[28px] border border-gray-100 bg-white p-4 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="text-right">
+                      <h4 className="text-sm font-bold text-slate-800">{t('mood')}</h4>
+                      <p className="mt-1 text-[11px] text-gray-400">{isRTL ? 'اختاري الشعور الأقرب الآن.' : 'Pick the closest feeling now.'}</p>
+                    </div>
+                    <span className="rounded-full bg-rose-50 px-3 py-1 text-[11px] font-bold text-rose-500">{moods[mood].label}</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-2">
+                    {moods.map(({ Icon, label }, i) => (
+                      <motion.button
+                        key={i}
+                        whileTap={{ scale: 0.94 }}
+                        onClick={() => setMood(i)}
+                        className={cn(
+                          "flex min-h-[72px] flex-col items-center justify-center rounded-2xl border transition-all",
+                          mood === i ? "border-rose-300 bg-rose-50 text-rose-600 shadow-sm" : "border-gray-100 bg-gray-50 text-gray-300"
+                        )}
+                      >
+                        <Icon className="h-7 w-7" />
+                        <span className="mt-2 text-[9px] font-bold leading-3">{label}</span>
+                      </motion.button>
+                    ))}
+                  </div>
+                </section>
 
-            {/* Mood */}
-            <section className="space-y-6">
-              <div className="flex flex-col items-center justify-center space-y-2">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('mood')}</h4>
-                <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest text-center">{moods[mood].label}</span>
-              </div>
-              <div className="flex justify-between px-2">
-                {moods.map(({ Icon }, i) => (
-                  <motion.button
-                    key={i}
-                    animate={{ 
-                      scale: mood === i ? 1.4 : 1,
-                      color: mood === i ? '#F43F5E' : '#D1D5DB'
-                    }}
-                    onClick={() => setMood(i)}
-                    className={cn(
-                      "p-3 rounded-full transition-all",
-                      mood === i ? "bg-rose-50 shadow-inner" : "bg-transparent"
-                    )}
-                  >
-                    <Icon className="w-8 h-8" />
-                  </motion.button>
-                ))}
-              </div>
+                <section className="rounded-[28px] border border-gray-100 bg-white p-4 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="text-right">
+                      <h4 className="text-sm font-bold text-slate-800">{t('symptoms')}</h4>
+                      <p className="mt-1 text-[11px] text-gray-400">
+                        {selectedSymptomsCount > 0
+                          ? (isRTL ? `${selectedSymptomsCount} أعراض محددة` : `${selectedSymptomsCount} symptoms selected`)
+                          : (isRTL ? 'اضغطي مرة للتدرج من خفيف إلى شديد.' : 'Tap to cycle from light to severe.')}
+                      </p>
+                    </div>
+                    <AlertCircle className="h-5 w-5 text-gray-300" />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {symptomList.map(symptom => {
+                      const level = symptoms[symptom.key] || 0;
+                      return (
+                        <motion.button
+                          key={symptom.key}
+                          whileTap={{ scale: 0.96 }}
+                          onClick={() => cycleSymptom(symptom.key)}
+                          className={cn(
+                            "inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-xs font-bold transition-all",
+                            level > 0 ? "border-rose-200 bg-rose-50 text-rose-700" : "border-gray-100 bg-gray-50 text-gray-500"
+                          )}
+                        >
+                          <span>{t(symptom.key as any)}</span>
+                          {level > 0 && (
+                            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[10px] text-rose-600">
+                              {levelLabels[level]}
+                            </span>
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </section>
 
-              {/* Expressive Feeling Input */}
-              <div className="space-y-4 pt-2">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('feeling')}</h4>
-                <input 
-                  type="text"
-                  value={feeling}
-                  onChange={(e) => setFeeling(e.target.value)}
-                  placeholder={t('mood_placeholder')}
-                  className="w-full p-4 rounded-2xl border-2 border-black/5 bg-white text-sm focus:border-rose-300 outline-none transition-all"
-                />
+                {isMentalMode && (
+                  <section className="rounded-[28px] border border-emerald-100 bg-emerald-50/60 p-4">
+                    <div className="mb-3 text-right">
+                      <h4 className="text-sm font-bold text-emerald-900">{isRTL ? 'كلمة تصف حالتك' : 'One word for today'}</h4>
+                      <p className="mt-1 text-[11px] leading-5 text-emerald-700/60">{isRTL ? 'اختاري وصفاً سريعاً أو اكتبي وصفك.' : 'Pick a quick label or write your own.'}</p>
+                    </div>
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {feelingTags.map(tag => (
+                        <button
+                          key={tag}
+                          onClick={() => setFeeling(tag)}
+                          className={cn(
+                            "rounded-full border px-3 py-2 text-xs font-bold transition-all",
+                            feeling === tag ? "border-emerald-300 bg-white text-emerald-800" : "border-emerald-100 bg-white/60 text-emerald-700/70"
+                          )}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="text"
+                      value={feeling}
+                      onChange={(e) => setFeeling(e.target.value)}
+                      placeholder={t('mood_placeholder')}
+                      className="w-full rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-right text-sm font-semibold text-slate-800 outline-none transition-all placeholder:text-gray-300 focus:border-emerald-300"
+                    />
+                  </section>
+                )}
+
+                <section className="rounded-[28px] border border-gray-100 bg-white p-4 shadow-sm">
+                  <div className="mb-3 text-right">
+                    <h4 className="text-sm font-bold text-slate-800">{t('notes')}</h4>
+                    <p className="mt-1 text-[11px] text-gray-400">{isRTL ? 'اكتبي أي شيء تريدين تذكره لاحقاً.' : 'Write anything you want to remember later.'}</p>
+                  </div>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder={isRTL ? 'مثلاً: نمت متأخرة، قلقي كان أعلى من المعتاد، أو شعرت براحة بعد المشي...' : t('how_feeling')}
+                    className="min-h-[120px] w-full resize-none rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-right text-sm leading-7 text-slate-800 outline-none transition-all placeholder:text-gray-300 focus:border-rose-200 focus:bg-white"
+                  />
+                </section>
               </div>
-            </section>
+            </div>
 
-            {/* Notes */}
-            <section className="space-y-4">
-              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">{t('notes')}</h4>
-              <textarea 
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={t('how_feeling')}
-                className="w-full p-4 rounded-2xl border-2 border-black/5 bg-white text-sm focus:border-rose-300 outline-none transition-all min-h-[100px]"
-              />
-            </section>
-
-            <button 
-              onClick={handleSave}
-              className="w-full py-5 bg-rose-400 text-white rounded-2xl font-bold shadow-xl shadow-rose-100 flex items-center justify-center space-x-2"
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              <span>{t('save_log')}</span>
-            </button>
+            <div className="border-t border-gray-100 bg-[#FDFCFB]/95 p-4">
+              <button
+                onClick={handleSave}
+                className="flex w-full items-center justify-center gap-2 rounded-[24px] bg-rose-500 py-4 text-base font-bold text-white shadow-xl shadow-rose-100 active:scale-[0.98]"
+              >
+                <CheckCircle2 className="h-5 w-5" />
+                <span>{isMentalMode ? (isRTL ? 'حفظ المتابعة' : 'Save check-in') : t('save_log')}</span>
+              </button>
+            </div>
           </motion.div>
         </>
       )}

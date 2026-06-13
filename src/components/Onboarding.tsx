@@ -75,7 +75,7 @@ const INITIAL_DATA: OnboardingData = {
   language: 'en',
   madhhab: null,
   birth_year: CURRENT_YEAR - 28,
-  goal_flags: [],
+  goal_flags: ['goal_track_cycle'],
   last_period_date: null,
   avg_cycle_length: 28,
   avg_haid_duration: 5,

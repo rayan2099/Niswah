@@ -77,6 +77,13 @@ const daysPhrase = (days: number): string => {
   return `${days} يوماً`;
 };
 
+const stateLabel = (state: any): string => ({
+  HAID: 'حيض',
+  TAHARA: 'طهارة',
+  ISTIHADAH: 'استحاضة',
+  NIFAS: 'نفاس',
+}[state] || 'غير محدد');
+
 const moodLabel = (mood: any): string => {
   const labels = ['حزين', 'عادي', 'سعيد', 'مبتهج', 'غاضب'];
   const index = Number.isFinite(Number(mood)) ? Number(mood) : 2;
@@ -104,45 +111,176 @@ const hasMentalEntryData = (entry: any): boolean => Boolean(
   (entry?.symptoms && Object.values(entry.symptoms).some(value => Number(value) > 0))
 );
 
-const buildMentalStateSections = (entries: any[] = []): ReportSection[] => {
+const averageScore = (entries: any[], key: 'energy_level' | 'sleep_quality'): string => {
+  const values = entries
+    .map(entry => Number(entry?.[key]))
+    .filter(value => Number.isFinite(value) && value > 0);
+  if (values.length === 0) return '—';
+  return `${(values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1)}/5`;
+};
+
+const countBy = <T extends string>(values: T[]): Record<T, number> => values.reduce((acc, value) => {
+  acc[value] = (acc[value] || 0) + 1;
+  return acc;
+}, {} as Record<T, number>);
+
+const topEntries = (counts: Record<string, number>, limit = 3): string[] => Object.entries(counts)
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, limit)
+  .map(([label, count]) => `${label} (${count})`);
+
+const includesAny = (text: string, words: string[]) => words.some(word => text.includes(word));
+
+const buildNotePatternInsights = (entries: any[]): string[] => {
+  const noteText = entries
+    .map(entry => `${entry?.feeling || ''} ${entry?.notes || ''}`)
+    .join(' ')
+    .toLowerCase();
+
+  const insights: string[] = [];
+  if (includesAny(noteText, ['نوم', 'سهر', 'متأخر', 'تعبت', 'تعب'])) {
+    insights.push('ملاحظاتك تلمّح إلى أن النوم والسهر يؤثران على طاقتك ومزاجك. جرّبي وقت تهدئة ثابت قبل النوم ولو لعشرين دقيقة.');
+  }
+  if (includesAny(noteText, ['ماء', 'شرب', 'جفاف', 'صداع'])) {
+    insights.push('تكرر في الملاحظات ما يرتبط بالماء أو الصداع. تذكير لطيف بالماء ووجبة خفيفة قد يجعل اليوم أهدأ.');
+  }
+  if (includesAny(noteText, ['ظهر', 'بطن', 'ألم', 'تقلص'])) {
+    insights.push('ظهرت إشارات ألم في الملاحظات. إن تكررت، سجّلي وقتها وشدتها وما سبقها؛ هذا يساعدك ويساعد الطبيبة عند الحاجة.');
+  }
+  if (includesAny(noteText, ['قلق', 'توتر', 'خوف', 'ضيق', 'حساسة'])) {
+    insights.push('عند القلق أو الحساسية، لا تضغطي على نفسك. سجّلي الشعور، خذي نفساً هادئاً، واطلبي دعماً لطيفاً من شخص آمن.');
+  }
+  if (includesAny(noteText, ['ذكر', 'دعاء', 'صلاة', 'مشي', 'راحة', 'تنفس'])) {
+    insights.push('جميل أنك تلاحظين ما يخفف عليك؛ الذكر، التنفس، المشي الخفيف أو الراحة ظهرت كأدوات دعم في سجلك.');
+  }
+
+  return insights.length > 0
+    ? insights
+    : ['ملاحظاتك المكتوبة هي أهم جزء في التقرير. كلما كتبتِ بجملة قصيرة عمّا ساعدك أو أتعبك، صار التقرير أقدر على فهم نمطك بلطف.'];
+};
+
+const buildCycleAwareInsight = (entry: any, user: any): string => {
+  if (user?.pregnant) {
+    return 'بما أنك في وضع الحمل، اربطي بين المزاج والنوم والأعراض والحركة أو الزيارات الطبية. أي نزيف، ألم شديد، نقص واضح في حركة الجنين، أو أفكار إيذاء النفس يحتاج تواصلاً طبياً فورياً.';
+  }
+
+  switch (entry?.fiqh_state) {
+    case 'HAID':
+      return 'آخر متابعة كانت أثناء الحيض. في الشهر القادم، جهّزي أيام الحيض براحة أكثر، ماء، مسكن مناسب إن كانت الطبيبة تسمح، ومساحة نفسية أخف بدون لوم.';
+    case 'TAHARA':
+      return 'آخر متابعة كانت في الطهارة. هذه فترة مناسبة لفهم طاقتك الطبيعية ومزاجك خارج أيام الدم، وهذا يساعد نسوة على تمييز التغيرات قبل الحيض.';
+    case 'ISTIHADAH':
+      return 'ظهرت حالة استحاضة في السجل. احتفظي بملاحظات واضحة عن اللون والكمية والمدة، واسألي أهل العلم أو الطبيبة عند الالتباس.';
+    case 'NIFAS':
+      return 'آخر متابعة كانت في النفاس. ركزي على التعافي، النوم قدر الإمكان، الدعم القريب، ومراجعة الطبيبة عند النزيف الشديد أو الحزن العميق المستمر.';
+    default:
+      return 'كل متابعة تضيف قطعة صغيرة للصورة: الحالة، النوم، الطاقة، المزاج، والأعراض معاً تعطينا فهماً أصدق من رقم واحد.';
+  }
+};
+
+const buildMentalStateSections = (entries: any[] = [], user: any = null): ReportSection[] => {
   const mentalEntries = [...entries]
     .filter(hasMentalEntryData)
-    .sort((a, b) => new Date(b?.time_logged || b?.date || 0).getTime() - new Date(a?.time_logged || a?.date || 0).getTime())
-    .slice(0, 5);
+    .sort((a, b) => new Date(b?.time_logged || b?.date || 0).getTime() - new Date(a?.time_logged || a?.date || 0).getTime());
 
   if (mentalEntries.length === 0) return [];
 
   const latest = mentalEntries[0];
+  const datedEntries = mentalEntries
+    .map(entry => entry?.date || entry?.time_logged)
+    .filter(Boolean)
+    .sort();
+  const startDate = datedEntries[0] || '—';
+  const endDate = datedEntries[datedEntries.length - 1] || '—';
+  const moodCounts = countBy(mentalEntries.map(entry => moodLabel(entry?.mood)));
+  const stateCounts = countBy(mentalEntries.map(entry => stateLabel(entry?.fiqh_state)));
+  const lowSleepDays = mentalEntries.filter(entry => Number(entry?.sleep_quality) > 0 && Number(entry.sleep_quality) <= 2).length;
+  const lowEnergyDays = mentalEntries.filter(entry => Number(entry?.energy_level) > 0 && Number(entry.energy_level) <= 2).length;
+  const stableDays = mentalEntries.filter(entry => [2, 3].includes(Number(entry?.mood)) && Number(entry?.energy_level || 0) >= 3).length;
+  const lowSleepLowEnergy = mentalEntries.filter(entry => Number(entry?.sleep_quality) <= 2 && Number(entry?.energy_level) <= 2).length;
   const activeSymptoms = latest?.symptoms
     ? Object.entries(latest.symptoms)
       .filter(([, value]) => Number(value) > 0)
       .map(([key, value]) => `${symptomLabel(key)} (${value}/3)`)
     : [];
-  const summaryRows: ReportRow[] = [
-    ['آخر تاريخ متابعة', safe(latest?.date)],
-    ['المزاج', moodLabel(latest?.mood)],
-    ['الطاقة', latest?.energy_level ? `${latest.energy_level}/5` : '—'],
-    ['النوم', latest?.sleep_quality ? `${latest.sleep_quality}/5` : '—'],
-  ];
+  const symptomCounts = mentalEntries.reduce((acc: Record<string, number>, entry) => {
+    Object.entries(entry?.symptoms || {}).forEach(([key, value]) => {
+      if (Number(value) > 0) acc[symptomLabel(key)] = (acc[symptomLabel(key)] || 0) + 1;
+    });
+    return acc;
+  }, {});
+  const mostCommonSymptoms = topEntries(symptomCounts).join('، ') || 'لا توجد أعراض متكررة واضحة';
+  const noteInsights = buildNotePatternInsights(mentalEntries);
+  const cycleInsight = buildCycleAwareInsight(latest, user);
+  const trendInsight = lowSleepLowEnergy > 0
+    ? `في ${daysPhrase(lowSleepLowEnergy)} ظهر انخفاض النوم والطاقة معاً. هذا لا يعني تشخيصاً، لكنه وقت مناسب لتخفيف المهام وطلب المساندة.`
+    : 'لم يظهر تكرار واضح لاجتماع انخفاض النوم والطاقة، وهذا مؤشر مطمئن نسبياً مع استمرار التسجيل.';
 
   return [
     {
-      title: 'متابعة الحالة النفسية والطاقة',
-      rows: summaryRows,
+      title: 'ملخص الشهر',
+      rows: [
+        ['الفترة التي يغطيها التقرير', `${safe(startDate)} إلى ${safe(endDate)}`],
+        ['عدد المتابعات', `${mentalEntries.length}`],
+        ['متوسط الطاقة', averageScore(mentalEntries, 'energy_level')],
+        ['متوسط النوم', averageScore(mentalEntries, 'sleep_quality')],
+        ['أيام مستقرة نسبياً', `${stableDays}`],
+        ['أيام نوم منخفض', `${lowSleepDays}`],
+        ['أيام طاقة منخفضة', `${lowEnergyDays}`],
+        ['أكثر الحالات ظهوراً', topEntries(stateCounts).join('، ') || '—'],
+      ],
+    },
+    {
+      title: 'آخر متابعة',
+      rows: [
+        ['التاريخ', safe(latest?.date)],
+        ['حالة الدورة', stateLabel(latest?.fiqh_state)],
+        ['المزاج', moodLabel(latest?.mood)],
+        ['الطاقة', latest?.energy_level ? `${latest.energy_level}/5` : '—'],
+        ['النوم', latest?.sleep_quality ? `${latest.sleep_quality}/5` : '—'],
+        ['الأعراض الظاهرة', activeSymptoms.length > 0 ? activeSymptoms.join('، ') : 'لا توجد أعراض مسجلة في آخر متابعة'],
+      ],
       paragraphs: [
         latest?.feeling ? `ملاحظة شعورية: ${latest.feeling}` : '',
-        latest?.notes ? `ملاحظات إضافية: ${latest.notes}` : '',
-        activeSymptoms.length > 0 ? `الأعراض المسجلة: ${activeSymptoms.join('، ')}` : '',
+        latest?.notes ? `ملاحظاتك: ${latest.notes}` : '',
       ].filter(Boolean),
     },
     {
+      title: 'ما فهمته نسوة من سجلك',
+      paragraphs: [
+        `أكثر المزاجات ظهوراً: ${topEntries(moodCounts).join('، ') || 'لا يوجد نمط واضح بعد'}.`,
+        `أكثر الأعراض تكراراً: ${mostCommonSymptoms}.`,
+        trendInsight,
+        cycleInsight,
+        ...noteInsights,
+      ],
+    },
+    {
+      title: 'خطة لطيفة للشهر القادم',
+      paragraphs: [
+        'اختاري عادة صغيرة واحدة فقط للأسبوع القادم: نوم أهدأ، ماء أكثر، مشي خفيف، أو ملاحظة قصيرة قبل النوم.',
+        'إذا تكرر عرض معيّن، سجّلي معه ثلاثة أشياء: النوم، الماء، وما الذي كان يحدث في يومك. هذا يجعل النمط أوضح بدون قسوة على نفسك.',
+        'عند أيام الحساسية أو القلق: خذي مساحة، اذكري الله بما يطمئنك، واطلبي دعماً آمناً. لست مطالبة بأن تكوني قوية كل الوقت.',
+      ],
+    },
+    {
+      title: 'متى تطلبين دعماً؟',
+      paragraphs: [
+        'راجعي الطبيبة عند ألم شديد أو متكرر، نزيف غير معتاد، دوخة شديدة، أو أعراض تعطل يومك.',
+        'اطلبي مساندة نفسية فوراً إذا ظهرت أفكار إيذاء النفس، حزن عميق مستمر، نوبات هلع، أو شعور بعدم الأمان.',
+        'هذا التقرير يساعدك على التنظيم وفهم النمط، ولا يقدم تشخيصاً طبياً أو فتوى شخصية.',
+      ],
+    },
+    {
       title: 'آخر متابعات مختصرة',
-      paragraphs: mentalEntries.map(entry => {
+      paragraphs: mentalEntries.slice(0, 8).map(entry => {
         const date = safe(entry?.date);
         const mood = moodLabel(entry?.mood);
         const energy = entry?.energy_level ? `${entry.energy_level}/5` : '—';
         const sleep = entry?.sleep_quality ? `${entry.sleep_quality}/5` : '—';
-        return `${date}: المزاج ${mood} | الطاقة ${energy} | النوم ${sleep}`;
+        const state = stateLabel(entry?.fiqh_state);
+        const note = entry?.feeling || entry?.notes ? ` | ملاحظة: ${safe(entry?.feeling || entry?.notes)}` : '';
+        return `${date}: ${state} | المزاج ${mood} | الطاقة ${energy} | النوم ${sleep}${note}`;
       }),
     },
   ];
@@ -170,7 +308,43 @@ const appendText = (parent: HTMLElement, tag: keyof HTMLElementTagNameMap, text:
   return element;
 };
 
-const buildReportPage = (title: string, subtitle: string, meta: string[], sections: ReportSection[]) => {
+const estimateSectionWeight = (section: ReportSection): number => {
+  const rowWeight = (section.rows?.length || 0) * 0.75;
+  const paragraphWeight = (section.paragraphs || []).reduce((sum, paragraph) => (
+    sum + 0.85 + Math.ceil(paragraph.length / 150) * 0.45
+  ), 0);
+  return 1.1 + rowWeight + paragraphWeight;
+};
+
+const paginateReportSections = (sections: ReportSection[]): ReportSection[][] => {
+  const pages: ReportSection[][] = [];
+  let currentPage: ReportSection[] = [];
+  let currentWeight = 0;
+
+  sections.forEach(section => {
+    const sectionWeight = estimateSectionWeight(section);
+    const maxWeight = pages.length === 0 ? 9.2 : 10.2;
+    if (currentPage.length > 0 && currentWeight + sectionWeight > maxWeight) {
+      pages.push(currentPage);
+      currentPage = [];
+      currentWeight = 0;
+    }
+    currentPage.push(section);
+    currentWeight += sectionWeight;
+  });
+
+  if (currentPage.length > 0) pages.push(currentPage);
+  return pages.length > 0 ? pages : [[]];
+};
+
+const buildReportPage = (
+  title: string,
+  subtitle: string,
+  meta: string[],
+  sections: ReportSection[],
+  pageNumber = 1,
+  totalPages = 1,
+) => {
   const page = document.createElement('div');
   page.dir = 'rtl';
   page.style.cssText = [
@@ -214,10 +388,12 @@ const buildReportPage = (title: string, subtitle: string, meta: string[], sectio
   `;
   page.appendChild(style);
 
-  const metaWrap = document.createElement('div');
-  metaWrap.className = 'meta';
-  meta.forEach(item => appendText(metaWrap, 'div', item));
-  page.appendChild(metaWrap);
+  if (meta.length > 0) {
+    const metaWrap = document.createElement('div');
+    metaWrap.className = 'meta';
+    meta.forEach(item => appendText(metaWrap, 'div', item));
+    page.appendChild(metaWrap);
+  }
 
   sections.forEach(section => {
     appendText(page, 'h2', section.title);
@@ -231,32 +407,46 @@ const buildReportPage = (title: string, subtitle: string, meta: string[], sectio
     section.paragraphs?.forEach(text => appendText(page, 'div', text, 'note'));
   });
 
-  appendText(page, 'div', 'تم إنشاء هذا التقرير بواسطة تطبيق نسوة · PDF v2', 'footer');
+  appendText(page, 'div', `تم إنشاء هذا التقرير بواسطة تطبيق نسوة · PDF v3 · صفحة ${pageNumber} من ${totalPages}`, 'footer');
   return page;
 };
 
 const renderVisualPdf = async (title: string, subtitle: string, meta: string[], sections: ReportSection[]): Promise<Blob | null> => {
   if (!canUseVisualPdf()) return null;
 
-  const page = buildReportPage(title, subtitle, meta, sections);
-  document.body.appendChild(page);
-
   try {
-    const canvas = await html2canvas(page, {
-      backgroundColor: '#fffdfb',
-      scale: Math.min(2, window.devicePixelRatio || 1.5),
-      useCORS: true,
-      logging: false,
-    });
+    const pages = paginateReportSections(sections);
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const imgData = canvas.toDataURL('image/png');
-    doc.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+
+    for (const [index, pageSections] of pages.entries()) {
+      const page = buildReportPage(
+        title,
+        index === 0 ? subtitle : 'متابعة التقرير والرؤى المرتبطة بسجلك.',
+        index === 0 ? meta : [],
+        pageSections,
+        index + 1,
+        pages.length,
+      );
+      document.body.appendChild(page);
+
+      try {
+        const canvas = await html2canvas(page, {
+          backgroundColor: '#fffdfb',
+          scale: Math.min(2, window.devicePixelRatio || 1.5),
+          useCORS: true,
+          logging: false,
+        });
+        if (index > 0) doc.addPage();
+        doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+      } finally {
+        page.remove();
+      }
+    }
+
     return doc.output('blob');
   } catch (err) {
     console.warn('Visual PDF rendering failed; falling back to text PDF:', err);
     return null;
-  } finally {
-    page.remove();
   }
 };
 
@@ -472,7 +662,7 @@ export const generateFiqhPDF = async (user: any, ledger: any[], fiqhState: strin
 
 export const generateDoctorPDF = async (user: any, ledger: any[], stats: any, entries: any[] = []): Promise<Blob> => {
   const visualLedger = ledger ?? [];
-  const mentalSections = buildMentalStateSections(entries);
+  const mentalSections = buildMentalStateSections(entries, user);
   const age = user?.birth_year ? new Date().getFullYear() - user.birth_year : '—';
   const visualPdf = await renderVisualPdf(
     'تقرير الدورة الطبية',
@@ -627,7 +817,7 @@ export const generateMentalStatePDF = async (user: any, entries: any[] = []): Pr
   const mentalEntries = [...entries]
     .filter(hasMentalEntryData)
     .sort((a, b) => new Date(b?.time_logged || b?.date || 0).getTime() - new Date(a?.time_logged || a?.date || 0).getTime());
-  const mentalSections = buildMentalStateSections(mentalEntries);
+  const mentalSections = buildMentalStateSections(mentalEntries, user);
   const visualPdf = await renderVisualPdf(
     'تقرير الحالة النفسية',
     'ملخص خاص لمتابعة المزاج والطاقة والنوم والأعراض اليومية المسجلة.',

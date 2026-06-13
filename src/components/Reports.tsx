@@ -77,6 +77,77 @@ const daysPhrase = (days: number): string => {
   return `${days} يوماً`;
 };
 
+const moodLabel = (mood: any): string => {
+  const labels = ['حزين', 'عادي', 'سعيد', 'مبتهج', 'غاضب'];
+  const index = Number.isFinite(Number(mood)) ? Number(mood) : 2;
+  return labels[index] || 'غير محدد';
+};
+
+const symptomLabel = (key: string): string => ({
+  cramps: 'تقلصات',
+  mood: 'تقلبات مزاجية',
+  headache: 'صداع',
+  bloating: 'انتفاخ',
+  backache: 'ألم الظهر',
+  nausea: 'غثيان',
+  fatigue: 'تعب',
+  acne: 'حبوب البشرة',
+  tender_breasts: 'ألم/حساسية الثدي',
+}[key] || key);
+
+const hasMentalEntryData = (entry: any): boolean => Boolean(
+  entry?.feeling ||
+  entry?.notes ||
+  entry?.mood !== undefined ||
+  entry?.sleep_quality !== undefined ||
+  entry?.energy_level !== undefined ||
+  (entry?.symptoms && Object.values(entry.symptoms).some(value => Number(value) > 0))
+);
+
+const buildMentalStateSections = (entries: any[] = []): ReportSection[] => {
+  const mentalEntries = [...entries]
+    .filter(hasMentalEntryData)
+    .sort((a, b) => new Date(b?.time_logged || b?.date || 0).getTime() - new Date(a?.time_logged || a?.date || 0).getTime())
+    .slice(0, 5);
+
+  if (mentalEntries.length === 0) return [];
+
+  const latest = mentalEntries[0];
+  const activeSymptoms = latest?.symptoms
+    ? Object.entries(latest.symptoms)
+      .filter(([, value]) => Number(value) > 0)
+      .map(([key, value]) => `${symptomLabel(key)} (${value}/3)`)
+    : [];
+  const summaryRows: ReportRow[] = [
+    ['آخر تاريخ متابعة', safe(latest?.date)],
+    ['المزاج', moodLabel(latest?.mood)],
+    ['الطاقة', latest?.energy_level ? `${latest.energy_level}/5` : '—'],
+    ['النوم', latest?.sleep_quality ? `${latest.sleep_quality}/5` : '—'],
+  ];
+
+  return [
+    {
+      title: 'متابعة الحالة النفسية والطاقة',
+      rows: summaryRows,
+      paragraphs: [
+        latest?.feeling ? `ملاحظة شعورية: ${latest.feeling}` : '',
+        latest?.notes ? `ملاحظات إضافية: ${latest.notes}` : '',
+        activeSymptoms.length > 0 ? `الأعراض المسجلة: ${activeSymptoms.join('، ')}` : '',
+      ].filter(Boolean),
+    },
+    {
+      title: 'آخر متابعات مختصرة',
+      paragraphs: mentalEntries.map(entry => {
+        const date = safe(entry?.date);
+        const mood = moodLabel(entry?.mood);
+        const energy = entry?.energy_level ? `${entry.energy_level}/5` : '—';
+        const sleep = entry?.sleep_quality ? `${entry.sleep_quality}/5` : '—';
+        return `${date}: المزاج ${mood} | الطاقة ${energy} | النوم ${sleep}`;
+      }),
+    },
+  ];
+};
+
 type ReportRow = [string, string];
 
 type ReportSection = {
@@ -399,8 +470,9 @@ export const generateFiqhPDF = async (user: any, ledger: any[], fiqhState: strin
   return doc.output('blob');
 };
 
-export const generateDoctorPDF = async (user: any, ledger: any[], stats: any): Promise<Blob> => {
+export const generateDoctorPDF = async (user: any, ledger: any[], stats: any, entries: any[] = []): Promise<Blob> => {
   const visualLedger = ledger ?? [];
+  const mentalSections = buildMentalStateSections(entries);
   const age = user?.birth_year ? new Date().getFullYear() - user.birth_year : '—';
   const visualPdf = await renderVisualPdf(
     'تقرير الدورة الطبية',
@@ -437,6 +509,7 @@ export const generateDoctorPDF = async (user: any, ledger: any[], stats: any): P
               return `البداية: ${start} | النهاية: ${end} | المدة: ${days} | الملاحظة: ${note}`;
             }),
       },
+      ...mentalSections,
     ],
   );
   if (visualPdf) return visualPdf;
@@ -514,6 +587,35 @@ export const generateDoctorPDF = async (user: any, ledger: any[], stats: any): P
 
   y += 5;
   doc.line(15, y, right, y); y += 8;
+
+  const mentalEntries = [...(entries || [])]
+    .filter(hasMentalEntryData)
+    .sort((a, b) => new Date(b?.time_logged || b?.date || 0).getTime() - new Date(a?.time_logged || a?.date || 0).getTime())
+    .slice(0, 4);
+
+  if (mentalEntries.length > 0 && y < 245) {
+    doc.setTextColor(6, 95, 70);
+    R(doc, 'متابعة الحالة النفسية والطاقة', right, y, 13); y += 7;
+    doc.setTextColor(55, 65, 81);
+
+    mentalEntries.forEach((entry: any) => {
+      const activeSymptoms = entry?.symptoms
+        ? Object.entries(entry.symptoms)
+          .filter(([, value]) => Number(value) > 0)
+          .map(([key, value]) => `${symptomLabel(key)} ${value}/3`)
+        : [];
+      R(doc, `${safe(entry?.date)}: المزاج ${moodLabel(entry?.mood)} | الطاقة ${entry?.energy_level || '—'}/5 | النوم ${entry?.sleep_quality || '—'}/5`, right, y, 9); y += 5;
+      if (entry?.feeling && y < 262) {
+        R(doc, `ملاحظة: ${entry.feeling}`, right, y, 8); y += 5;
+      }
+      if (activeSymptoms.length > 0 && y < 262) {
+        R(doc, `الأعراض: ${activeSymptoms.join('، ')}`, right, y, 8); y += 5;
+      }
+    });
+
+    y += 3;
+    doc.line(15, y, right, y); y += 6;
+  }
 
   doc.setTextColor(150, 150, 150);
   R(doc, 'تم إنشاء هذا التقرير بواسطة تطبيق نسوة. يرجى استشارة طبيب مؤهل للتشخيص الطبي.', W / 2, 285, 8, 'center');

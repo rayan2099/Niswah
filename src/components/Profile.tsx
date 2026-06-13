@@ -617,7 +617,7 @@ export const Profile = ({ }: ProfileProps) => {
           ? Math.max(...(ledger ?? []).map((l: any) => (l?.tuhr_duration_days || 0) + ((l?.haid_duration_hours || 0) / 24))).toFixed(1)
           : '28',
       };
-      const blob = await generateDoctorPDF(safeUser, ledger ?? [], stats);
+      const blob = await generateDoctorPDF(safeUser, ledger ?? [], stats, entries ?? []);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.style.display = 'none';

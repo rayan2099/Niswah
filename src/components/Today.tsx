@@ -1466,25 +1466,25 @@ export const Today = ({
           <div className="absolute -left-10 -top-10 h-28 w-28 rounded-full bg-emerald-100/45 blur-2xl" />
           <div className="absolute -bottom-12 right-8 h-24 w-24 rounded-full bg-rose-100/50 blur-2xl" />
 
-          <div className="relative flex items-start justify-between gap-4">
-            <button
-              onClick={openMentalLog}
-              className="shrink-0 rounded-2xl bg-emerald-800 px-4 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-200 active:scale-95 transition-transform"
-            >
-              {todayEntry ? (isRTL ? 'تحديث' : 'Update') : (isRTL ? 'تسجيل' : 'Log')}
-            </button>
-            <div className={cn("flex-1 space-y-2", isRTL ? "text-right" : "text-left")}>
-              <div className="flex items-center justify-end gap-2">
+          <div className="relative flex items-start gap-4">
+            <div className={cn("min-w-0 flex-1 space-y-2", isRTL ? "text-right" : "text-left")}>
+              <div className={cn("flex items-center gap-2", isRTL ? "justify-start flex-row-reverse" : "justify-start")}>
                 <p className="text-[11px] font-bold text-emerald-700">{contextLabel}</p>
                 <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm">
                   <Heart className="h-4 w-4" />
                 </div>
               </div>
-              <h3 className="text-2xl font-serif font-bold text-gray-950">
-                {todayEntry ? (isRTL ? 'كيف قلبك اليوم؟' : 'How is your heart today?') : (isRTL ? 'اطمئني على نفسك' : 'Check in with yourself')}
+              <h3 className={cn("text-2xl font-serif font-bold text-gray-950", isRTL ? "text-right" : "text-left")}>
+                {isRTL ? 'كيف نفسيتك اليوم؟' : 'How is your mood today?'}
               </h3>
-              <p className="text-xs leading-relaxed text-gray-500 max-w-[17rem]">{helperText}</p>
+              <p className={cn("text-xs leading-relaxed text-gray-500", isRTL ? "mr-0 ml-auto" : "ml-0 mr-auto", "max-w-[18rem]")}>{helperText}</p>
             </div>
+            <button
+              onClick={openMentalLog}
+              className="shrink-0 rounded-2xl bg-emerald-800 px-4 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-200 active:scale-95 transition-transform"
+            >
+              {todayEntry ? (isRTL ? 'سجلي مرة أخرى' : 'Log again') : (isRTL ? 'تسجيل' : 'Log')}
+            </button>
           </div>
 
           <div className="relative grid grid-cols-3 gap-2">
@@ -1532,7 +1532,7 @@ export const Today = ({
               onClick={openMentalLog}
               className="w-full rounded-2xl bg-emerald-800 px-4 py-4 text-sm font-bold text-white shadow-lg shadow-emerald-100 active:scale-[0.99] transition-transform"
             >
-              {isRTL ? 'تحديث حالتي النفسية' : 'Update mental state'}
+              {isRTL ? 'سجلي مرة أخرى خلال اليوم' : 'Log again today'}
             </button>
           </div>
         ) : (

@@ -13,6 +13,7 @@ import { useTranslation } from '../i18n/LanguageContext';
 import { PWAInstallBanner } from './PWAInstallBanner';
 
 type AuthMode = 'welcome' | 'email' | 'phone' | 'reset';
+const SAUDI_PHONE_PREFIX = '+966';
 
 export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
   const { t, isRTL } = useTranslation();
@@ -181,10 +182,25 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
 
   const normalizePhone = (value: string) => {
     const compact = value.replace(/[\s()-]/g, '');
+    if (!compact) return '';
     if (compact.startsWith('00')) return `+${compact.slice(2)}`;
+    if (compact.startsWith('+')) return compact;
+    if (compact.startsWith('966')) return `+${compact}`;
     if (compact.startsWith('05')) return `+966${compact.slice(1)}`;
     if (compact.startsWith('5') && compact.length === 9) return `+966${compact}`;
-    return compact;
+    return `${SAUDI_PHONE_PREFIX}${compact.replace(/^0+/, '')}`;
+  };
+
+  const displayPhone = (value: string) => {
+    const normalized = normalizePhone(value);
+    if (normalized.startsWith(SAUDI_PHONE_PREFIX)) {
+      return normalized.slice(SAUDI_PHONE_PREFIX.length);
+    }
+    return value.replace(/^\+?966/, '').replace(/^0/, '');
+  };
+
+  const handlePhoneChange = (value: string) => {
+    setPhone(displayPhone(value).replace(/[^\d]/g, '').slice(0, 9));
   };
 
   const handlePhoneAuth = async () => {
@@ -606,17 +622,25 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
 
             <div>
               <label className="text-sm text-gray-500 text-right block mb-1">رقم الجوال</label>
-              <input
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="+9665XXXXXXXX"
-                className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-left focus:outline-none focus:border-emerald-300"
-                dir="ltr"
-                required
-              />
+              <div dir="ltr" className="flex w-full items-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-50">
+                <div className="flex h-full items-center gap-2 border-r border-gray-200 bg-white px-4 py-3 text-sm font-extrabold text-emerald-700">
+                  <span className="text-base leading-none">🇸🇦</span>
+                  <span>{SAUDI_PHONE_PREFIX}</span>
+                </div>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  value={phone}
+                  onChange={e => handlePhoneChange(e.target.value)}
+                  placeholder="5XXXXXXXX"
+                  className="min-w-0 flex-1 bg-transparent px-4 py-3 text-left tracking-wide text-slate-900 outline-none placeholder:text-gray-300"
+                  dir="ltr"
+                  maxLength={9}
+                  required
+                />
+              </div>
+              <p className="mt-2 text-right text-xs text-gray-400">اكتبي رقمك بدون الصفر الأول، مثل 5XXXXXXXX</p>
             </div>
 
             <div>

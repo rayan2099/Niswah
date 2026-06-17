@@ -343,6 +343,30 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               </motion.div>
             )}
 
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setMode('phone')}
+                className="w-full py-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-emerald-700 active:scale-95 transition-transform flex items-center justify-center gap-2"
+              >
+                <Phone className="h-4 w-4" />
+                الجوال
+              </button>
+
+              <button
+                onClick={() => setMode('email')}
+                className="w-full py-4 bg-rose-50 border border-rose-200 rounded-2xl font-bold text-rose-600 active:scale-95 transition-transform"
+              >
+                البريد الإلكتروني
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 my-1">
+              <div className="flex-1 h-px bg-gray-200"/>
+              <span className="text-xs text-gray-400">أو</span>
+              <div className="flex-1 h-px bg-gray-200"/>
+            </div>
+
             {/* Google */}
             <button
               onClick={handleGoogle}
@@ -369,30 +393,6 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
               </svg>
               المتابعة مع Apple
             </button>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3 my-1">
-              <div className="flex-1 h-px bg-gray-200"/>
-              <span className="text-xs text-gray-400">أو</span>
-              <div className="flex-1 h-px bg-gray-200"/>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setMode('phone')}
-                className="w-full py-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-emerald-700 active:scale-95 transition-transform flex items-center justify-center gap-2"
-              >
-                <Phone className="h-4 w-4" />
-                الجوال
-              </button>
-
-              <button
-                onClick={() => setMode('email')}
-                className="w-full py-4 bg-rose-50 border border-rose-200 rounded-2xl font-bold text-rose-600 active:scale-95 transition-transform"
-              >
-                البريد الإلكتروني
-              </button>
-            </div>
           </div>
 
           <AnimatePresence>

@@ -291,10 +291,10 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
             <div className="text-center px-2">
               <h1 className="text-[34px] leading-tight font-bold text-rose-900 mb-2">
                 <span className="sr-only">نسوة</span>
-                ابدئي بثقة
+                افهمي دورتكِ واطمئني
               </h1>
               <p className="text-sm text-gray-500 max-w-xs text-center leading-7">
-                رفيقتك للحيض والطهارة والحمل، بوعي صحي وفقهي وخصوصية كاملة.
+                تتبّع للحيض والطهارة والحمل مع إرشاد فقهي وصحي، وخصوصية تبقى لكِ وحدك.
               </p>
             </div>
 
